@@ -1,0 +1,16 @@
+; Dummy assembler file for 
+; A Crude Assembler for the 65816 in Python 
+
+        origin 0e000
+        lda.# 00 
+        tax
+
+        native
+
+; clear some memory
+loop
+        sta.x 1000
+        dex
+        bne loop
+
+        stp

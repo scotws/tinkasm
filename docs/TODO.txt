@@ -1,0 +1,7 @@
+TODO List for A Typist's Assember for the 65816 in Python 
+Scot W. Stevenson <scot.stevenson@gmail.com>
+First version: 24. Sep 2015
+This version: 24. Sep 2015
+
+(Well, everything)
+
