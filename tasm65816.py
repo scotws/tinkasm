@@ -81,6 +81,16 @@ def d_origin(addr65):
 directives = {'advance': d_advance, 'a:8': d_a8, 'include': d_include,\
         'end': d_end, 'origin': d_origin} 
 
+directives_list = list(directives.keys())
+
+def is_directive(s):
+    "See if string is a valid mnemonic. Returns boolian."
+    if s in directives_list:
+        return True 
+    else:
+        return False
+
+
 
 ### OPCODES ###
 
@@ -105,10 +115,11 @@ def ocs_stack0():
 
 
 
-# Entries in the opcode table are tuples (immutable) of opcode, length in 
-# bytes, number of operands, special routines to execute
+# Entries in the opcode table are tuples (immutable) of opcode in hex, mnemonic
+# string, length in bytes, number of operands, special routines to execute. 
 
-# TODO load these from an external file 
+# TODO load these from an external file so we can later have different versions
+# for different processors
 
 opcode_table = (
         (0x00, 'brk', 1, 0, ocs_brk),
@@ -117,10 +128,34 @@ opcode_table = (
         (0x03, 'ora.s', 2, 1, ocs_stack0 ),
         (0x04, 'tsb.d', 2, 1, None ),
         (0x05, 'ora.d', 2, 1, None )) 
+
+# Generate full list of mnemonics from opcode table automatically
+mnemonics = {}
+
+for o in opcode_table: 
+    mnemonics[o[1]] = o[0]
+
+mnemonic_list = list(mnemonics.keys())
+
+# See if this is redundant because we use TRY/EXCEPT structure
+def is_mnemonic(s):
+    "See if string is a valid mnemonic. Returns boolian."
+    if s in mnemonic_list:
+        return True 
+    else:
+        return False
+
+def opcode(s): 
+    "Return opcode when given lowercase mnemonic."
+    return mnemonics[s]
         
-def opcode_entry(opcode):
+def opcode_data(opc):
     "Given an opcode, retrieve tuple for that instruction from opcode_table"
-    return opcode_table[opcode] 
+    return opcode_table[opc] 
+
+def opcode_length(opc): 
+    "Return length of complete instruction (opcode and operand) in bytes"
+    return opcode_data(opc)[2]
 
 
 ### PARSING STEPS ###
