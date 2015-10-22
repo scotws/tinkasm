@@ -14,7 +14,20 @@ PARAMETERS
 
 -i --input      - Input assembler file (required) 
 -o --output     - Output file for the binary code, default is tasm.bin 
--l --listing    - Output file for the listing, default is listing.txt  
+-l --listing    - Output file for the listing, default is tasm.txt  
+-v --verbose    - Print lots of info about each assembly step
+
+
+INTERNAL STRUCTURE
+
+The Typist's Assembler was built with a few assumptions in mind. First, the code to be assembled will be very small relative to current normal hardware specifications: The total memory space of the 65816 is 16 MB, while my machine 
+has 16 GB of RAM. Because of this, saving space was a low priority. This is also true for speed, because programs are going to be relatively short (if we had wanted speed, we'd be using something like C or Go). The top priority was a clear design that will break up the process in as many small steps as possible to make the program easy to understand, easy to maintain and easy to change. 
+
+For that reason, it was written in a "multipass" structure: Lots of little steps, usually as loops, that do exactly one thing and then pass a list on to the next step. 
+
+
+(Tuples with original line number)
+
 
 
 

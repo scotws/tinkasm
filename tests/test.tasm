@@ -1,7 +1,7 @@
 ; Dummy assembler file for 
 ; A Crude Assembler for the 65816 in Python 
 
-        origin 0e000
+        origin 0e000    ; dude, inline comment!
 
         lda.# 00 
         tax
@@ -15,6 +15,6 @@ loop
         dex
         bne loop
 
-        stp
+        STP     ; assemlber will convert this to lower case
 
         end
