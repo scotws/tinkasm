@@ -11,9 +11,11 @@
 ### SETUP ### 
 
 import argparse
+import pickle 
 # import shlex        # https://docs.python.org/3/library/shlex.html
 import sys
 
+symbol_table = {}
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', dest='source', required=True, 
@@ -26,7 +28,11 @@ parser.add_argument('-v', '--verbose',
         help='Display each step as it is happening', action='store_true')
 parser.add_argument('-d', '--dump', 
         help='Dump content of each inbetween step', action='store_true')
+parser.add_argument('-c', '--opcodes', dest='opcodes', 
+        default='opcodes65816.pickle', help='Opcode table, default for 65816') 
 args = parser.parse_args()
+
+### OUTPUT FUNCTIONS ###
 
 def verbose(s):
     """Print information string given if --verbose flag was set. Later 
@@ -41,8 +47,16 @@ def dump(l):
         for line in l:
             print(line)
 
+def symbols():
+    """Dump symbol table if dump argument was given"""
+    if args.dump:
+        for s in sorted(symbol_table):
+            print("Symbol", s, ":", symbol_table[s]) 
+
+
 ### CONSTANTS ###
 
+ASSIGN = "="        # Change this to " equ " or whatever 
 COMMENT = ';'       # Change this for a different comment marker 
 
 
@@ -53,6 +67,13 @@ def fatal(l,s):
     """Abort program because of fatal error during assembly"""
     print('FATAL ERROR in line', l, ":", s)
     sys.exit(1) 
+
+# TODO Make this work with various formats, currently assumes hex
+def number2int(s):
+    """Convert a number string provided by the user in one of various 
+    formats to an integer we can use internally. See Manual for details on
+    supported formats."""
+    return int(s, 16)
 
 
 ### MULTI-PASS ASSEMBLER ###
@@ -66,6 +87,7 @@ def fatal(l,s):
 # always reference the original line number at each stage. 
 
 # TODO Print banner if verbose 
+
 
 # --- Step RAW: Import original code and add line numbers ---
 
@@ -117,7 +139,7 @@ sc_inlines = []
 for n, l in sc_comments:
     sc_inlines.append((n, remove_inlines(l)))
 
-verbose('INLINES: Removed inline comments') 
+verbose('INLINES: Removed all inline comments') 
 dump(sc_inlines) 
 
     
@@ -156,8 +178,7 @@ if originline[0] != "origin":
     l = sc_lower[0][0]
     fatal(l, 'No ORIGIN directive found') 
 
-# TODO Currently assumes ORIGIN string is hex, process number
-LC = int(originline[1], 16) 
+LC = number2int(originline[1]) 
 sc_origin = sc_lower[1:]
 
 verbose('ORIGIN: Found ORIGIN directive, setting LC to {0}'.format(originline[1]))
@@ -177,7 +198,50 @@ verbose('END: Found END directive in last line')
 dump(sc_end) 
 
 
-# TODO HIER HIER TODO 
+# --- Step ASSIGN: Handle the clear assignment lines ---
+
+if args.verbose:
+    print('Initializing symbol table') 
+
+sc_assign = []
+
+for n, l in sc_end:
+    if ASSIGN in l: 
+        s, v = l.split(ASSIGN)
+        symbol = s.split()[-1] 
+        value = number2int(v.split()[0])
+        symbol_table[symbol] = value  
+    else: 
+        sc_assign.append((n, l))
+
+verbose('ASSIGN: Assigned {0} symbols to symbol table'.format(len(sc_end)-len(sc_assign))) 
+dump(sc_assign) 
+symbols() 
+
+
+# --- Step PASS1: Create Intermediate File ---
+
+intermediate_file = []
+
+# Load opcodes. The opcode routines are kept in a common file, regardless of
+# which processor we use, the opcode tables are by processor type. 
+
+# TODO make this more general with importlib, get rid of *
+from opcode_routines import * 
+
+# Load opcode table 
+with open(args.opcodes, 'rb') as f:
+    opcode_table = pickle.load(f) 
+
+if args.verbose: 
+    print('Loaded opcode table {0}'.format(args.opcodes))
+
+
+# HIER HIER 
+
+
+
+####################################################
 
 
 ### BASIC DATA STRUCTURES ###
@@ -230,41 +294,6 @@ def is_directive(s):
 
 
 ### OPCODES ###
-
-# Opcode special routines. These are called during assembly of the opcode
-# becasuse special treatment or checks are required
-
-def ocs_brk():
-    "Check brk instruction to make sure that extra byte is provided."
-    print ("Special routine for BRK not coded yet") 
-
-def ocs_cop():
-    "Check cop instruction to make sure that extra byte is provided."
-    print ("Special routine for COP not coded yet") 
-
-def ocs_wdm():
-    "Warn user that wdm instruction is being assembled"
-    print ("Special routine for WDM not coded yet") 
-
-def ocs_stack0():
-    "Warn user that Stack Addressing Mode has operand 0"
-    print ("Warning for Stack Addressing with operand 0 not coded yet") 
-
-
-
-# Entries in the opcode table are tuples (immutable) of opcode in hex, mnemonic
-# string, length in bytes, number of operands, special routines to execute. 
-
-# TODO load these from an external file so we can later have different versions
-# for different processors
-
-opcode_table = (
-        (0x00, 'brk', 1, 0, ocs_brk),
-        (0x01, 'ora.dx', 2, 1, None),
-        (0x02, 'cop', 2, 1, ocs_cop),
-        (0x03, 'ora.s', 2, 1, ocs_stack0 ),
-        (0x04, 'tsb.d', 2, 1, None ),
-        (0x05, 'ora.d', 2, 1, None )) 
 
 # Generate full list of mnemonics from opcode table automatically
 mnemonics = {}

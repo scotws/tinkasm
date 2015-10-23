@@ -3,7 +3,11 @@
 
         origin 0e000    ; dude, inline comment!
 
-        lda.# 00 
+        frog = 1
+        pig = 2 
+
+        lda.# frog
+        ldy.# 01
         tax
 
         native
