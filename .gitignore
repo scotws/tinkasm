@@ -1,0 +1,9 @@
+# Ignore old stuff which is only for me
+old
+
+# Ignore vi swap files
+*.swp
+
+# Ignore pycache
+__pycache__
+

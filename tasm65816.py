@@ -2,43 +2,45 @@
 # A Typist's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 22. Oct 2015
+# This version: 27. Oct 2015
 
 # TODO License
 
+"""(DOCMENTATION STRING DUMMY)"""
+
+# TODO make sure this is python 3
 
 
 ### SETUP ### 
 
 import argparse
-import pickle 
-# import shlex        # https://docs.python.org/3/library/shlex.html
 import sys
 
-symbol_table = {}
+import special     # dictionary of special routines special.opc 
+from opcodes import opcode_table
+
+
+### ARGUMENTS ###
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', dest='source', required=True, 
-        help='Assembler source code file')
+        help='Assembler source code file (required)')
 parser.add_argument('-o', '--output', dest='output', 
-        help='Binary output file', default='tasm.bin')
+        help='Binary output file (default TASM.BIN)', default='tasm.bin')
 parser.add_argument('-l', '--listing', dest='listing', 
-        help='Human-readable code listing', default='tasm.txt')
+        help='Name of listing file (default TASM.LST)', default='tasm.lst')
 parser.add_argument('-v', '--verbose', 
-        help='Display each step as it is happening', action='store_true')
+        help='Display additional information', action='store_true')
 parser.add_argument('-d', '--dump', 
-        help='Dump content of each inbetween step', action='store_true')
-parser.add_argument('-c', '--opcodes', dest='opcodes', 
-        default='opcodes65816.pickle', help='Opcode table, default for 65816') 
+        help='Print intermediate steps as (long) lists', action='store_true')
+parser.add_argument('-s', '--symbols', dest='symbols', 
+        help='Name of symbol table file (default TASM.SYM)', default='tasm.sym')
+parser.add_argument('-w', '--warnings', 
+        help='Print all warnings', action='store_true')
 args = parser.parse_args()
 
-### OUTPUT FUNCTIONS ###
 
-def verbose(s):
-    """Print information string given if --verbose flag was set. Later 
-    expand this by the option of priting to a log file instead."""
-    if args.verbose:
-        print('STEP', s)
+### OUTPUT FUNCTIONS ###
 
 def dump(l):
     """At each assembly stage, print the complete stage as a list. Produces
@@ -47,17 +49,23 @@ def dump(l):
         for line in l:
             print(line)
 
-def symbols():
-    """Dump symbol table if dump argument was given"""
-    if args.dump:
-        for s in sorted(symbol_table):
-            print("Symbol", s, ":", symbol_table[s]) 
+def verbose(s):
+    """Print information string given if --verbose flag was set. Later 
+    expand this by the option of priting to a log file instead."""
+    if args.verbose:
+        print(s)
+
+def warning(s):
+    """If program called with -w or --warnings, print a warning string"""
+    if args.warnigns:
+        print('WARNING: ', s) 
 
 
 ### CONSTANTS ###
 
 ASSIGN = "="        # Change this to " equ " or whatever 
 COMMENT = ';'       # Change this for a different comment marker 
+
 
 
 ### HELPER FUNCTIONS ###
@@ -96,7 +104,7 @@ def number2int(s):
 with open(args.source, "r") as f:
     sc_raw = list(enumerate(f.readlines(),1))
 
-verbose('RAW: Read {0} lines from {1}'.format (len(sc_raw), args.source))
+verbose('STEP RAW: Read {0} lines from {1}'.format (len(sc_raw), args.source))
 dump(sc_raw) 
 
 
@@ -109,7 +117,7 @@ for l in sc_raw:
     if l[1].strip():
         sc_empty.append(l) 
 
-verbose('EMPTY: Removed {0} empty lines'.format(len(sc_raw)-len(sc_empty)))
+verbose('STEP EMPTY: Removed {0} empty lines'.format(len(sc_raw)-len(sc_empty)))
 dump(sc_empty) 
 
 
@@ -122,7 +130,7 @@ for l in sc_empty:
     if l[1].strip()[0] != COMMENT :
         sc_comments.append(l) 
 
-verbose('COMMENTS: Removed {0} full-line comments'.format(len(sc_empty)-len(sc_comments)))
+verbose('STEP COMMENTS: Removed {0} full-line comments'.format(len(sc_empty)-len(sc_comments)))
 dump(sc_comments) 
 
 
@@ -139,14 +147,14 @@ sc_inlines = []
 for n, l in sc_comments:
     sc_inlines.append((n, remove_inlines(l)))
 
-verbose('INLINES: Removed all inline comments') 
+verbose('STEP INLINES: Removed all inline comments') 
 dump(sc_inlines) 
 
     
 # --- Step MACROS: Define macros ---
 # TODO code this 
 
-verbose('MACROS: Defined 0 macros (DUMMY, not coded yet)')
+verbose('STEP MACROS: Defined 0 macros (DUMMY, not coded yet)')
 # TODO add dump 
 
 
@@ -155,14 +163,14 @@ verbose('MACROS: Defined 0 macros (DUMMY, not coded yet)')
 
 sc_expand = sc_inlines
 
-verbose('EXPAND: Expanded 0 macros (DUMMY, not coded yet)')
+verbose('STEP EXPAND: Expanded 0 macros (DUMMY, not coded yet)')
 dump(sc_expand) 
 
 
 # --- Step LOWER: Convert everything to lower case ---
 
 sc_lower = [(n, l.lower()) for n, l in sc_expand] 
-verbose('LOWER: Converted all remaining code to lower case')
+verbose('STEP LOWER: Converted all remaining code to lower case')
 dump(sc_lower) 
 
 
@@ -181,7 +189,7 @@ if originline[0] != "origin":
 LC = number2int(originline[1]) 
 sc_origin = sc_lower[1:]
 
-verbose('ORIGIN: Found ORIGIN directive, setting LC to {0}'.format(originline[1]))
+verbose('STEP ORIGIN: Found ORIGIN directive, setting LC to {0}'.format(originline[1]))
 dump(sc_origin) 
 
 
@@ -194,14 +202,15 @@ if endline[0] != "end":
 
 sc_end = sc_origin[:-1]
 
-verbose('END: Found END directive in last line') 
+verbose('STEP END: Found END directive in last line') 
 dump(sc_end) 
 
 
 # --- Step ASSIGN: Handle the clear assignment lines ---
 
-if args.verbose:
-    print('Initializing symbol table') 
+verbose('Initializing symbol table') 
+
+symbol_table = {}
 
 sc_assign = []
 
@@ -214,31 +223,44 @@ for n, l in sc_end:
     else: 
         sc_assign.append((n, l))
 
-verbose('ASSIGN: Assigned {0} symbols to symbol table'.format(len(sc_end)-len(sc_assign))) 
+verbose('STEP ASSIGN: Assigned {0} symbols to symbol table'.format(len(sc_end)-len(sc_assign))) 
 dump(sc_assign) 
-symbols() 
 
 
 # --- Step PASS1: Create Intermediate File ---
 
 intermediate_file = []
 
-# Load opcodes. The opcode routines are kept in a common file, regardless of
-# which processor we use, the opcode tables are by processor type. 
+# Generate opcode dictionary
+# TODO generate this automatically from opcode_table once that is complete
 
-# TODO make this more general with importlib, get rid of *
-from opcode_routines import * 
+TEMP_opcodes = ['brk', 'ora.dx', 'cop', 'ora.s', 'tsb.d', 'ora.d']
+opcode_dict = {}
 
-# Load opcode table 
-with open(args.opcodes, 'rb') as f:
-    opcode_table = pickle.load(f) 
+for n, o in enumerate(TEMP_opcodes):
+    opcode_dict[o] = n 
 
-if args.verbose: 
-    print('Loaded opcode table {0}'.format(args.opcodes))
 
+print(opcode_dict)
 
 # HIER HIER 
 
+
+### GENERATE OUTPUT FILES ###
+
+print('DUMMY: save listing file as {0}'.format(args.listing))
+
+# Generate symbol table 
+# TODO make this a file args.symbols
+
+print('DUMMY: save symbol table as {0}'.format(args.symbols)) 
+
+for s in sorted(symbol_table):
+    print('{0} : {1:x}'.format(s, symbol_table[s]))
+
+
+### END ###
+sys.exit(0) 
 
 
 ####################################################
@@ -326,6 +348,4 @@ def opcode_length(opc):
 
 
 
-### END ###
-sys.exit(0) 
 
