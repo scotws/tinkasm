@@ -3,22 +3,8 @@
 
         origin 0e000    ; dude, inline comment!
 
-        frog = 1
-        pig = 2 
+        nop
 
-        lda.# frog
-        ldy.# 01
-        tax
-
-        native
-
-; clear some memory
-
-loop
-        sta.x 1000
-        dex
-        bne loop
-
-        STP     ; assemlber will convert this to lower case
+        stp
 
         end

@@ -31,10 +31,10 @@ parser.add_argument('-l', '--listing', dest='listing',
         help='Name of listing file (default TASM.LST)', default='tasm.lst')
 parser.add_argument('-v', '--verbose', 
         help='Display additional information', action='store_true')
-parser.add_argument('-d', '--dump', 
-        help='Print intermediate steps as (long) lists', action='store_true')
 parser.add_argument('-s', '--symbols', dest='symbols', 
         help='Name of symbol table file (default TASM.SYM)', default='tasm.sym')
+parser.add_argument('-d', '--dump', 
+        help='Print intermediate steps as (long) lists', action='store_true')
 parser.add_argument('-w', '--warnings', 
         help='Print all warnings', action='store_true')
 args = parser.parse_args()
@@ -67,6 +67,20 @@ ASSIGN = "="        # Change this to " equ " or whatever
 COMMENT = ';'       # Change this for a different comment marker 
 
 
+### GENERATE TABLES ###
+
+# Generate opcode dictionary
+# TODO remove special NOP handling once opcode table is complete: Remove if
+# portion of next line and assigment to nop
+
+opcode_dict =\
+    { opcode_table[n][1]:n for n, e in enumerate(opcode_table) if opcode_table[n][1] != 'nop'}
+
+opcode_dict['nop'] = 0xea
+
+verbose('Generated opcode dictionary')
+
+
 
 ### HELPER FUNCTIONS ###
 
@@ -84,7 +98,7 @@ def number2int(s):
     return int(s, 16)
 
 
-### MULTI-PASS ASSEMBLER ###
+### PASSES ###
 
 # The assembler works by connecting as many little steps as possible (see the 
 # Manual for details). Each step is given a title such as RAW, and all
@@ -229,25 +243,16 @@ dump(sc_assign)
 
 # --- Step PASS1: Create Intermediate File ---
 
-intermediate_file = []
-
-# Generate opcode dictionary
-# TODO generate this automatically from opcode_table once that is complete
-
-TEMP_opcodes = ['brk', 'ora.dx', 'cop', 'ora.s', 'tsb.d', 'ora.d']
-opcode_dict = {}
-
-for n, o in enumerate(TEMP_opcodes):
-    opcode_dict[o] = n 
-
-
-print(opcode_dict)
 
 # HIER HIER 
 
 
+intermediate_file = []
+
+
 ### GENERATE OUTPUT FILES ###
 
+verbose('Generating output files {0} and {1}'.format(args.listing, args.symbols))
 print('DUMMY: save listing file as {0}'.format(args.listing))
 
 # Generate symbol table 
