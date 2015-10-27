@@ -1,0 +1,7 @@
+Major changes to the Typtist's Assembler for the 65816 in Python 
+Scot W. Stevenson <scot.stevenson@gmail.com>
+First version: 27. Okt 2015
+This version: 27. Okt 2015
+
+
+27. Oct 2015 - First functional assembly (well, NOP STP, but still)

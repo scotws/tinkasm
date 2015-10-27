@@ -3,6 +3,9 @@
 
         origin 0e000    ; dude, inline comment!
 
+        frog = 0x01eeee
+        pig = 0xea
+
         nop
 
         stp

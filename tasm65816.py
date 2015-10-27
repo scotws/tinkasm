@@ -15,6 +15,8 @@
 
 import argparse
 import sys
+import time
+import timeit
 
 import special     # dictionary of special routines special.opc 
 from opcodes import opcode_table
@@ -47,7 +49,8 @@ def dump(l):
     an enormous amount of output, probably only interesting for debugging."""
     if args.dump:
         for line in l:
-            print(line)
+            print('{0:5d}: {1}'.format(line[0], repr(line[1])))
+        print()
 
 def verbose(s):
     """Print information string given if --verbose flag was set. Later 
@@ -65,20 +68,23 @@ def warning(s):
 
 ASSIGN = "="        # Change this to " equ " or whatever 
 COMMENT = ';'       # Change this for a different comment marker 
+ST_WIDTH = 16       # Number of chars of symbol in Symbol Table printed
+
+title_string = "A Typist's Assembler for the 65816 in Python\n"
 
 
 ### GENERATE TABLES ###
 
-# Generate opcode dictionary
+# Generate mnemonic list 
 # TODO remove special NOP handling once opcode table is complete: Remove if
 # portion of next line and assigment to nop
 
-opcode_dict =\
+mnemonics =\
     { opcode_table[n][1]:n for n, e in enumerate(opcode_table) if opcode_table[n][1] != 'nop'}
 
-opcode_dict['nop'] = 0xea
+mnemonics['nop'] = 0xea
 
-verbose('Generated opcode dictionary')
+verbose('Generated mnemonics list')
 
 
 
@@ -108,7 +114,14 @@ def number2int(s):
 # the original line number and a line of code as a string. That way, we can
 # always reference the original line number at each stage. 
 
-# TODO Print banner if verbose 
+
+# --- Step ZERO: Set up timing, print banner ---
+
+verbose(title_string)
+
+# TODO print banner
+
+time_start = timeit.default_timer() 
 
 
 # --- Step RAW: Import original code and add line numbers ---
@@ -237,120 +250,107 @@ for n, l in sc_end:
     else: 
         sc_assign.append((n, l))
 
-verbose('STEP ASSIGN: Assigned {0} symbols to symbol table'.format(len(sc_end)-len(sc_assign))) 
-dump(sc_assign) 
+verbose('STEP ASSIGN: Assigned {0} symbols to symbol table'.\
+        format(len(sc_end)-len(sc_assign))) 
+
+if args.verbose:
+    print() 
+    print('Symbol Table:')
+
+    for v in sorted(symbol_table):
+        print('{0} : {1:x}'.format(v.rjust(ST_WIDTH), symbol_table[v]))
+    print()
 
 
 # --- Step PASS1: Create Intermediate File ---
 
+# Life is easier if we define the entry types down here. See "Although
+# practicality beats purity", https://www.python.org/dev/peps/pep-0020/
 
-# HIER HIER 
+# Entry types TODO use ENUMERATE once we're done 
+OPCODE_DONE = 0     # Contains completely assembled instruction 
+
+pass1_entry_types = {0: 'OPCODE_DONE'}
 
 
-intermediate_file = []
+sc_pass1 = []       # Immediate file
+
+for n, l in sc_assign:
+
+    # - Substep MNEMONIC: See if we have a correct mnemonic - 
+    m = l.strip() 
+
+    try: 
+        oc = mnemonics[m]
+    except KeyError:
+        pass
+    else:
+        sc_pass1.append((n, OPCODE_DONE, oc))
+        continue
+
+verbose('STEP PASS1: Created intermediate file')
+
+# Easier to handle the intermediate file formationg separately
+if args.dump:
+
+    for l, t, c in sc_pass1:
+        print('{0:5d}: {1} {2:x}'.format(l, pass1_entry_types[t], c))
+    print()
 
 
-### GENERATE OUTPUT FILES ###
 
-verbose('Generating output files {0} and {1}'.format(args.listing, args.symbols))
-print('DUMMY: save listing file as {0}'.format(args.listing))
+# --- Step PASS2: Create binary file --- 
 
-# Generate symbol table 
-# TODO make this a file args.symbols
+# TODO unwind multi-byte instructions
+sc_pass2 = [b[2] for b in sc_pass1 if b[1] == OPCODE_DONE]
 
-print('DUMMY: save symbol table as {0}'.format(args.symbols)) 
+verbose('STEP PASS2: Generated binary object code') 
 
-for s in sorted(symbol_table):
-    print('{0} : {1:x}'.format(s, symbol_table[s]))
+if args.dump:
+    print(repr(sc_pass2))
+    print()
+
+object_code = bytes(sc_pass2) 
+code_size = len(object_code)
+
+
+# Save binary file 
+with open(args.output, 'wb') as f:
+    f.write(object_code)
+
+verbose('Saved {0} bytes of object code as {1}'.\
+        format(code_size, args.output))
+
+
+# --- Step LIST: Create listing file ---
+
+with open(args.listing, 'w') as f:
+    f.write(title_string)
+    f.write('Code listing file {0} in 65816 assembler\n'.format(args.listing))
+    f.write('Generated at {0}\n\n'.format(time.asctime()))
+
+verbose('STEP LIST: Created listing as {0}'.\
+        format(args.listing))
+
+
+
+# --- Step SYMBOLS: Create symbol file ---
+
+verbose('STEP SYMBOLS: Created symbol table listing as {0} (DUMMY)'\
+        .format(args.symbols))
+
+# TODO save symbol table file 
+
+
+# TODO HIER HIER TODO 
+
 
 
 ### END ###
+
+time_end = timeit.default_timer() 
+verbose('All steps complete in {0} seconds.'.format(time_end - time_start))
+verbose('Enjoy the cake.')
 sys.exit(0) 
-
-
-####################################################
-
-
-### BASIC DATA STRUCTURES ###
-
-# Source file seems legit, now load everything else
-
-directive_list = ['advance', 'a:8', 'a:16', 'xy:8', 'xy:16', 'axy:8',\
-        'axy:16', 'b', 'w', 'lw', 'emulated', 'end', 'include', 'macro',\
-        'mend', 'native', 'origin', 'str', 'str0', 'strlf', 'lsb', 'msb',\
-        'bank']
-
-LC = 0 
-
-
-
-### DIRECTIVES ###
-
-def d_advance(addr65): 
-    "Advance to address given, filling up space inbetween with zeros"
-    print ("ADVANCE not coded yet")
-
-def d_a8():
-    "Switch Accumulator size to 8 bits. Assumes Native Mode."
-    print ("A:8 not coded yet")
-
-def d_include(filename):
-    "Include source code from external file."
-    print ("INCLUDE not coded yet")
-
-def d_end(): 
-    "Mark end of assembly text. Required." 
-    print ("END not coded yet") 
-
-def d_origin(addr65): 
-    "Set origin of assembly. Also marks end of macro section. Required."
-    print ("ORIGIN not coded yet") 
-
-directives = {'advance': d_advance, 'a:8': d_a8, 'include': d_include,\
-        'end': d_end, 'origin': d_origin} 
-
-directives_list = list(directives.keys())
-
-def is_directive(s):
-    "See if string is a valid mnemonic. Returns boolian."
-    if s in directives_list:
-        return True 
-    else:
-        return False
-
-
-
-### OPCODES ###
-
-# Generate full list of mnemonics from opcode table automatically
-mnemonics = {}
-
-for o in opcode_table: 
-    mnemonics[o[1]] = o[0]
-
-mnemonic_list = list(mnemonics.keys())
-
-# See if this is redundant because we use TRY/EXCEPT structure
-def is_mnemonic(s):
-    "See if string is a valid mnemonic. Returns boolian."
-    if s in mnemonic_list:
-        return True 
-    else:
-        return False
-
-def opcode(s): 
-    "Return opcode when given lowercase mnemonic."
-    return mnemonics[s]
-        
-def opcode_data(opc):
-    "Given an opcode, retrieve tuple for that instruction from opcode_table"
-    return opcode_table[opc] 
-
-def opcode_length(opc): 
-    "Return length of complete instruction (opcode and operand) in bytes"
-    return opcode_data(opc)[2]
-
-
-
 
 

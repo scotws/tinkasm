@@ -4,6 +4,9 @@ old
 # Ignore vi swap files
 *.swp
 
+# Ignore testing files
+tasm.*
+
 # Ignore pycache
 __pycache__
 
