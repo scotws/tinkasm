@@ -1,13 +1,17 @@
 ; Dummy assembler file for 
 ; A Crude Assembler for the 65816 in Python 
 
-        origin 0e000    ; dude, inline comment!
+            origin 0e000
 
-        frog = 0x01eeee
-        pig = 0xea
+            testaddr = 01000
 
-        nop
+-> loop1
+            nop
+            native
 
-        stp
+-> loop2    nop             ; make sure this works on one single line
+            emulated
 
-        end
+            stp
+
+            end

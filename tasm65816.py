@@ -1,4 +1,4 @@
-# #!/usr/bin/env python3
+#!/usr/bin/env python3
 # A Typist's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
@@ -18,9 +18,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-"""(DOCMENTATION STRING DUMMY)"""
-
-# TODO make sure this is python 3
+"""(TODO DOCUMENTATION STRING DUMMY)"""
 
 
 ### SETUP ### 
@@ -32,6 +30,17 @@ import timeit
 
 import special     # dictionary of special routines special.opc 
 from opcodes import opcode_table
+
+# Check for correct version of Python
+
+if sys.version_info.major != 3:
+    print("FATAL: Python 3 required. Aborting.")
+    sys.exit(1) 
+
+# Initialize various counts
+
+n_warnings = 0
+
 
 
 ### ARGUMENTS ###
@@ -54,15 +63,8 @@ parser.add_argument('-w', '--warnings',
 args = parser.parse_args()
 
 
-### OUTPUT FUNCTIONS ###
 
-def dump(l):
-    """At each assembly stage, print the complete stage as a list. Produces
-    an enormous amount of output, probably only interesting for debugging."""
-    if args.dump:
-        for line in l:
-            print('{0:5d}: {1}'.format(line[0], repr(line[1])))
-        print()
+### BASIC OUTPUT FUNCTIONS ###
 
 def verbose(s):
     """Print information string given if --verbose flag was set. Later 
@@ -72,8 +74,9 @@ def verbose(s):
 
 def warning(s):
     """If program called with -w or --warnings, print a warning string"""
-    if args.warnigns:
-        print('WARNING: ', s) 
+    if args.warnings:
+        print('WARNING:', s) 
+        
 
 
 ### CONSTANTS ###
@@ -83,6 +86,11 @@ COMMENT = ';'       # Change this for a different comment marker
 ST_WIDTH = 16       # Number of chars of symbol in Symbol Table printed
 
 title_string = "A Typist's Assembler for the 65816 in Python\n"
+
+LC0 = 0             # Start address of code ("location counter") 
+LCi = 0             # Index to where we are in code
+
+symbol_table = {}
 
 
 ### GENERATE TABLES ###
@@ -102,6 +110,7 @@ verbose('Generated mnemonics list')
 
 ### HELPER FUNCTIONS ###
 
+
 # TODO see if this should be a formal error with RAISE and all of that
 def fatal(l,s): 
     """Abort program because of fatal error during assembly"""
@@ -114,6 +123,26 @@ def number2int(s):
     formats to an integer we can use internally. See Manual for details on
     supported formats."""
     return int(s, 16)
+
+def dump(l):
+    """At each assembly stage, print the complete stage as a list. Produces
+    an enormous amount of output, probably only interesting for debugging."""
+    if args.dump:
+        for line in l:
+            print('{0:5d}: {1}'.format(line[0], repr(line[1])))
+        print()
+
+def dump_symbol_table(d=symbol_table, s=""):
+    print('Symbol Table', s)
+
+    if len(symbol_table) > 0: 
+
+        for v in sorted(symbol_table):
+            print('{0} : {1:x}'.format(v.rjust(ST_WIDTH), symbol_table[v]))
+        print()
+
+    else:
+        print('    (empty)\n')
 
 
 ### PASSES ###
@@ -216,7 +245,6 @@ dump(sc_lower)
 # --- Step ORIGIN: Find ORIGIN directive, initialize location counter ---
 
 sc_origin = []
-LC = 0 
 
 # ORIGIN line should be in first line now 
 originline = sc_lower[0][1].strip().split() 
@@ -225,10 +253,11 @@ if originline[0] != "origin":
     l = sc_lower[0][0]
     fatal(l, 'No ORIGIN directive found') 
 
-LC = number2int(originline[1]) 
+LC0 = number2int(originline[1]) 
 sc_origin = sc_lower[1:]
 
-verbose('STEP ORIGIN: Found ORIGIN directive, setting LC to {0}'.format(originline[1]))
+verbose('STEP ORIGIN: Found ORIGIN directive, setting LC to {0:6x}'.\
+        format(LC0))
 dump(sc_origin) 
 
 
@@ -249,8 +278,6 @@ dump(sc_end)
 
 verbose('Initializing symbol table') 
 
-symbol_table = {}
-
 sc_assign = []
 
 for n, l in sc_end:
@@ -264,14 +291,10 @@ for n, l in sc_end:
 
 verbose('STEP ASSIGN: Assigned {0} symbols to symbol table'.\
         format(len(sc_end)-len(sc_assign))) 
+dump(sc_assign)
 
 if args.verbose:
-    print() 
-    print('Symbol Table:')
-
-    for v in sorted(symbol_table):
-        print('{0} : {1:x}'.format(v.rjust(ST_WIDTH), symbol_table[v]))
-    print()
+    dump_symbol_table(symbol_table, "after ASSIGN")
 
 
 # --- Step PASS1: Create Intermediate File ---
@@ -279,30 +302,118 @@ if args.verbose:
 # Life is easier if we define the entry types down here. See "Although
 # practicality beats purity", https://www.python.org/dev/peps/pep-0020/
 
-# Entry types TODO use ENUMERATE once we're done 
+cpu_mode = "emulated"
+a_mode = 8 
+xy_mode = 8 
+
+
+# Intermediate file Entry types 
+# TODO use ENUMERATE construct once we're done 
 OPCODE_DONE = 0     # Contains completely assembled instruction 
+MODE_EMULATED = 1    # Tell Pass 2 this part is emulated
+MODE_NATIVE = 2     # Tell Pass 2 this part is native
+A16 = 3
+A8 = 4
+XY16 = 5
+XY8 = 6
 
-pass1_entry_types = {0: 'OPCODE_DONE'}
-
+pass1_entry_types = {0: 'OPCODE_DONE',
+        1: 'MODE_EMULATE',
+        2: 'MODE_NATIVE',
+        3: 'A16',
+        4: 'A8',
+        5: 'XY16',
+        6: 'XY8'
+        }
 
 sc_pass1 = []       # Immediate file
 
 for n, l in sc_assign:
 
-    # - Substep MNEMONIC: See if we have a correct mnemonic - 
-    m = l.strip() 
+    w = l.split()
+    w0 = w[0].strip() 
 
+
+    # -- Substep LABEL: See if we were given a label --
+    
+    if w0 == '->':
+
+        # Warn if symbol name is missing. That is not fatal 
+        
+        try:
+            w1 = w[1].strip()
+        except IndexError:  
+            warning('Directive "->" found without label name in {0}, deleting'.\
+                    format(n))
+            n_warnings += 1
+            continue
+
+        # Make sure we haven't defined this symbol before. That is fatal. 
+        # Unknown symbol table entries must be initialized with None so we can
+        # know if we're trying to reference to address 0
+        # TODO see if we need to do this differenty once we add forward
+        # references
+        
+        # TODO This construct sucks, rewrite once we know how this will work
+
+        if w1 not in symbol_table.keys():
+            verbose('Label {0} found in line {1}, address is {2:06x}'.\
+                    format(w1, n, LC0 + LCi))
+            symbol_table[w1] = LC0 + LCi
+        elif symbol_table[w1]: 
+            print('FATAL: Attempt to redefine symbol {0} in line {1}'.\
+                        format(w1, l))
+            sys.exit(1)
+        else:
+            symbol_table[w1] = LC0 + LCi
+            
+
+        # Some people put the label in the same line as another directive or an
+        # instruction, so we have to allow for that
+        w = w[2:]  
+
+        try:
+            w0 = w[0].strip()
+        except IndexError:
+            # That was all that was in the line
+            continue
+
+
+    # -- Substep MNEMONIC: See if we have a correct mnemonic --
+    
     try: 
-        oc = mnemonics[m]
+        oc = mnemonics[w0]
     except KeyError:
         pass
     else:
         sc_pass1.append((n, OPCODE_DONE, oc))
+        LCi += 1
         continue
+
+
+    # -- Substep CPU_MODE: See if we have native or emulated directive
+    # This must come after label directive
+    # TODO 00 is a dummy value in MODE_ , see if needed
+    # TODO see if we want to save LC0+LCi with OPCODE_DONE (probably)
+
+    if w0 == 'native':
+        sc_pass1.append((n, OPCODE_DONE, 0x18)) # clc
+        sc_pass1.append((n, OPCODE_DONE, 0xfb)) # xce
+        sc_pass1.append((n, MODE_NATIVE, 00)) 
+        cpu_mode = 'native'
+        continue
+
+    if w0 == 'emulated':
+        sc_pass1.append((n, OPCODE_DONE, 0x38)) # sec
+        sc_pass1.append((n, OPCODE_DONE, 0xfb)) # xce
+        sc_pass1.append((n, MODE_EMULATED, 00)) 
+        cpu_mode = 'emulated'
+        continue
+    
+    
 
 verbose('STEP PASS1: Created intermediate file')
 
-# Easier to handle the intermediate file formationg separately
 if args.dump:
 
     for l, t, c in sc_pass1:
@@ -314,13 +425,15 @@ if args.dump:
 # --- Step PASS2: Create binary file --- 
 
 # TODO unwind multi-byte instructions
+# TODO use bytearray because it is faster (http://www.dotnetperls.com/bytes)
 sc_pass2 = [b[2] for b in sc_pass1 if b[1] == OPCODE_DONE]
 
 verbose('STEP PASS2: Generated binary object code') 
 
+# TODO make this a real hexdump
 if args.dump:
-    print(repr(sc_pass2))
-    print()
+    bl = [hex(b)[2:] for b in sc_pass2]
+    print('{0}\n'.format(bl))
 
 object_code = bytes(sc_pass2) 
 code_size = len(object_code)
@@ -333,35 +446,42 @@ with open(args.output, 'wb') as f:
 verbose('Saved {0} bytes of object code as {1}'.\
         format(code_size, args.output))
 
+if n_warnings != 0 and args.warnings:
+    print('Generated {0} warning(s).'.format(n_warnings))
+
 
 # --- Step LIST: Create listing file ---
 
 with open(args.listing, 'w') as f:
     f.write(title_string)
-    f.write('Code listing file {0} in 65816 assembler\n'.format(args.listing))
-    f.write('Generated at {0}\n\n'.format(time.asctime()))
+    f.write('Code listing file {0} generated on {1}\n'\
+            .format(args.listing, time.asctime()))
+    if n_warnings != 0:
+        f.write('Generated {0} warnings.\n'.format(n_warnings))
+    f.write('Code origin is {0:06x},'.format(LC0))
+    f.write(' {0:x} bytes of machine code generated\n'.format(code_size))
 
-verbose('STEP LIST: Created listing as {0}'.\
+verbose('STEP LIST: Created listing as {0}\n'.\
         format(args.listing))
 
 
 
 # --- Step SYMBOLS: Create symbol file ---
 
-verbose('STEP SYMBOLS: Created symbol table listing as {0} (DUMMY)'\
-        .format(args.symbols))
-
 # TODO save symbol table file 
 
+verbose('STEP SYM_TABLE: Created symbol table listing as {0} (DUMMY)\n'\
+        .format(args.symbols))
 
-# TODO HIER HIER TODO 
+if args.verbose:
+    dump_symbol_table(symbol_table, "at end of run")
 
 
 
 ### END ###
 
 time_end = timeit.default_timer() 
-verbose('All steps complete in {0} seconds.'.format(time_end - time_start))
+verbose('All steps completed in {0:.5f} seconds.'.format(time_end - time_start))
 verbose('Enjoy the cake.')
 sys.exit(0) 
 
