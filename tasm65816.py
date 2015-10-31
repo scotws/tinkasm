@@ -2,7 +2,7 @@
 # A Typist's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 27. Oct 2015
+# This version: 01. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 ### SETUP ### 
 
 import argparse
+import re
 import sys
 import time
 import timeit
@@ -81,9 +82,16 @@ def warning(s):
 
 ### CONSTANTS ###
 
-ASSIGN = "="        # Change this to " equ " or whatever 
+ASSIGN = "="        # Used instead of ".equ" or such
 COMMENT = ';'       # Change this for a different comment marker 
-ST_WIDTH = 16       # Number of chars of symbol in Symbol Table printed
+CURRENT = '*'       # Marks current location counter
+SEPARATORS = '[.:]' # Legal separators in number strings in RE format
+
+HEX = '$'           # Prefix for hexadecimal numbers
+BINARY = '%'        # Prefix for binary numbers
+DECIMAL = '&'       # Prefix for decimal numbers (SUBJECT TO CHANGE)
+
+ST_WIDTH = 16       # Number of chars of symbol from Symbol Table printed
 
 title_string = "A Typist's Assembler for the 65816 in Python\n"
 
@@ -117,12 +125,40 @@ def fatal(l,s):
     print('FATAL ERROR in line', l, ":", s)
     sys.exit(1) 
 
-# TODO Make this work with various formats, currently assumes hex
-def number2int(s):
+def convert_number(s): 
     """Convert a number string provided by the user in one of various 
     formats to an integer we can use internally. See Manual for details on
     supported formats."""
-    return int(s, 16)
+    
+    # Remove separator markings
+    s1 = re.sub(SEPARATORS, '', s)
+
+    # By default, all numbers are hexadecimal. See if we were given a different
+    # number
+    c = s1[0]
+
+    if c == DECIMAL:
+        BASE = 10
+        s2 = s1[1:]
+    elif c == BINARY:
+        BASE = 2
+        s2 = s1[1:]
+    else: 
+        BASE = 16 
+        s2 = s1
+    
+    # If we can convert this to a number, it's a number, otherweise we claim its
+    # a symbol
+    
+    try: 
+        f = True
+        r = int(s2, BASE)
+    except ValueError:
+        f = False
+        r = s
+
+    return f, r
+
 
 def dump(l):
     """At each assembly stage, print the complete stage as a list. Produces
@@ -253,7 +289,7 @@ if originline[0] != "origin":
     l = sc_lower[0][0]
     fatal(l, 'No ORIGIN directive found') 
 
-LC0 = number2int(originline[1]) 
+_, LC0 = convert_number(originline[1])  # ORIGIN may not take a symbol (yet)
 sc_origin = sc_lower[1:]
 
 verbose('STEP ORIGIN: Found ORIGIN directive, setting LC to {0:6x}'.\
@@ -284,7 +320,7 @@ for n, l in sc_end:
     if ASSIGN in l: 
         s, v = l.split(ASSIGN)
         symbol = s.split()[-1] 
-        value = number2int(v.split()[0])
+        _, value = convert_number(v.split()[0])  # Can't do symbol to symbol
         symbol_table[symbol] = value  
     else: 
         sc_assign.append((n, l))
@@ -294,7 +330,7 @@ verbose('STEP ASSIGN: Assigned {0} symbols to symbol table'.\
 dump(sc_assign)
 
 if args.verbose:
-    dump_symbol_table(symbol_table, "after ASSIGN")
+    dump_symbol_table(symbol_table, "after ASSIGN (all numbers in hex)")
 
 
 # --- Step PASS1: Create Intermediate File ---
@@ -474,7 +510,7 @@ verbose('STEP SYM_TABLE: Created symbol table listing as {0} (DUMMY)\n'\
         .format(args.symbols))
 
 if args.verbose:
-    dump_symbol_table(symbol_table, "at end of run")
+    dump_symbol_table(symbol_table, "at end of run (all numbers in hex)")
 
 
 

@@ -3,7 +3,10 @@
 
             origin 0e000
 
-            testaddr = 01000
+            test1 = 01:0000
+            test2 = 10.0000
+            test3 = %00001111
+            test4 = &10
 
 -> loop1
             nop
