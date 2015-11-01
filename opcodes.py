@@ -1,7 +1,7 @@
 # Opcodes for the Typist's Assembler for the 65816 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 23. Okt 2015
-# This version: 27. Okt 2015
+# This version: 01. Nov 2015
 
 opcode_table = (
     (0x00, 'brk', 1, 0),
@@ -145,9 +145,9 @@ opcode_table = (
     (0x8a, 'nop', 1, 0),
     (0x8b, 'nop', 1, 0),
     (0x8c, 'nop', 1, 0),
-    (0x8d, 'nop', 1, 0),
+    (0x8d, 'sta', 3, 1),
     (0x8e, 'nop', 1, 0),
-    (0x8f, 'nop', 1, 0),
+    (0x8f, 'sta.l', 4, 1),
     (0x90, 'nop', 1, 0),
     (0x91, 'nop', 1, 0),
     (0x92, 'nop', 1, 0),
@@ -177,9 +177,9 @@ opcode_table = (
     (0xaa, 'tax', 1, 0),
     (0xab, 'nop', 1, 0),
     (0xac, 'nop', 1, 0),
-    (0xad, 'nop', 1, 0),
+    (0xad, 'lda', 3, 1),
     (0xae, 'nop', 1, 0),
-    (0xaf, 'nop', 1, 0),
+    (0xaf, 'lda.l', 4, 1),
     (0xb0, 'nop', 1, 0),
     (0xb1, 'nop', 1, 0),
     (0xb2, 'nop', 1, 0),

@@ -3,13 +3,15 @@
 
             .origin 0e000
 
-            lda 0aabb
-            sta 0ccdd
+            nop
+
+            lda.l 01aabb
+
+            nop
+
+            sta.l 02ccdd
 
             nop
             stp
-
--> data
-    .byte 00 01 02 03 04 05 06 
 
             .end

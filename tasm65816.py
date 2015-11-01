@@ -100,6 +100,12 @@ LCi = 0             # Index to where we are in code
 
 symbol_table = {}
 
+# Positions in the opcode tables
+OT_OPCODE = 0 
+OT_MNEMONIC = 1 
+OT_N_BYTES = 2
+OT_N_OPERANDS = 3 
+
 
 ### GENERATE TABLES ###
 
@@ -471,16 +477,46 @@ for n, l in sc_assign:
 
     # -- Substep MNEMONIC: See if we have a mnemonic --
     
-    # TODO This currently only works with single-byte instructions
+    # TODO Make this work with symbols 
     
     try: 
         oc = mnemonics[w0]
     except KeyError:
         pass
     else:
-        sc_pass1.append((n, DONE, [oc]))
-        LCi += 1
+        # TODO Refactor this once we handle symbols
+        # TODO Handle special routines 
+        nb = opcode_table[oc][OT_N_BYTES] 
+
+        if nb == 1: 
+            li = [oc] 
+
+        elif nb == 2: 
+            # TODO see if this is a symbol
+            _, opr = convert_number(w[1]) 
+            li = [oc, lsb(opr)]  
+
+        elif nb == 3: 
+            # TODO see if this is a symbol 
+            _, opr = convert_number(w[1])
+            oprl = little_endian_16(opr) 
+            li = [oc]
+            li.extend(oprl) 
+
+        elif nb == 4: 
+            # TODO see if this is a symbol 
+            _, opr = convert_number(w[1])
+            oprl = little_endian_24(opr) 
+            li = [oc]
+            li.extend(oprl) 
+
+        sc_pass1.append((n, DONE, li))
+        LCi += nb 
+
         continue
+
+
+### HIER HIER 
 
 
     # --- Substep BYTE: See if we have a .BYTE directive
