@@ -1,8 +1,7 @@
 MANUAL for A Typist's Assembler for the 65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 20. Oct 2015
-
+This version: 01. Nov 2015
 
 
 - Requires Python 3.4 or later. Will not run with Python 2.7. 
@@ -15,8 +14,33 @@ PARAMETERS
 -i --input      - Input assembler file (required) 
 -o --output     - Output file for the binary code, default is tasm.bin 
 -l --listing    - Output file for the listing, default is tasm.txt  
--v --verbose    - Print lots of info about each assembly step
+-v --verbose    - Print more info about each assembly step
+-d --dump       - Dump state of inbetween steps, produces lots of output
 
+
+DIRECTIVES
+
+By tradition, assembler directives start with a dot.
+
+
+        *
+        .A16
+        .A8
+        .AXY16
+        .AXY8
+        .BYTE / .B
+        .EMULATED
+        .END 
+        .LONG / .L
+        .NATIVE
+        .ORIGIN
+        .STRING / .STR
+        .STRING0 / .STR0
+        .STRINGLF / .STRLF
+        .WORD / .W
+        .XY16
+        .XY8
+        = 
 
 INTERNAL STRUCTURE
 

@@ -2,7 +2,7 @@
 # A Typist's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 01. Nov 2015
+# This version: 1. Nov 2015 
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -87,9 +87,9 @@ COMMENT = ';'       # Change this for a different comment marker
 CURRENT = '*'       # Marks current location counter
 SEPARATORS = '[.:]' # Legal separators in number strings in RE format
 
-HEX = '$'           # Prefix for hexadecimal numbers
-BINARY = '%'        # Prefix for binary numbers
-DECIMAL = '&'       # Prefix for decimal numbers (SUBJECT TO CHANGE)
+HEX_PREFIX = '$'           # Prefix for hexadecimal numbers
+BIN_PREFIX = '%'        # Prefix for binary numbers
+DEC_PREFIX = '&'       # Prefix for decimal numbers (SUBJECT TO CHANGE)
 
 ST_WIDTH = 16       # Number of chars of symbol from Symbol Table printed
 
@@ -118,6 +118,35 @@ verbose('Generated mnemonics list')
 
 ### HELPER FUNCTIONS ###
 
+def lsb(n):
+    """Return Least Significant Byte of a number"""
+    return n & 0xff
+
+def msb(n):
+    """Return Most Significant Byte of a number"""
+    return (n & 0xff00) >> 8  
+
+def bank(n):
+    """Return Bank Byte of a number"""
+    return (n & 0xff0000) >> 16
+
+def little_endian_16(n): 
+    """Given a number, return a list with two bytes in correct format"""
+    return [lsb(n), msb(n)]
+
+def little_endian_24(n):
+    """Given a number, return a list with three bytes in correct format"""
+    return [lsb(n), msb(n), bank(n)]
+
+def string2bytes(s):
+    """Given a string with quotation marks, isolate what is between them
+    and return the number of characters and a list of the ASCII values of
+    the characters in that string. Assumes that there is one and only one
+    string in the line that is delimited by quotation marks"""
+
+    s1 = l.split('"')[1] 
+    return len(s1), [ord(a) for a in s1]
+
 
 # TODO see if this should be a formal error with RAISE and all of that
 def fatal(l,s): 
@@ -137,10 +166,10 @@ def convert_number(s):
     # number
     c = s1[0]
 
-    if c == DECIMAL:
+    if c == DEC_PREFIX:
         BASE = 10
         s2 = s1[1:]
-    elif c == BINARY:
+    elif c == BIN_PREFIX:
         BASE = 2
         s2 = s1[1:]
     else: 
@@ -148,11 +177,12 @@ def convert_number(s):
         s2 = s1
     
     # If we can convert this to a number, it's a number, otherweise we claim its
-    # a symbol
+    # a symbol. Note that this means that a symbol such as "faced" will be
+    # converted to a number, so such numbers should always be prefixed with a 0 
     
     try: 
-        f = True
         r = int(s2, BASE)
+        f = True
     except ValueError:
         f = False
         r = s
@@ -179,6 +209,7 @@ def dump_symbol_table(d=symbol_table, s=""):
 
     else:
         print('    (empty)\n')
+
 
 
 ### PASSES ###
@@ -278,14 +309,14 @@ verbose('STEP LOWER: Converted all remaining code to lower case')
 dump(sc_lower) 
 
 
-# --- Step ORIGIN: Find ORIGIN directive, initialize location counter ---
+# --- Step ORIGIN: Find .ORIGIN directive, initialize location counter ---
 
 sc_origin = []
 
 # ORIGIN line should be in first line now 
 originline = sc_lower[0][1].strip().split() 
 
-if originline[0] != "origin":
+if originline[0] != ".origin":
     l = sc_lower[0][0]
     fatal(l, 'No ORIGIN directive found') 
 
@@ -297,11 +328,11 @@ verbose('STEP ORIGIN: Found ORIGIN directive, setting LC to {0:6x}'.\
 dump(sc_origin) 
 
 
-# --- Step END: Make sure we have an END directive --- 
+# --- Step END: Make sure we have an .END directive --- 
 
 endline = sc_origin[-1][1].strip().split() 
 
-if endline[0] != "end":
+if endline[0] != ".end":
     fatal(sc_origin[0][0], 'No END directive found') 
 
 sc_end = sc_origin[:-1]
@@ -310,7 +341,7 @@ verbose('STEP END: Found END directive in last line')
 dump(sc_end) 
 
 
-# --- Step ASSIGN: Handle the clear assignment lines ---
+# --- Step ASSIGN: Handle assignment lines ---
 
 verbose('Initializing symbol table') 
 
@@ -344,25 +375,47 @@ xy_mode = 8
 
 
 # Intermediate file Entry types 
-# TODO use ENUMERATE construct once we're done 
-OPCODE_DONE = 0     # Contains completely assembled instruction 
-MODE_EMULATED = 1    # Tell Pass 2 this part is emulated
-MODE_NATIVE = 2     # Tell Pass 2 this part is native
-A16 = 3
-A8 = 4
-XY16 = 5
-XY8 = 6
+# TODO use ENUMERATE construct once we have sorted this all out 
 
-pass1_entry_types = {0: 'OPCODE_DONE',
+DONE = 0           # Contains completely assembled binary data
+MODE_EMULATED = 1  # Tell Pass 2 the following is emulated
+MODE_NATIVE = 2    # Tell Pass 2 the following is native
+OPC_SYMBOL = 3     # Opcode with unresolved symbol
+
+A16 = 10
+A8 = 11
+XY16 = 12
+XY8 = 13
+AXY16 = 14
+AXY8 = 15
+
+pass1_entry_types = {
+        0: 'DONE',
         1: 'MODE_EMULATE',
         2: 'MODE_NATIVE',
-        3: 'A16',
-        4: 'A8',
-        5: 'XY16',
-        6: 'XY8'
+        3: 'OPC_SYMBOL',
+       10: 'A16',
+       11: 'A8',
+       12: 'XY16',
+       13: 'XY8',
+       14: 'AXY16',
+       15: 'AXY8'
         }
 
+# Intermediate file is a list of entries, each a list, with three elements: The
+# original line number, the entry type code (see above), and a "payload" list
+# with parameters that are unpacked depending on the type 
+
+# Elements of the intermediate file. These are indexes to the entries of the
+# lines in each entry
+
+IMF_LINE = 0
+IMF_STATUS = 1 
+IMF_PAYLOAD = 2
+
 sc_pass1 = []       # Immediate file
+
+# Loop through all lines 
 
 for n, l in sc_assign:
 
@@ -374,7 +427,7 @@ for n, l in sc_assign:
     
     if w0 == '->':
 
-        # Warn if symbol name is missing. That is not fatal 
+        # Warn if symbol name is missing, a non-fatal error
         
         try:
             w1 = w[1].strip()
@@ -387,10 +440,11 @@ for n, l in sc_assign:
         # Make sure we haven't defined this symbol before. That is fatal. 
         # Unknown symbol table entries must be initialized with None so we can
         # know if we're trying to reference to address 0
+        
         # TODO see if we need to do this differenty once we add forward
         # references
         
-        # TODO This construct sucks, rewrite once we know how this will work
+        # TODO This sucks, rewrite once we know how this will work
 
         if w1 not in symbol_table.keys():
             verbose('Label {0} found in line {1}, address is {2:06x}'.\
@@ -405,7 +459,7 @@ for n, l in sc_assign:
             
 
         # Some people put the label in the same line as another directive or an
-        # instruction, so we have to allow for that
+        # instruction, so even we think that's crude, we have to allow for it
         w = w[2:]  
 
         try:
@@ -415,34 +469,111 @@ for n, l in sc_assign:
             continue
 
 
-    # -- Substep MNEMONIC: See if we have a correct mnemonic --
+    # -- Substep MNEMONIC: See if we have a mnemonic --
+    
+    # TODO This currently only works with single-byte instructions
     
     try: 
         oc = mnemonics[w0]
     except KeyError:
         pass
     else:
-        sc_pass1.append((n, OPCODE_DONE, oc))
+        sc_pass1.append((n, DONE, [oc]))
         LCi += 1
         continue
 
 
+    # --- Substep BYTE: See if we have a .BYTE directive
+    
+    if w0 == '.byte' or w0 == '.b':
+
+        bs = [convert_number(b)[1] for b in w[1:]]
+        sc_pass1.append((n, DONE, bs))
+        LCi += len(w[1:])
+        continue 
+
+
+    # --- Substep WORD: See if we have a .WORD directive
+
+    if w0 == '.word' or w0 == '.w':
+
+        bl = []
+        for b in w[1:]:
+            bl.extend(little_endian_16(convert_number(b)[1])) 
+
+        sc_pass1.append((n, DONE, bl))
+        LCi += len(w[1:]) * 2 
+        continue 
+   
+
+    # --- Substep LONG: See if we have a .LONG directive
+
+    if w0 == '.long' or w0 == '.l':
+
+        bl = []
+        for b in w[1:]:
+            bl.extend(little_endian_24(convert_number(b)[1])) 
+            print(bl)
+
+        sc_pass1.append((n, DONE, bl))
+        LCi += len(w[1:]) * 3
+        continue 
+
+
+    # --- Substep STRING: See if we have a .STRING directive
+    # TODO see if we want to combine all string directives
+
+    if w0 == '.string' or w0 == '.str':
+
+        sn, sl = string2bytes(l) 
+        sc_pass1.append((n, DONE, sl))
+        LCi += sn
+        continue 
+
+
+    # --- Substep STRING_ZERO: See if we have a .STRING0 directive
+
+    if w0 == '.string0' or w0 == '.str0':
+
+        sn, sl = string2bytes(l) 
+        sl.append(00) 
+        sn += 1
+
+        sc_pass1.append((n, DONE, sl))
+        LCi += sn
+        continue 
+
+
+    # --- Substep STRING_LF: See if we have a .STRINGLF directive
+
+    if w0 == '.stringlf' or w0 == '.strlf':
+
+        sn, sl = string2bytes(l) 
+        sl.append(0x0a) 
+        sn += 1
+
+        sc_pass1.append((n, DONE, sl))
+        LCi += sn
+        continue 
+
+
     # -- Substep CPU_MODE: See if we have native or emulated directive
+    
     # This must come after label directive
     # TODO 00 is a dummy value in MODE_ , see if needed
-    # TODO see if we want to save LC0+LCi with OPCODE_DONE (probably)
+    # TODO see if we want to save LC0+LCi with DONE (probably)
 
-    if w0 == 'native':
-        sc_pass1.append((n, OPCODE_DONE, 0x18)) # clc
-        sc_pass1.append((n, OPCODE_DONE, 0xfb)) # xce
-        sc_pass1.append((n, MODE_NATIVE, 00)) 
+    if w0 == '.native':
+        sc_pass1.append((n, DONE, [0x18])) # clc
+        sc_pass1.append((n, DONE, [0xfb])) # xce
+        sc_pass1.append((n, MODE_NATIVE, [])) # Payload is dummy
         cpu_mode = 'native'
         continue
 
-    if w0 == 'emulated':
-        sc_pass1.append((n, OPCODE_DONE, 0x38)) # sec
-        sc_pass1.append((n, OPCODE_DONE, 0xfb)) # xce
-        sc_pass1.append((n, MODE_EMULATED, 00)) 
+    if w0 == '.emulated':
+        sc_pass1.append((n, DONE, [0x38])) # sec
+        sc_pass1.append((n, DONE, [0xfb])) # xce
+        sc_pass1.append((n, MODE_EMULATED, [])) # Payload is dummy
         cpu_mode = 'emulated'
         continue
     
@@ -450,19 +581,37 @@ for n, l in sc_assign:
 
 verbose('STEP PASS1: Created intermediate file')
 
+# TODO open up list
 if args.dump:
 
-    for l, t, c in sc_pass1:
-        print('{0:5d}: {1} {2:x}'.format(l, pass1_entry_types[t], c))
+    for l, t, bl in sc_pass1:
+        print('{0:5d}: {1} {2}'.format(l, pass1_entry_types[t], bl))
     print()
 
 
 
 # --- Step PASS2: Create binary file --- 
 
-# TODO unwind multi-byte instructions
 # TODO use bytearray because it is faster (http://www.dotnetperls.com/bytes)
-sc_pass2 = [b[2] for b in sc_pass1 if b[1] == OPCODE_DONE]
+sc_pass2 = []
+
+def p2_done(l): 
+    """Handle lines that are completely done"""
+    sc_pass2.extend(l[IMF_PAYLOAD])
+
+pass2_routines = {
+        DONE: p2_done, }
+
+for l in sc_pass1:
+    
+    try:
+        pass2_routines[l[IMF_STATUS]](l)
+    except:
+        # TODO change this to real error code
+        print("DUMMY Intermediate File, entry not found.")
+
+object_code = bytes(sc_pass2) 
+code_size = len(object_code)
 
 verbose('STEP PASS2: Generated binary object code') 
 
@@ -471,15 +620,13 @@ if args.dump:
     bl = [hex(b)[2:] for b in sc_pass2]
     print('{0}\n'.format(bl))
 
-object_code = bytes(sc_pass2) 
-code_size = len(object_code)
 
+# --- Step BIN: Save binary file --- 
 
-# Save binary file 
 with open(args.output, 'wb') as f:
     f.write(object_code)
 
-verbose('Saved {0} bytes of object code as {1}'.\
+verbose('STEP BIN: Saved {0} bytes of object code as {1}'.\
         format(code_size, args.output))
 
 if n_warnings != 0 and args.warnings:

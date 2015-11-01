@@ -1,20 +1,15 @@
 ; Dummy assembler file for 
 ; A Crude Assembler for the 65816 in Python 
 
-            origin 0e000
+            .origin 0e000
 
-            test1 = 01:0000
-            test2 = 10.0000
-            test3 = %00001111
-            test4 = &10
+            lda 0aabb
+            sta 0ccdd
 
--> loop1
             nop
-            native
-
--> loop2    nop             ; make sure this works on one single line
-            emulated
-
             stp
 
-            end
+-> data
+    .byte 00 01 02 03 04 05 06 
+
+            .end
