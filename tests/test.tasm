@@ -1,17 +1,21 @@
 ; Dummy assembler file for 
 ; A Crude Assembler for the 65816 in Python 
 
-            .origin 0e000
 
-            nop
+            .origin 0e000   ; must come first
 
-            lda.l 01aabb
+            data = e010
+            jack = 1000
 
-            nop
+            .a16
 
-            sta.l 02ccdd
+            lda jack 
+            sta 2000
 
-            nop
             stp
+
+            .advance data
+
+            .long 010203 
 
             .end

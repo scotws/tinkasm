@@ -93,8 +93,6 @@ DEC_PREFIX = '&'       # Prefix for decimal numbers (SUBJECT TO CHANGE)
 
 ST_WIDTH = 16       # Number of chars of symbol from Symbol Table printed
 
-title_string = "A Typist's Assembler for the 65816 in Python\n"
-
 LC0 = 0             # Start address of code ("location counter") 
 LCi = 0             # Index to where we are in code
 
@@ -105,6 +103,9 @@ OT_OPCODE = 0
 OT_MNEMONIC = 1 
 OT_N_BYTES = 2
 OT_N_OPERANDS = 3 
+
+title_string = "A Typist's Assembler for the 65816 in Python\n"
+verbose(title_string)
 
 
 ### GENERATE TABLES ###
@@ -153,7 +154,6 @@ def string2bytes(s):
     s1 = l.split('"')[1] 
     return len(s1), [ord(a) for a in s1]
 
-
 # TODO see if this should be a formal error with RAISE and all of that
 def fatal(l,s): 
     """Abort program because of fatal error during assembly"""
@@ -161,9 +161,10 @@ def fatal(l,s):
     sys.exit(1) 
 
 def convert_number(s): 
+    # TODO We need to handle CURRENT marker as well
     """Convert a number string provided by the user in one of various 
-    formats to an integer we can use internally. See Manual for details on
-    supported formats."""
+    formats to an integer we can use internally. See Manual for details 
+    on supported formats."""
     
     # Remove separator markings
     s1 = re.sub(SEPARATORS, '', s)
@@ -230,8 +231,6 @@ def dump_symbol_table(d=symbol_table, s=""):
 
 
 # --- Step ZERO: Set up timing, print banner ---
-
-verbose(title_string)
 
 # TODO print banner
 
@@ -324,12 +323,12 @@ originline = sc_lower[0][1].strip().split()
 
 if originline[0] != ".origin":
     l = sc_lower[0][0]
-    fatal(l, 'No ORIGIN directive found') 
+    fatal(l, 'No ORIGIN directive found, must be first line after macros') 
 
 _, LC0 = convert_number(originline[1])  # ORIGIN may not take a symbol (yet)
 sc_origin = sc_lower[1:]
 
-verbose('STEP ORIGIN: Found ORIGIN directive, setting LC to {0:6x}'.\
+verbose('STEP ORIGIN: Found ORIGIN directive, starting at {0:06x}'.\
         format(LC0))
 dump(sc_origin) 
 
@@ -339,7 +338,7 @@ dump(sc_origin)
 endline = sc_origin[-1][1].strip().split() 
 
 if endline[0] != ".end":
-    fatal(sc_origin[0][0], 'No END directive found') 
+    fatal(sc_origin[0][0], 'No END directive found, must be in last line') 
 
 sc_end = sc_origin[:-1]
 
@@ -383,11 +382,14 @@ xy_mode = 8
 # Intermediate file Entry types 
 # TODO use ENUMERATE construct once we have sorted this all out 
 
-DONE = 0           # Contains completely assembled binary data
-MODE_EMULATED = 1  # Tell Pass 2 the following is emulated
-MODE_NATIVE = 2    # Tell Pass 2 the following is native
-OPC_SYMBOL = 3     # Opcode with unresolved symbol
+OPC_DONE = 0       # Contains completely assembled binary data from opcode
+DATA_DONE = 1      # Contains completely assembled binary data from data
+OPC_SYMBOL = 2     # Opcode with unresolved symbol
+ADV_SYMBOL = 3     # .ADVANCE directive with unresolved symbol
+MODE_EMULATED = 4  # Tell Pass 2 the following is emulated
+MODE_NATIVE = 5    # Tell Pass 2 the following is native
 
+# See if these are required
 A16 = 10
 A8 = 11
 XY16 = 12
@@ -396,17 +398,27 @@ AXY16 = 14
 AXY8 = 15
 
 pass1_entry_types = {
-        0: 'DONE',
-        1: 'MODE_EMULATE',
-        2: 'MODE_NATIVE',
-        3: 'OPC_SYMBOL',
-       10: 'A16',
+        0: 'OPC_DONE',
+        1: 'DATA_DONE',
+        2: 'OPC_SYMBOL',
+        3: 'ADV_SYMBOL',
+        4: 'MODE_EMULATE',
+        5: 'MODE_NATIVE',
+       10: 'A16',  # See if these are required
        11: 'A8',
        12: 'XY16',
        13: 'XY8',
        14: 'AXY16',
-       15: 'AXY8'
-        }
+       15: 'AXY8'}
+
+pass1_axy_variants = {
+        '.a8': [0xe2, 0x20],  # sep 20 
+        '.a16': [0xc2, 0x20],  # rep 20 
+        '.xy8': [0xe2, 0x10],  # sep 10 
+        '.xy16': [0xc2, 0x10],  # rep 10 
+        '.axy8': [0xe2, 0x30],  # sep 30 
+        '.axy16': [0xc2, 0x30]} # rep 30 
+
 
 # Intermediate file is a list of entries, each a list, with three elements: The
 # original line number, the entry type code (see above), and a "payload" list
@@ -477,46 +489,75 @@ for n, l in sc_assign:
 
     # -- Substep MNEMONIC: See if we have a mnemonic --
     
-    # TODO Make this work with symbols 
-    
     try: 
         oc = mnemonics[w0]
     except KeyError:
         pass
     else:
-        # TODO Refactor this once we handle symbols
-        # TODO Handle special routines 
         nb = opcode_table[oc][OT_N_BYTES] 
+        
+        # Single byte instructions are easy because we don't have to look for
+        # symbols, so we get them out of the way fast
+        if nb == 1:
+            sc_pass1.append((n, OPC_DONE, [oc]))
+            LCi += 1
+            continue 
+            
+        # MVN and MVP are a serious pain, so we get them out of the way ASAP
+        # TODO code this. 
+        if oc == 0x44 or oc == 0x54:
+            print('DUMMY: Found MVN or MVP, not coded yet, skipping')
+            continue 
 
-        if nb == 1: 
-            li = [oc] 
+        # Multi-byte instruction, but all with only one operand
+        is_number, opr = convert_number(w[1]) 
 
-        elif nb == 2: 
-            # TODO see if this is a symbol
-            _, opr = convert_number(w[1]) 
+        # If we have a symbol, we punt the problem to the next pass
+        if not is_number: 
+            # We've got a symbol
+            sc_pass1.append((n, OPC_SYMBOL, [oc, w[1]]))
+            continue 
+
+        # We've got a number, so we can convert everything right way
+        if nb == 2: 
             li = [oc, lsb(opr)]  
 
         elif nb == 3: 
-            # TODO see if this is a symbol 
-            _, opr = convert_number(w[1])
             oprl = little_endian_16(opr) 
             li = [oc]
             li.extend(oprl) 
 
         elif nb == 4: 
-            # TODO see if this is a symbol 
-            _, opr = convert_number(w[1])
             oprl = little_endian_24(opr) 
             li = [oc]
             li.extend(oprl) 
 
-        sc_pass1.append((n, DONE, li))
-        LCi += nb 
+        else:
+            print('FATAL: Opcode claims to have length of more than 4 bytes')
+            sys.exit(1)
 
+        sc_pass1.append((n, OPC_DONE, li))
+        LCi += nb 
         continue
 
 
-### HIER HIER 
+    # --- Substep ADVANCE: See if we have an .ADVANCE directive
+
+    if w0 == '.advance':
+
+        is_number, nz = convert_number(w[1]) 
+        
+        if not is_number:
+            sc_pass1.append((n, ADV_SYMBOL, [w[1]]))
+            continue 
+
+        bs = [00] * (nz - (LC0 + LCi))
+        sc_pass1.append((n, DATA_DONE, bs))
+
+        verbose('Advanced {0} bytes from {1:x} to {2:x}, line {3}'.\
+                format(len(bs), LC0+LCi, nz, n)) 
+
+        continue 
 
 
     # --- Substep BYTE: See if we have a .BYTE directive
@@ -524,8 +565,12 @@ for n, l in sc_assign:
     if w0 == '.byte' or w0 == '.b':
 
         bs = [convert_number(b)[1] for b in w[1:]]
-        sc_pass1.append((n, DONE, bs))
+        sc_pass1.append((n, DATA_DONE, bs))
         LCi += len(w[1:])
+
+        verbose('Stored {0} bytes of data from line {1} (BYTE directive)'.\
+                format(len(w[1:]), n))
+
         continue 
 
 
@@ -534,10 +579,14 @@ for n, l in sc_assign:
     if w0 == '.word' or w0 == '.w':
 
         bl = []
+
         for b in w[1:]:
             bl.extend(little_endian_16(convert_number(b)[1])) 
 
-        sc_pass1.append((n, DONE, bl))
+        verbose('Stored {0} bytes of data from line {1} (WORD directive)'.\
+                format(len(w[1:])*2, n))
+
+        sc_pass1.append((n, DATA_DONE, bl))
         LCi += len(w[1:]) * 2 
         continue 
    
@@ -549,9 +598,11 @@ for n, l in sc_assign:
         bl = []
         for b in w[1:]:
             bl.extend(little_endian_24(convert_number(b)[1])) 
-            print(bl)
 
-        sc_pass1.append((n, DONE, bl))
+        verbose('Stored {0} bytes of data from line {1} (LONG directive)'.\
+                format(len(w[1:])*3, n))
+
+        sc_pass1.append((n, DATA_DONE, bl))
         LCi += len(w[1:]) * 3
         continue 
 
@@ -562,7 +613,7 @@ for n, l in sc_assign:
     if w0 == '.string' or w0 == '.str':
 
         sn, sl = string2bytes(l) 
-        sc_pass1.append((n, DONE, sl))
+        sc_pass1.append((n, DATA_DONE, sl))
         LCi += sn
         continue 
 
@@ -575,7 +626,7 @@ for n, l in sc_assign:
         sl.append(00) 
         sn += 1
 
-        sc_pass1.append((n, DONE, sl))
+        sc_pass1.append((n, DATA_DONE, sl))
         LCi += sn
         continue 
 
@@ -588,7 +639,7 @@ for n, l in sc_assign:
         sl.append(0x0a) 
         sn += 1
 
-        sc_pass1.append((n, DONE, sl))
+        sc_pass1.append((n, DATA_DONE, sl))
         LCi += sn
         continue 
 
@@ -597,29 +648,38 @@ for n, l in sc_assign:
     
     # This must come after label directive
     # TODO 00 is a dummy value in MODE_ , see if needed
-    # TODO see if we want to save LC0+LCi with DONE (probably)
 
     if w0 == '.native':
-        sc_pass1.append((n, DONE, [0x18])) # clc
-        sc_pass1.append((n, DONE, [0xfb])) # xce
+        sc_pass1.append((n, OPC_DONE, [0x18])) # clc
+        sc_pass1.append((n, OPC_DONE, [0xfb])) # xce
         sc_pass1.append((n, MODE_NATIVE, [])) # Payload is dummy
         cpu_mode = 'native'
         continue
 
     if w0 == '.emulated':
-        sc_pass1.append((n, DONE, [0x38])) # sec
-        sc_pass1.append((n, DONE, [0xfb])) # xce
+        sc_pass1.append((n, OPC_DONE, [0x38])) # sec
+        sc_pass1.append((n, OPC_DONE, [0xfb])) # xce
         sc_pass1.append((n, MODE_EMULATED, [])) # Payload is dummy
         cpu_mode = 'emulated'
         continue
     
     
+    # --- Substep AXY: Handle AXY direcives
+    
+    # This is the last legal entry possible. 
+
+    try:
+        sl = pass1_axy_variants[w0]
+    except KeyError:
+        fatal(n, 'Instruction or directive "{0}" unknown.'.format(w[0])) 
+    else:
+        # TODO see if we have to append a marker for AXY etc for pass 2
+        sc_pass1.append((n, OPC_DONE, sl))
+
 
 verbose('STEP PASS1: Created intermediate file')
 
-# TODO open up list
 if args.dump:
-
     for l, t, bl in sc_pass1:
         print('{0:5d}: {1} {2}'.format(l, pass1_entry_types[t], bl))
     print()
@@ -632,11 +692,20 @@ if args.dump:
 sc_pass2 = []
 
 def p2_done(l): 
-    """Handle lines that are completely done"""
+    """Handle lines that are completely done, opcode or data"""
     sc_pass2.extend(l[IMF_PAYLOAD])
 
+def p2_adv_symbol(l): 
+    """Handle lines that contain an advance and an unresolved symbol"""
+    print('DUMMY: Found ADVANCE with unresolved symbol, skipping') 
+
+def p2_opc_symbol(l):
+    """Handle lines that contain an opcode and an unresolved symbol"""
+    print('DUMMY: Found opcode with unresolved symbol, skipping')
+
 pass2_routines = {
-        DONE: p2_done, }
+        OPC_DONE: p2_done, DATA_DONE: p2_done, 
+        ADV_SYMBOL: p2_adv_symbol, OPC_SYMBOL: p2_opc_symbol}
 
 for l in sc_pass1:
     
@@ -644,17 +713,30 @@ for l in sc_pass1:
         pass2_routines[l[IMF_STATUS]](l)
     except:
         # TODO change this to real error code
-        print("DUMMY Intermediate File, entry not found.")
+        print('DUMMY Intermediate File, entry not found.')
+        print('Line was:', l) 
 
 object_code = bytes(sc_pass2) 
 code_size = len(object_code)
 
 verbose('STEP PASS2: Generated binary object code') 
 
-# TODO make this a real hexdump
+# TODO Move this to a separate routine 
 if args.dump:
-    bl = [hex(b)[2:] for b in sc_pass2]
-    print('{0}\n'.format(bl))
+
+    c = 0 
+    lcp = LC0
+
+    print('{0:06x}'.format(lcp), end=': ')
+
+    for e in sc_pass2:
+        print('{0:02x}'.format(e), end=' ')
+        c += 1
+        if c % 16 == 0:
+            print()
+            lcp += 16
+            print('{0:06x}'.format(lcp), end=': ')
+    print('\n') 
 
 
 # --- Step BIN: Save binary file --- 
