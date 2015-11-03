@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# A Typist's Assembler for the 65816 in Forth 
+# A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 1. Nov 2015 
+# This version: 2. Nov 2015 
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -104,7 +104,7 @@ OT_MNEMONIC = 1
 OT_N_BYTES = 2
 OT_N_OPERANDS = 3 
 
-title_string = "A Typist's Assembler for the 65816 in Python\n"
+title_string = "A Tinkerer's Assembler for the 65816 in Python\n"
 verbose(title_string)
 
 
@@ -118,6 +118,7 @@ mnemonics =\
     { opcode_table[n][1]:n for n, e in enumerate(opcode_table) if opcode_table[n][1] != 'nop'}
 
 mnemonics['nop'] = 0xea
+
 
 verbose('Generated mnemonics list')
 
@@ -162,6 +163,8 @@ def fatal(l,s):
 
 def convert_number(s): 
     # TODO We need to handle CURRENT marker as well
+    # TODO Rename this to "analyze_operand" and return code for type
+    #      This will let us use the routine to find math routines
     """Convert a number string provided by the user in one of various 
     formats to an integer we can use internally. See Manual for details 
     on supported formats."""
@@ -310,17 +313,20 @@ dump(sc_expand)
 # --- Step LOWER: Convert everything to lower case ---
 
 sc_lower = [(n, l.lower()) for n, l in sc_expand] 
+
 verbose('STEP LOWER: Converted all remaining code to lower case')
 dump(sc_lower) 
 
 
 # --- Step ORIGIN: Find .ORIGIN directive, initialize location counter ---
+# TODO Move this up: Have MACRO section fail if no origin
 
 sc_origin = []
 
 # ORIGIN line should be in first line now 
 originline = sc_lower[0][1].strip().split() 
 
+# TODO rewrite so this works with ".org" as well
 if originline[0] != ".origin":
     l = sc_lower[0][0]
     fatal(l, 'No ORIGIN directive found, must be first line after macros') 
@@ -373,6 +379,10 @@ if args.verbose:
 
 # Life is easier if we define the entry types down here. See "Although
 # practicality beats purity", https://www.python.org/dev/peps/pep-0020/
+
+# TODO This is too monolithic. Break it up so we find the AXY markers first,
+# then only go through and fill up the symbol table, even if this means losing
+# information that we pick up on this pass
 
 cpu_mode = "emulated"
 a_mode = 8 
@@ -442,6 +452,7 @@ for n, l in sc_assign:
 
 
     # -- Substep LABEL: See if we were given a label --
+    # TODO Make this the single focus of a pass
     
     if w0 == '->':
 
@@ -542,6 +553,7 @@ for n, l in sc_assign:
 
 
     # --- Substep ADVANCE: See if we have an .ADVANCE directive
+    # TODO Break this out and make it its own pass
 
     if w0 == '.advance':
 
@@ -559,8 +571,8 @@ for n, l in sc_assign:
 
         continue 
 
-
     # --- Substep BYTE: See if we have a .BYTE directive
+    # TODO Break these data out and make them their own pass
     
     if w0 == '.byte' or w0 == '.b':
 

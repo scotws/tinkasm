@@ -1,12 +1,12 @@
-# A Typist's Assembler for the 65816 in Python
+# A Tinkerer's Assembler for the 6502/65c02/65816
 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 
 
 ### TL;DR
 
-This is a PRE-ALPHA version of a multi-pass assembler for the 65816 8/16-bit CPU
-in Python 3. 
+This is a PRE-ALPHA version of a multi-pass assembler for the 6502/65c02/65816 
+8/16-bit MPUs in Python 3. 
 
 ### WHAT'S ALL THIS HERE NOW ANYWAY?
 
