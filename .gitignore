@@ -5,7 +5,7 @@ old
 *.swp
 
 # Ignore testing files
-tasm.*
+tink.*
 
 # Ignore pycache
 __pycache__

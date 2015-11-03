@@ -29,8 +29,9 @@ import sys
 import time
 import timeit
 
-import special     # dictionary of special routines special.opc 
-from opcodes import opcode_table
+# dictionary of special routines special.opc 
+# TODO do this differently 
+import special     
 
 # Check for correct version of Python
 
@@ -50,22 +51,29 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', dest='source', required=True, 
         help='Assembler source code file (required)')
 parser.add_argument('-o', '--output', dest='output', 
-        help='Binary output file (default TASM.BIN)', default='tasm.bin')
+        help='Binary output file (default TINK.BIN)', default='tink.bin')
 parser.add_argument('-l', '--listing', dest='listing', 
-        help='Name of listing file (default TASM.LST)', default='tasm.lst')
+        help='Name of listing file (default TINK.LST)', default='tink.lst')
+parser.add_argument('-m', '--mpu', dest='mpu', help='Type of MPU', 
+        choices=['6502', '65c02', '65816'], default='65816')
 parser.add_argument('-v', '--verbose', 
         help='Display additional information', action='store_true')
-parser.add_argument('-s', '--symbols', dest='symbols', 
-        help='Name of symbol table file (default TASM.SYM)', default='tasm.sym')
 parser.add_argument('-d', '--dump', 
         help='Print intermediate steps as (long) lists', action='store_true')
-parser.add_argument('-w', '--warnings', 
-        help='Print all warnings', action='store_true')
+parser.add_argument('-x', '--hexdump', 
+        help='Create ASCII file TINK.HEX with hexdump of program',
+        action='store_true')
+parser.add_argument('-w', '--warnings', default=True,
+        help='Disable warnings (default: print them)', action='store_false')
 args = parser.parse_args()
 
 
-
 ### BASIC OUTPUT FUNCTIONS ###
+
+def fatal(l,s): 
+    """Abort program because of fatal error during assembly"""
+    print('FATAL ERROR in line', l, ":", s)
+    sys.exit(1) 
 
 def verbose(s):
     """Print information string given if --verbose flag was set. Later 
@@ -78,6 +86,22 @@ def warning(s):
     if args.warnings:
         print('WARNING:', s) 
         
+
+# Import opcodes depending on MPU type 
+
+MPU = args.mpu.lower() 
+
+if MPU == '6502':
+    from opcodes6502 import opcode_table
+elif MPU == '65c02':
+    from opcodes65c02 import opcode_table
+elif MPU == '65816':
+    from opcodes65816 import opcode_table
+else:
+    print('FATAL: Unknown MPU type {0} given.'.format(args.mpu))
+    sys.exit(1)
+
+verbose('Loading opcodes for {0}'.format(MPU))
 
 
 ### CONSTANTS ###
@@ -154,12 +178,6 @@ def string2bytes(s):
 
     s1 = l.split('"')[1] 
     return len(s1), [ord(a) for a in s1]
-
-# TODO see if this should be a formal error with RAISE and all of that
-def fatal(l,s): 
-    """Abort program because of fatal error during assembly"""
-    print('FATAL ERROR in line', l, ":", s)
-    sys.exit(1) 
 
 def convert_number(s): 
     # TODO We need to handle CURRENT marker as well
@@ -774,20 +792,12 @@ with open(args.listing, 'w') as f:
     f.write('Code origin is {0:06x},'.format(LC0))
     f.write(' {0:x} bytes of machine code generated\n'.format(code_size))
 
+    # TODO write listing
+    # TODO add symbol list
+
 verbose('STEP LIST: Created listing as {0}\n'.\
         format(args.listing))
 
-
-
-# --- Step SYMBOLS: Create symbol file ---
-
-# TODO save symbol table file 
-
-verbose('STEP SYM_TABLE: Created symbol table listing as {0} (DUMMY)\n'\
-        .format(args.symbols))
-
-if args.verbose:
-    dump_symbol_table(symbol_table, "at end of run (all numbers in hex)")
 
 
 
