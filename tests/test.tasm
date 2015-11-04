@@ -1,21 +1,29 @@
-; Dummy assembler file for 
-; A Crude Assembler for the 65816 in Python 
+; Test file for 
+; A Tinkerer's Assembler for the 6502/65c02/65816
 
+            .mpu 65816
+
+    .macro frogsbreath
+            nop
+    .endmacro
 
             .origin 0e000   ; must come first
 
-            data = e010
             jack = 1000
 
-            .a16
+            .native
+    .invoke frogsbreath
+            .axy16
 
             lda jack 
             sta 2000
 
             stp
 
-            .advance data
+-> good     .axy8
 
-            .long 010203 
+            .advance jill
+
+-> jill    .long 010203 
 
             .end

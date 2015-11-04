@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 2. Nov 2015 
+# This version: 3. Nov 2015 
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,6 +41,7 @@ if sys.version_info.major != 3:
 
 # Initialize various counts
 
+n_invocations = 0
 n_warnings = 0
 
 
@@ -86,8 +87,23 @@ def warning(s):
     if args.warnings:
         print('WARNING:', s) 
         
+def hexdump(listing, addr65 = 0):
+    """Print hexdump of listing to screen"""
 
-# Import opcodes depending on MPU type 
+    print('{0:06x}'.format(addr65), end=': ')
+    c = 0 
+
+    for e in listing:
+        print('{0:02x}'.format(e), end=' ')
+        c += 1
+        if c % 16 == 0:
+            print()
+            addr65 += 16
+            print('{0:06x}'.format(addr65), end=': ')
+    print('\n') 
+
+
+### IMPORT OPCODE TABLE ### 
 
 MPU = args.mpu.lower() 
 
@@ -98,7 +114,8 @@ elif MPU == '65c02':
 elif MPU == '65816':
     from opcodes65816 import opcode_table
 else:
-    print('FATAL: Unknown MPU type {0} given.'.format(args.mpu))
+    # Paranoid, this should be caught by argparse routines automatically
+    print('FATAL: Unknown MPU type {0} given'.format(args.mpu))
     sys.exit(1)
 
 verbose('Loading opcodes for {0}'.format(MPU))
@@ -111,11 +128,12 @@ COMMENT = ';'       # Change this for a different comment marker
 CURRENT = '*'       # Marks current location counter
 SEPARATORS = '[.:]' # Legal separators in number strings in RE format
 
-HEX_PREFIX = '$'           # Prefix for hexadecimal numbers
-BIN_PREFIX = '%'        # Prefix for binary numbers
-DEC_PREFIX = '&'       # Prefix for decimal numbers (SUBJECT TO CHANGE)
+HEX_PREFIX = '$'    # Prefix for hexadecimal numbers
+BIN_PREFIX = '%'    # Prefix for binary numbers
+DEC_PREFIX = '&'    # Prefix for decimal numbers (SUBJECT TO CHANGE)
 
-ST_WIDTH = 16       # Number of chars of symbol from Symbol Table printed
+ST_WIDTH = 10       # Number of chars of symbol from Symbol Table printed
+INDENT = ' '*12     # Indent in whitespace for inserted instructions
 
 LC0 = 0             # Start address of code ("location counter") 
 LCi = 0             # Index to where we are in code
@@ -123,6 +141,7 @@ LCi = 0             # Index to where we are in code
 symbol_table = {}
 
 # Positions in the opcode tables
+
 OT_OPCODE = 0 
 OT_MNEMONIC = 1 
 OT_N_BYTES = 2
@@ -227,6 +246,7 @@ def dump(l):
         print()
 
 def dump_symbol_table(d=symbol_table, s=""):
+    """Print Symbol Tabel to screen"""
     print('Symbol Table', s)
 
     if len(symbol_table) > 0: 
@@ -251,14 +271,18 @@ def dump_symbol_table(d=symbol_table, s=""):
 # always reference the original line number at each stage. 
 
 
-# --- Step ZERO: Set up timing, print banner ---
+# -------------------------------------------------------------------
+# STEP ZERO: Set up timing, print banner 
 
 # TODO print banner
 
 time_start = timeit.default_timer() 
 
+verbose('Beginning assembly. Timer started.')
 
-# --- Step RAW: Import original code and add line numbers ---
+
+# -------------------------------------------------------------------
+# STEP RAW: Import original code and add line numbers
 
 # Line numbers start with 1 because this is for humans
 
@@ -269,7 +293,8 @@ verbose('STEP RAW: Read {0} lines from {1}'.format (len(sc_raw), args.source))
 dump(sc_raw) 
 
 
-# --- Step EMPTY: Remove empty lines ---
+# -------------------------------------------------------------------
+# Step EMPTY: Remove empty lines
 # TODO keep empty lines in separate list to reconstruct listing file
 
 sc_empty = []
@@ -282,7 +307,8 @@ verbose('STEP EMPTY: Removed {0} empty lines'.format(len(sc_raw)-len(sc_empty)))
 dump(sc_empty) 
 
 
-# --- Step COMMENTS: Remove comments that span whole lines ---
+# -------------------------------------------------------------------
+# STEP COMMENTS: Remove comments that span whole lines
 # TODO keep comment lines in separate list to reconstruct listing file
 
 sc_comments = []
@@ -295,7 +321,8 @@ verbose('STEP COMMENTS: Removed {0} full-line comments'.format(len(sc_empty)-len
 dump(sc_comments) 
 
 
-# -- Step INLINES: Remove comments that are inline ---
+# -------------------------------------------------------------------
+# STEP INLINES: Remove comments that are inline
 # TODO keep inline comments in a separate list to reconstruct file listing
 
 def remove_inlines(l): 
@@ -308,56 +335,113 @@ sc_inlines = []
 for n, l in sc_comments:
     sc_inlines.append((n, remove_inlines(l)))
 
-verbose('STEP INLINES: Removed all inline comments') 
+verbose('STEP INLINES: Removed all inline comments and terminating linefeeds') 
 dump(sc_inlines) 
 
-    
-# --- Step MACROS: Define macros ---
-# TODO code this 
 
-verbose('STEP MACROS: Defined 0 macros (DUMMY, not coded yet)')
-# TODO add dump 
+# -------------------------------------------------------------------
+# STEP MPU: Make sure we have the correct MPU listed
+
+sc_mpu = []
+
+# MPU line should be in first line now 
+ml = sc_inlines[0][1].strip().split() 
+n = sc_inlines[0][0]
+
+if ml[0].lower() != '.mpu': 
+    fatal('No ".mpu" directive found at beginning of source file')
+
+if ml[1] != MPU:
+    fatal(n, 'MPU mismatch: {0} given, {1} in source file'.\
+            format(MPU, ml[1]))
+
+sc_mpu = sc_inlines[1:]
+
+verbose('STEP MPU: Found .mpu directive, "{0}", agrees with MPU given'.\
+        format(MPU))
+dump(sc_mpu)
 
 
-# --- STEP EXPAND: Expand macros in source code --- 
-# TODO code this 
+# -------------------------------------------------------------------
+# STEP LOWER: Convert everything to lower case
 
-sc_expand = sc_inlines
+sc_lower = [(n, l.lower()) for n, l in sc_mpu] 
 
-verbose('STEP EXPAND: Expanded 0 macros (DUMMY, not coded yet)')
-dump(sc_expand) 
-
-
-# --- Step LOWER: Convert everything to lower case ---
-
-sc_lower = [(n, l.lower()) for n, l in sc_expand] 
-
-verbose('STEP LOWER: Converted all remaining code to lower case')
+verbose('STEP LOWER: Converted all lines to lower case')
 dump(sc_lower) 
 
 
-# --- Step ORIGIN: Find .ORIGIN directive, initialize location counter ---
-# TODO Move this up: Have MACRO section fail if no origin
+# -------------------------------------------------------------------
+# STEP MACROS: Define macros 
+# TODO add parameters 
+
+sc_macros = []
+macros = {}
+are_defining = False 
+macro_name = ''
+
+for mn, ml in enumerate(sc_lower): 
+
+    w = ml[1].split() 
+
+    if are_defining:
+
+        if w[0] != ".endmacro": 
+            macros[macro_name].append((ml[0], ml[1]))
+        else: 
+            are_defining = False 
+            continue 
+
+    else:
+
+        if w[0] != '.macro':    # .MACRO must be first in the line 
+            sc_macros.append((ml[0], ml[1]))
+            continue 
+        else: 
+            verbose('Found macro {0} in line {1}'.\
+                    format(w[1], ml[0]))
+
+            macro_name = w[1]
+            macros[macro_name] = []
+            are_defining = True 
+
+
+verbose('STEP MACROS: Defined {0} macros'.format(len(macros)))
+
+if args.dump: 
+
+    for m in macros.keys(): 
+        print('Macro {0}:'.format(m))
+
+        for ml in macros[m]:
+            print('    {0}'.format(ml)) 
+
+    print() 
+
+
+# -------------------------------------------------------------------
+# STEP ORIGIN: Find .ORIGIN directive
 
 sc_origin = []
 
 # ORIGIN line should be in first line now 
-originline = sc_lower[0][1].strip().split() 
+originline = sc_macros[0][1].strip().split() 
 
 # TODO rewrite so this works with ".org" as well
 if originline[0] != ".origin":
-    l = sc_lower[0][0]
+    l = sc_macros[0][0]
     fatal(l, 'No ORIGIN directive found, must be first line after macros') 
 
 _, LC0 = convert_number(originline[1])  # ORIGIN may not take a symbol (yet)
-sc_origin = sc_lower[1:]
+sc_origin = sc_macros[1:]
 
 verbose('STEP ORIGIN: Found ORIGIN directive, starting at {0:06x}'.\
         format(LC0))
 dump(sc_origin) 
 
 
-# --- Step END: Make sure we have an .END directive --- 
+# -------------------------------------------------------------------
+# STEP END: Find .END directive 
 
 endline = sc_origin[-1][1].strip().split() 
 
@@ -370,7 +454,8 @@ verbose('STEP END: Found END directive in last line')
 dump(sc_end) 
 
 
-# --- Step ASSIGN: Handle assignment lines ---
+# -------------------------------------------------------------------
+# STEP ASSIGN: Handle assignments
 
 verbose('Initializing symbol table') 
 
@@ -393,18 +478,127 @@ if args.verbose:
     dump_symbol_table(symbol_table, "after ASSIGN (all numbers in hex)")
 
 
-# --- Step PASS1: Create Intermediate File ---
+# -------------------------------------------------------------------
+# STEP INVOKE: Insert macro definitions
+
+# Macros must be expanded before we touch the .NATIVE and .AXY directives
+# because those might be in the macros
+
+sc_invoke = []
+pre_len = len(sc_assign)
+
+for n, l in sc_assign: 
+    
+    if '.invoke' not in l:
+        sc_invoke.append((n, l)) 
+    else:
+        print('DUMMY: Expanding Macro in line {0}'.\
+                format(n))
+
+# HIER HIER 
+
+post_len = len(sc_invoke)
+verbose('STEP INVOKE: Expanded {0} macros, adding {1} lines'.\
+        format(n_invocations, post_len - pre_len))
+
+dump(sc_invoke)
+
+# -------------------------------------------------------------------
+# STEP MODES: Handle '.native' and '.emulated' directives
+
+# .NATIVE and .EMULATED can either be alone in their line, or with a label or
+# a local label, because people do that. If the line contains one word, it will
+# be the directive, if there are two or three, it will be the last one and we
+# need to conserve the other two.
+
+sc_modes = []
+
+for n, l in sc_invoke:
+
+    if '.native' in l:
+        rest = l.replace('.native', '')  # Delete substring
+        
+        if rest.strip() != '':  
+            sc_modes.append((n, rest)) 
+
+        # We need the spaces so we don't screw up label detection later
+        sc_modes.append((n, INDENT+'clc'))
+        sc_modes.append((n, INDENT+'xce'))
+
+    elif '.emulated' in l: 
+        rest = l.replace('.emulated', '')  # Delete substring
+        
+        if rest.strip() != '':  
+            sc_modes.append((n, rest)) 
+
+        # We need leading spaces so we don't screw up label detection later
+        sc_modes.append((n, INDENT+'sec'))
+        sc_modes.append((n, INDENT+'xce'))
+
+    else:
+        sc_modes.append((n, l))
+        
+ 
+verbose('STEP MODES: Handled mode switches')
+dump(sc_modes) 
+
+
+# -------------------------------------------------------------------
+# STEP AXY: Handle register size switches
+
+# We add the actual REP/SEP instructions as well as internal directives for the
+# following steps 
+
+sc_axy = []
+
+# We need leading spaces so we don't screw up label detection later
+axy_ins = {
+'.a8':    ((INDENT+'sep 20'), (INDENT+'.a->8')),
+'.a16':   ((INDENT+'rep 20'), (INDENT+'.a->16')), 
+'.xy8':   ((INDENT+'sep 10'), (INDENT+'.xy->8')) ,
+'.xy16':  ((INDENT+'rep 10'), (INDENT+'.xy->16')), 
+'.axy8':  ((INDENT+'sep 30'), (INDENT+'.a->8'), (INDENT+'.xy->8')),
+'.axy16': ((INDENT+'rep 30'), (INDENT+'.a->16'), (INDENT+'.xy->16')) } 
+
+for n, l in sc_modes:
+    have_found = False
+
+    for a in axy_ins: 
+
+        if a in l:
+
+            for e in axy_ins[a]:
+                sc_axy.append((n, e))
+                have_found = True
+
+            rest = l.replace(a, '')  
+        
+            # Some people put label markers in the same line as these
+            # directives, so we have to let them by copying the rest of the line
+            # back to the beginning of the next
+            if rest.strip() != '':  
+                sc_axy.append((n, rest)) 
+
+    if not have_found:
+        sc_axy.append((n, l)) 
+
+verbose('STEP AXY: Handled register size switches (8/16 bit for A, X, and Y)')
+dump(sc_axy) 
+
+
+# -------------------------------------------------------------------
+# STEP PASS1: Create Intermediate File
 
 # Life is easier if we define the entry types down here. See "Although
 # practicality beats purity", https://www.python.org/dev/peps/pep-0020/
 
-# TODO This is too monolithic. Break it up so we find the AXY markers first,
-# then only go through and fill up the symbol table, even if this means losing
-# information that we pick up on this pass
-
 cpu_mode = "emulated"
 a_mode = 8 
 xy_mode = 8 
+
+
+
+
 
 
 # Intermediate file Entry types 
@@ -435,17 +629,13 @@ pass1_entry_types = {
        10: 'A16',  # See if these are required
        11: 'A8',
        12: 'XY16',
-       13: 'XY8',
-       14: 'AXY16',
-       15: 'AXY8'}
+       13: 'XY8'}
 
 pass1_axy_variants = {
         '.a8': [0xe2, 0x20],  # sep 20 
         '.a16': [0xc2, 0x20],  # rep 20 
         '.xy8': [0xe2, 0x10],  # sep 10 
-        '.xy16': [0xc2, 0x10],  # rep 10 
-        '.axy8': [0xe2, 0x30],  # sep 30 
-        '.axy16': [0xc2, 0x30]} # rep 30 
+        '.xy16': [0xc2, 0x10]}  # rep 10 
 
 
 # Intermediate file is a list of entries, each a list, with three elements: The
@@ -463,7 +653,7 @@ sc_pass1 = []       # Immediate file
 
 # Loop through all lines 
 
-for n, l in sc_assign:
+for n, l in sc_axy:
 
     w = l.split()
     w0 = w[0].strip() 
@@ -474,7 +664,7 @@ for n, l in sc_assign:
     
     if w0 == '->':
 
-        # Warn if symbol name is missing, a non-fatal error
+        # If the labe name is missing, this is a local label
         
         try:
             w1 = w[1].strip()
@@ -589,6 +779,7 @@ for n, l in sc_assign:
 
         continue 
 
+
     # --- Substep BYTE: See if we have a .BYTE directive
     # TODO Break these data out and make them their own pass
     
@@ -674,25 +865,7 @@ for n, l in sc_assign:
         continue 
 
 
-    # -- Substep CPU_MODE: See if we have native or emulated directive
-    
-    # This must come after label directive
-    # TODO 00 is a dummy value in MODE_ , see if needed
-
-    if w0 == '.native':
-        sc_pass1.append((n, OPC_DONE, [0x18])) # clc
-        sc_pass1.append((n, OPC_DONE, [0xfb])) # xce
-        sc_pass1.append((n, MODE_NATIVE, [])) # Payload is dummy
-        cpu_mode = 'native'
-        continue
-
-    if w0 == '.emulated':
-        sc_pass1.append((n, OPC_DONE, [0x38])) # sec
-        sc_pass1.append((n, OPC_DONE, [0xfb])) # xce
-        sc_pass1.append((n, MODE_EMULATED, [])) # Payload is dummy
-        cpu_mode = 'emulated'
-        continue
-    
+   
     
     # --- Substep AXY: Handle AXY direcives
     
@@ -751,25 +924,14 @@ code_size = len(object_code)
 
 verbose('STEP PASS2: Generated binary object code') 
 
-# TODO Move this to a separate routine 
+# TODO add dump of file
+
 if args.dump:
-
-    c = 0 
-    lcp = LC0
-
-    print('{0:06x}'.format(lcp), end=': ')
-
-    for e in sc_pass2:
-        print('{0:02x}'.format(e), end=' ')
-        c += 1
-        if c % 16 == 0:
-            print()
-            lcp += 16
-            print('{0:06x}'.format(lcp), end=': ')
-    print('\n') 
+    hexdump(sc_pass2, LC0)
 
 
-# --- Step BIN: Save binary file --- 
+# -------------------------------------------------------------------
+# STEP BIN: Save binary file 
 
 with open(args.output, 'wb') as f:
     f.write(object_code)
@@ -781,22 +943,67 @@ if n_warnings != 0 and args.warnings:
     print('Generated {0} warning(s).'.format(n_warnings))
 
 
-# --- Step LIST: Create listing file ---
+# -------------------------------------------------------------------
+# STEP LIST: Create listing file
 
 with open(args.listing, 'w') as f:
     f.write(title_string)
-    f.write('Code listing file {0} generated on {1}\n'\
-            .format(args.listing, time.asctime()))
+    f.write('Code listing for file {0}\n'.format(args.source))
+    f.write('Generated on {0}\n'.format(time.asctime()))
+    f.write('Target MPU was {0}\n'.format(MPU))
+    time_end = timeit.default_timer() 
+    f.write('Assembly time was {0:.5f} seconds\n'.format(time_end - time_start))
     if n_warnings != 0:
         f.write('Generated {0} warnings.\n'.format(n_warnings))
-    f.write('Code origin is {0:06x},'.format(LC0))
-    f.write(' {0:x} bytes of machine code generated\n'.format(code_size))
+    f.write('Code origin is {0:06x}\n'.format(LC0))
+    f.write('Generated {0} bytes of machine code\n'.format(code_size))
 
-    # TODO write listing
-    # TODO add symbol list
+    # Add listing 
+    f.write('\nLISTING:\n')
+
+    # TODO write this 
+
+
+    # Add macros
+    f.write('\nMACROS:\n')
+
+    if len(macros) > 0: 
+
+        for m in macros.keys(): 
+            f.write('Macro {0}\n'.format(m))
+
+            for ml in macros[m]:
+                f.write('    {0}\n'.format(ml)) 
+
+        f.write('\n') 
+
+    else:
+        f.write('    (none)\n')
+
+
+    # Add symbol list 
+    f.write('\nSYMBOLS:\n')
+
+    if len(symbol_table) > 0: 
+
+        for v in sorted(symbol_table):
+            f.write('{0} : {1:x}\n'.format(v.rjust(ST_WIDTH), symbol_table[v]))
+        f.write('\n')
+
+    else:
+        f.write('    (empty)\n')
+
 
 verbose('STEP LIST: Created listing as {0}\n'.\
         format(args.listing))
+
+
+# -------------------------------------------------------------------
+# STEP HEXDUMP: Create hexdump file if requested
+
+if args.hexdump:
+    print("DUMMY creating hexdump file TINK.HEX")
+    
 
 
 
