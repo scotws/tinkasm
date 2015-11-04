@@ -20,10 +20,10 @@
 
             stp
 
--> good     .axy8
+good        .axy8
 
             .advance jill
 
--> jill    .long 010203 
+jill        .long 010203 
 
             .end

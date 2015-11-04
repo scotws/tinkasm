@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 3. Nov 2015 
+# This version: 04. Nov 2015 
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 
 import argparse
 import re
+import string
 import sys
 import time
 import timeit
@@ -34,16 +35,13 @@ import timeit
 import special     
 
 # Check for correct version of Python
-
 if sys.version_info.major != 3:
     print("FATAL: Python 3 required. Aborting.")
     sys.exit(1) 
 
 # Initialize various counts
-
 n_invocations = 0
 n_warnings = 0
-
 
 
 ### ARGUMENTS ###
@@ -372,6 +370,46 @@ dump(sc_lower)
 
 
 # -------------------------------------------------------------------
+# STEP BREAKUP: Split labels into their own lines
+
+# It's legal to have a label and either an opcode or a directive in the same
+# line. To make life easier for the following routines, we make sure each label
+# has it's own line. Since we have gotten rid of the full-line comments,
+# anything that is in the first column and is not whitespace is considered
+# a label. We don't distinguish between global and local labels at this point
+
+# It is tempting to start filling the symbol table at this point because we're
+# touching all the labels and that would be far more efficient. However, we keep
+# these steps separate for ideological reasons. 
+
+sc_breakup = []
+
+for n, l in sc_lower:
+
+    # Most of the stuff will be whitespace
+    if l[0] in string.whitespace:
+        sc_breakup.append((n, l))
+        continue 
+
+    # We know now we have a label, we just don't know if it is alone in its
+    # line. 
+    w = l.split() 
+
+    # If we're alone in the line we're done 
+    if len(w) == 1:
+        sc_breakup.append((n, l))
+        continue 
+
+    # Nope, there is some other stuff there
+    sc_breakup.append((n, w[0]))
+    rest = l.replace(w[0], '')  # Delete word from string
+    sc_breakup.append((n, (len(w[0])*' ')+rest))
+
+verbose('STEP BREAKUP: All labels have a line to themselves')
+dump(sc_breakup)
+
+
+# -------------------------------------------------------------------
 # STEP MACROS: Define macros 
 # TODO add parameters 
 
@@ -380,7 +418,7 @@ macros = {}
 are_defining = False 
 macro_name = ''
 
-for mn, ml in enumerate(sc_lower): 
+for mn, ml in enumerate(sc_breakup): 
 
     w = ml[1].split() 
 
@@ -391,20 +429,17 @@ for mn, ml in enumerate(sc_lower):
         else: 
             are_defining = False 
             continue 
-
     else:
-
-        if w[0] != '.macro':    # .MACRO must be first in the line 
+        # .MACRO must be first in the line, no labels allowed 
+        if w[0] != '.macro':    
             sc_macros.append((ml[0], ml[1]))
             continue 
         else: 
-            verbose('Found macro {0} in line {1}'.\
-                    format(w[1], ml[0]))
+            verbose('Found macro {0} in line {1}'.format(w[1], ml[0]))
 
             macro_name = w[1]
             macros[macro_name] = []
             are_defining = True 
-
 
 verbose('STEP MACROS: Defined {0} macros'.format(len(macros)))
 
@@ -537,7 +572,6 @@ for n, l in sc_invoke:
 
     else:
         sc_modes.append((n, l))
-        
  
 verbose('STEP MODES: Handled mode switches')
 dump(sc_modes) 

@@ -33,7 +33,7 @@ of Ice and Fire*.
 
 ### Drawbacks
 
-The first problem is that as an assembler, TinkAsm is horribly, horribly
+The first problem is that as an assembler, TinkAsm is horribly
 inefficient. 
 
 

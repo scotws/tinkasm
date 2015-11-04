@@ -1,7 +1,9 @@
 # Special Opcode Routines for the 65816 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 22. Okt 2015
-# This version: 27. Okt 2015
+# This version: 03. Nov 2015
+
+# TODO We probably don't need this at all, consider deleting it
 
 # Opcode routines for the MPUs. Make common routines so they can be used if we
 # ever expand to other processors. Load this before we load the pickled opcode

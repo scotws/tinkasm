@@ -1,7 +1,10 @@
-# Opcodes for the Tinkerer's Assembler for the 65816 
+# Opcodes for the Tinkerer's Assembler for the 6502/65c02/65816 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 23. Okt 2015
-# This version: 01. Nov 2015
+# This version: 03. Nov 2015
+
+# OPCODE TABLE for the 6502
+# TODO This table is not functional yet
 
 opcode_table = (
     (0x00, 'brk', 1, 0),
