@@ -40,6 +40,33 @@ inefficient.
 ### Internal Structure 
 
 
+## Assembler Features
+
+### Labels
+
+Tinkasm sees any string as a label that is in the first column of a line and is
+not the comment directive. In other words, anything that is *not* a label or a
+comment must have whitespace in front of it. Note there are no rules for the
+string itself. `*!$?' is a perfectly legal string. (TODO check Unicode
+characters). 
+
+During use, there are two kinds of label references, **global** and **local**. A
+global reference points to the label by name as is expected, for instance `jmp
+loop`. A local reference is either a `+` or a `-` that refers to the *next* or
+*previous* label regardless of the name. For instance:
+
+```
+ice&fire        nop
+                nop
+                jmp ice&fire    ; gobal reference
+                bra -           ; local reference
+```
+
+It is assumed that branches will always work with labels. 
+
+Currently, no arithmetic with label references is possible, such as `jmp cats +
+2`. This feature will be
+added in a future version.
 
 
 

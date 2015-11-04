@@ -9,7 +9,7 @@
 
             .origin 0e000   ; must come first
 
-            jack = 1000
+#!?*        jack = 1000
 
             .native
     .invoke frogsbreath
@@ -18,11 +18,13 @@
             lda jack 
             sta 2000
 
+            jmp #!?*
+
             stp
 
-good        .axy8
+jood        .axy8
 
-            .advance jill
+            .advance 
 
 jill        .long 010203 
 

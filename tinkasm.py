@@ -405,7 +405,7 @@ for n, l in sc_lower:
     rest = l.replace(w[0], '')  # Delete word from string
     sc_breakup.append((n, (len(w[0])*' ')+rest))
 
-verbose('STEP BREAKUP: All labels have a line to themselves')
+verbose('STEP BREAKUP: All labels now have a line to themselves')
 dump(sc_breakup)
 
 
@@ -430,7 +430,7 @@ for mn, ml in enumerate(sc_breakup):
             are_defining = False 
             continue 
     else:
-        # .MACRO must be first in the line, no labels allowed 
+        # .MACRO must be first in the line
         if w[0] != '.macro':    
             sc_macros.append((ml[0], ml[1]))
             continue 
@@ -541,37 +541,26 @@ dump(sc_invoke)
 # -------------------------------------------------------------------
 # STEP MODES: Handle '.native' and '.emulated' directives
 
-# .NATIVE and .EMULATED can either be alone in their line, or with a label or
-# a local label, because people do that. If the line contains one word, it will
-# be the directive, if there are two or three, it will be the last one and we
-# need to conserve the other two.
+# Since we have moved labels to their own lines, we assume that both .NATVIE
+# and .EMULATED alone in their respective lines
 
 sc_modes = []
 
 for n, l in sc_invoke:
 
     if '.native' in l:
-        rest = l.replace('.native', '')  # Delete substring
-        
-        if rest.strip() != '':  
-            sc_modes.append((n, rest)) 
-
-        # We need the spaces so we don't screw up label detection later
+        # Spaces are for cosmetic reasons, as we have already handled labels
         sc_modes.append((n, INDENT+'clc'))
         sc_modes.append((n, INDENT+'xce'))
+        continue 
 
-    elif '.emulated' in l: 
-        rest = l.replace('.emulated', '')  # Delete substring
-        
-        if rest.strip() != '':  
-            sc_modes.append((n, rest)) 
-
-        # We need leading spaces so we don't screw up label detection later
+    if '.emulated' in l: 
+        # Spaces are for cosmetic reasons, as we have already handled labels
         sc_modes.append((n, INDENT+'sec'))
         sc_modes.append((n, INDENT+'xce'))
-
-    else:
-        sc_modes.append((n, l))
+        continue
+    
+    sc_modes.append((n, l))
  
 verbose('STEP MODES: Handled mode switches')
 dump(sc_modes) 
@@ -585,7 +574,7 @@ dump(sc_modes)
 
 sc_axy = []
 
-# We need leading spaces so we don't screw up label detection later
+# Indentation is cosmetic, as we have already handled labels
 axy_ins = {
 '.a8':    ((INDENT+'sep 20'), (INDENT+'.a->8')),
 '.a16':   ((INDENT+'rep 20'), (INDENT+'.a->16')), 
@@ -599,19 +588,13 @@ for n, l in sc_modes:
 
     for a in axy_ins: 
 
+        # Because we moved labels to their own lines, we can assume that
+        # register switches are alone in the line
         if a in l:
 
             for e in axy_ins[a]:
                 sc_axy.append((n, e))
                 have_found = True
-
-            rest = l.replace(a, '')  
-        
-            # Some people put label markers in the same line as these
-            # directives, so we have to let them by copying the rest of the line
-            # back to the beginning of the next
-            if rest.strip() != '':  
-                sc_axy.append((n, rest)) 
 
     if not have_found:
         sc_axy.append((n, l)) 
