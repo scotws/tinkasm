@@ -121,9 +121,9 @@ verbose('Loading opcodes for {0}'.format(MPU))
 
 ### CONSTANTS ###
 
-ASSIGN = "="        # Used instead of ".equ" or such
 COMMENT = ';'       # Change this for a different comment marker 
 CURRENT = '*'       # Marks current location counter
+LOCAL_LABEL = '@'   # Marks local labels
 SEPARATORS = '[.:]' # Legal separators in number strings in RE format
 
 HEX_PREFIX = '$'    # Prefix for hexadecimal numbers
@@ -373,14 +373,14 @@ dump(sc_lower)
 # STEP BREAKUP: Split labels into their own lines
 
 # It's legal to have a label and either an opcode or a directive in the same
-# line. To make life easier for the following routines, we make sure each label
-# has it's own line. Since we have gotten rid of the full-line comments,
-# anything that is in the first column and is not whitespace is considered
+# line. To make life easier for the following routines, here we make sure each
+# label has it's own line. Since we have gotten rid of the full-line comments,
+# anything that is in the first column and is not whitespace is then considered
 # a label. We don't distinguish between global and local labels at this point
 
-# It is tempting to start filling the symbol table at this point because we're
-# touching all the labels and that would be far more efficient. However, we keep
-# these steps separate for ideological reasons. 
+# It is tempting to start filling the symbol table here because we're touching
+# all the labels and that would be far more efficient. However, we keep these
+# steps separate for ideological reasons. 
 
 sc_breakup = []
 
@@ -412,6 +412,12 @@ dump(sc_breakup)
 # -------------------------------------------------------------------
 # STEP MACROS: Define macros 
 # TODO add parameters 
+
+# We currently can add macros anywhere in the source code, whereas the
+# literature says to limit it to the area before the code. As long as this
+# works, it provides more flexibility
+
+# Note we cannot nest macros (yet). 
 
 sc_macros = []
 macros = {}
@@ -492,13 +498,27 @@ dump(sc_end)
 # -------------------------------------------------------------------
 # STEP ASSIGN: Handle assignments
 
-verbose('Initializing symbol table') 
+# We accept two kinds of assignment directives , "=" and ".equ". Since we've
+# moved all labels to their own lines, any such directive must be the second
+# word in the line.
 
 sc_assign = []
 
 for n, l in sc_end:
-    if ASSIGN in l: 
-        s, v = l.split(ASSIGN)
+
+    w = l.split() 
+
+    # An assigment line must have three words at least. The "at least" part
+    # is to be able to add math functions later
+    if len(w) < 3:
+        sc_assign.append((n, l))
+        continue 
+
+    # Sorry, Lisp and Forth coders, infix notation only here
+    a = w[1] 
+
+    if '='or a == '.equ': 
+        s, v = l.split(a)
         symbol = s.split()[-1] 
         _, value = convert_number(v.split()[0])  # Can't do symbol to symbol
         symbol_table[symbol] = value  
@@ -515,9 +535,10 @@ if args.verbose:
 
 # -------------------------------------------------------------------
 # STEP INVOKE: Insert macro definitions
+# TODO Add parameters
 
 # Macros must be expanded before we touch the .NATIVE and .AXY directives
-# because those might be in the macros
+# because those might be present in the macros
 
 sc_invoke = []
 pre_len = len(sc_assign)
@@ -526,17 +547,32 @@ for n, l in sc_assign:
     
     if '.invoke' not in l:
         sc_invoke.append((n, l)) 
-    else:
-        print('DUMMY: Expanding Macro in line {0}'.\
-                format(n))
+        continue 
+        
+    # Name of macro to invoke must be second word in line
+    w = l.split()
+    
+    try:
+        m = macros[w[1]]
+    except KeyError:
+        fatal(n, 'Attempt to invoke non-existing macro "{0}"'.\
+                format(w[1]))
 
-# HIER HIER 
+    for ml in m:
+        sc_invoke.append(ml)
+
+    n_invocations += 1
+    verbose('Expanding macro {0} into line {1}'.\
+                format(w[1], n))
 
 post_len = len(sc_invoke)
-verbose('STEP INVOKE: Expanded {0} macros, adding {1} lines'.\
-        format(n_invocations, post_len - pre_len))
 
+# We give the "net" number of lines added because we also remove the invocation
+# line itself
+verbose('STEP INVOKE: {0} macro expansions, net {1} lines added'.\
+        format(n_invocations, post_len - pre_len))
 dump(sc_invoke)
+
 
 # -------------------------------------------------------------------
 # STEP MODES: Handle '.native' and '.emulated' directives
@@ -796,6 +832,9 @@ for n, l in sc_axy:
 
         continue 
 
+# -------------------------------------------------------------------
+# STEP DATA: Handle directives that store data directly
+
 
     # --- Substep BYTE: See if we have a .BYTE directive
     # TODO Break these data out and make them their own pass
@@ -844,6 +883,8 @@ for n, l in sc_axy:
         LCi += len(w[1:]) * 3
         continue 
 
+# -------------------------------------------------------------------
+# STEP STRINGS: Handle directives that store strings directly
 
     # --- Substep STRING: See if we have a .STRING directive
     # TODO see if we want to combine all string directives
@@ -882,19 +923,6 @@ for n, l in sc_axy:
         continue 
 
 
-   
-    
-    # --- Substep AXY: Handle AXY direcives
-    
-    # This is the last legal entry possible. 
-
-    try:
-        sl = pass1_axy_variants[w0]
-    except KeyError:
-        fatal(n, 'Instruction or directive "{0}" unknown.'.format(w[0])) 
-    else:
-        # TODO see if we have to append a marker for AXY etc for pass 2
-        sc_pass1.append((n, OPC_DONE, sl))
 
 
 verbose('STEP PASS1: Created intermediate file')
@@ -904,9 +932,16 @@ if args.dump:
         print('{0:5d}: {1} {2}'.format(l, pass1_entry_types[t], bl))
     print()
 
+# -------------------------------------------------------------------
+# STEP VALIDATE: Make sure we only have DATA_DONE and OPC_DONE entries
+
+sc_validate = []
+
+verbose('STEP VALIDATE: Confirmed all lines assembled as binary data')
+dump(sc_validate)
 
 
-# --- Step PASS2: Create binary file --- 
+# -------------------------------------------------------------------
 
 # TODO use bytearray because it is faster (http://www.dotnetperls.com/bytes)
 sc_pass2 = []

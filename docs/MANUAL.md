@@ -3,7 +3,7 @@
 Scot W. Stevenson <scot.stevenson@gmail.com>
 
 
-### Overview
+## Overview
 
 The Tinkerer's Assembler (TinkAsm for short) is a multi-pass assembler for the
 6502, 65c02, and 65816 8/16-MPUs. It is written in simple Python 3 code with the
@@ -12,65 +12,152 @@ understand, but also easy to modify and adapt to their own needs. It uses the
 Typist's Assembler Notation (TAN) and is released under the GPL. 
 
 
-### Basic Idea
+## Basic Idea
+
+People who want to play around with assemblers but are not computer scientists
+have a rough time. Like compilers, professional grade assemblers involve things
+like lexers and parsers, formal grammars, descending down to strange places and
+using weird things called ASTs. And if writing one weren't bad enough, but
+trying to adapt other people's assemblers to experiment with them is far worse. 
+
+This is an assembler for the 6502, 65c02, and 65816 MPUs for people who like to
+tinker -- hence the name: A Tinkerer's Assembler. Instead of parsing and lexing
+the source code and doing other computer science stuff, the assembly
+process is broken down into a large number of very simple passes that each do
+one thing. Easy to understand, easy to modify. 
+
+This, then, is an assembler for those of us who associate the "Wizard Book" with
+*Lord of the Rings* and the "Dragon Book" with *A Song of Ice and Fire.* Enjoy.
 
 
-(Assemblers involve all kinds of complicated words like parsers, lexers)
+## Use
 
-TinkAsm, in contrast, is written in a series of simple passes that (usually) do
-exactly one thing. 
+TinkAsm requires Python 3.4 or later. It will not run with Python 2.7. 
 
-It is written in Python, probably the most widespread easily accessable
-language. What is more, it is written in *simple* Python. There are no objects,
-and though some simple list comprehensions and enumerations are used, it relies
-heavily on FOR/ELIF/ELSE and TRY/EXCEPT constructs. 
+The assembler does not distinguish between upper and lower case (internally, all
+is converted to lower case). 
 
-
-This, then, is an assembler for non-computer scientists - for those of us who
-associate "the Wizard Book" with *Lord of the Rings* and "the Dragon Book" with *A Song
-of Ice and Fire*. 
+(call options) 
 
 
-### Drawbacks
+### PARAMETERS
 
-The first problem is that as an assembler, TinkAsm is horribly
-inefficient. 
+-i --input      - Input assembler file (required) 
+-o --output     - Output file for the binary code, default is tasm.bin 
+-l --listing    - Output file for the listing, default is tasm.txt  
+-v --verbose    - Print more info about each assembly step
+-d --dump       - Dump state of inbetween steps, produces lots of output
+-x --hexdump    - Create a human-readable hexdump file tasm.hex
 
 
-### Internal Structure 
 
+## Drawbacks
 
-## Assembler Features
+Because of the way it is structured, as an assembler, TinkAsm is horribly
+inefficient as an actual assembler. If you're in it for raw speed, this is not
+the assembler for you. 
+
+TinkAsm assumes that there is one and one menemonic for each opcode. This is why
+the assembler uses Typist's Assembler Notation (TAN) instead of traditional
+notation for these MPUs. 
+
+## Use 
 
 ### Labels
 
-Tinkasm sees any string as a label that is in the first column of a line and is
+TinkAsm sees any string as a label that is in the first column of a line and is
 not the comment directive. In other words, anything that is *not* a label or a
 comment must have whitespace in front of it. Note there are no rules for the
 string itself. `*!$?' is a perfectly legal string. (TODO check Unicode
 characters). 
 
-During use, there are two kinds of label references, **global** and **local**. A
-global reference points to the label by name as is expected, for instance `jmp
-loop`. A local reference is either a `+` or a `-` that refers to the *next* or
-*previous* label regardless of the name. For instance:
+During use, there are two kinds of label references, global and local. A
+**global** reference points to the label by name as is expected. 
 
 ```
 ice&fire        nop
                 nop
                 jmp ice&fire    ; gobal reference
-                bra -           ; local reference
+                
 ```
 
-It is assumed that branches will always work with labels. 
+A **local reference** is an easy to use form of a label for trivial uses such as
+loops. It consists of `@` as the generic label and either a `+` or a `-` after
+the jump or branch instruction. 
+
+```
+@               nop
+                nop
+                jmp -           ; local reference
+```
+The `-` or `+` always refers to the next or previous `@`. 
+
+It is assumed that branches will always be given a label, not the relative
+offset. There is in fact currently no way to pass on such offset.
 
 Currently, no arithmetic with label references is possible, such as `jmp cats +
-2`. This feature will be
-added in a future version.
+2`. This feature will be added in a future version.
+
+
+### Macros
+
+The macro system of TinkAsm is currently very primitive. Macros do not accept
+parameters and cannot reference other macros.
+
+To define a macro, use the directive `.macro` followed by the name string of the
+macro. No label may preceed the directive. In a future version, parameters will
+follow the name string. The actual macro contents follow in the subsequent
+lines in the usual format. The macro definition is terminated by `.endmacro` in
+its own line.
+
+To expand a macro, use the `.invoke` directive followed by the macro's name. In
+future versions, this will be followed optional parameters. 
 
 
 
-### (OLD STUFF BELOW HERE) 
+## Internals 
+
+
+### Structure 
+
+Each pass starts by defining the empty list that will filled with the output of
+this stage. Processing the previous list is usually handled by walking through
+each line, modifying what needs to be changed, and then appending the processed
+line to the new list. 
+
+At the end, we offer the options of printing an
+information string if we are in verbose mode, or dumping the complete list.
+
+
+### Coding Style
+
+We try to avoid complicated IF/ELIF/ELSE constructs, using IF/CONTINUE instead.
+For example, 
+
+```
+if cond:
+    stuff1
+else:
+    stuff2
+```
+
+should be coded as
+
+```
+if cond:
+    stuff1
+    continue 
+
+stuff 2
+```
+In the same manner, we usually use TRY/EXCEPT to get rid of the error condition
+instead of including a complete construct with TRY/EXCEPT/ELSE/FINALLY.
+
+The use of ELSE after FOR loops is prohibitted, as it confuses Python newbies no
+end. 
+
+
+# (OLD STUFF BELOW HERE) 
 
 
 The 65816 is the ["big sibling"](http://en.wikipedia.org/wiki/WDC_65816/65802)
@@ -94,25 +181,8 @@ it.
 
 See `docs/MANUAL.txt` for further information.
 
-### DEVELOPMENT
-
-This program is a hobby, and is developed in fits and starts. Feedback is most
-welcome. 
 
 
-
-- Requires Python 3.4 or later. Will not run with Python 2.7. 
-- Does not distinguish between upper and lower case (internally, all is converted to lower case)
-
-
-
-### PARAMETERS
-
--i --input      - Input assembler file (required) 
--o --output     - Output file for the binary code, default is tasm.bin 
--l --listing    - Output file for the listing, default is tasm.txt  
--v --verbose    - Print more info about each assembly step
--d --dump       - Dump state of inbetween steps, produces lots of output
 
 
 DIRECTIVES
@@ -141,10 +211,18 @@ DIRECTIVES
 
 ### INTERNAL STRUCTURE
 
-The Typist's Assembler was built with a few assumptions in mind. First, the code to be assembled will be very small relative to current normal hardware specifications: The total memory space of the 65816 is 16 MB, while my machine 
-has 16 GB of RAM. Because of this, saving space was a low priority. This is also true for speed, because programs are going to be relatively short (if we had wanted speed, we'd be using something like C or Go). The top priority was a clear design that will break up the process in as many small steps as possible to make the program easy to understand, easy to maintain and easy to change. 
+The Typist's Assembler was built with a few assumptions in mind. First, the code
+to be assembled will be very small relative to current normal hardware
+specifications: The total memory space of the 65816 is 16 MB, while my machine
+has 16 GB of RAM. Because of this, saving space was a low priority. This is also
+true for speed, because programs are going to be relatively short (if we had
+wanted speed, we'd be using something like C or Go). The top priority was a
+clear design that will break up the process in as many small steps as possible
+to make the program easy to understand, easy to maintain and easy to change. 
 
-For that reason, it was written in a "multipass" structure: Lots of little steps, usually as loops, that do exactly one thing and then pass a list on to the next step. 
+For that reason, it was written in a "multipass" structure: Lots of little
+steps, usually as loops, that do exactly one thing and then pass a list on to
+the next step. 
 
 
 (Tuples with original line number)
@@ -154,10 +232,25 @@ For that reason, it was written in a "multipass" structure: Lots of little steps
 
 NOTES ON CODING STYLE 
 
-Priority for the coding style was to make the program easy to understand -- and thereby also easy to modify and adapt -- for people who might not be familiar with the workings of an assembler. This is why Python was chosen as a language. Speed and compactness of code are secondary; in both these cases, the single-pass assember in Forth (https://github.com/scotws/tasm65816) is probably the better choice. 
+Priority for the coding style was to make the program easy to understand -- and
+thereby also easy to modify and adapt -- for people who might not be familiar
+with the workings of an assembler. This is why Python was chosen as a language.
+Speed and compactness of code are secondary; in both these cases, the
+single-pass assember in Forth (https://github.com/scotws/tasm65816) is probably
+the better choice. 
 
-In practical terms, what this means is that IF constructs were used even in cases when the result could have been achieved through calculation, because it allows a quicker understanding of the logic involved. 
+In practical terms, what this means is that IF constructs were used even in
+cases when the result could have been achieved through calculation, because it
+allows a quicker understanding of the logic involved. 
 
+
+## SOURCES AND THANKS 
+
+TinkAsm was inspired by Samuel A. Falvo II, who pointed me to a paper by Sarkar
+*et al*, ["A Nanopass Framework for Compiler Education"](
+https://www.google.de/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0CCAQFjAAahUKEwi9-_29kffIAhWKVSwKHeM8CGk&url=http%3A%2F%2Fwww.cs.indiana.edu%2F~dyb%2Fpubs%2Fnano-jfp.pdf&usg=AFQjCNHxFyzbyfAHuc-cxgTggCzBbiI7bg&sig2=-YZn5Ztrh0Nj7-EoCMgL7A&bvm=bv.106674449,bs.2,d.bGg).
+The authors discuss using compilers with multiple small passes for educational
+purposes. 
 
 
 

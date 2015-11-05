@@ -5,27 +5,28 @@
 
     .macro frogsbreath
             nop
+            nop
+            nop
     .endmacro
 
             .origin 0e000   ; must come first
 
 #!?*        jack = 1000
+            jill .equ 03
 
             .native
-    .invoke frogsbreath
             .axy16
+    .invoke frogsbreath
 
             lda jack 
             sta 2000
 
             jmp #!?*
 
+    .invoke frogsbreath
+
             stp
 
-jood        .axy8
-
-            .advance 
-
-jill        .long 010203 
+            .long 010203 
 
             .end
