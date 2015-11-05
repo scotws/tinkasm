@@ -39,9 +39,11 @@ if sys.version_info.major != 3:
     print("FATAL: Python 3 required. Aborting.")
     sys.exit(1) 
 
-# Initialize various counts
-n_invocations = 0
-n_warnings = 0
+# Initialize various counts. Some of these are just for general data collection
+n_invocations = 0       # How many macros were expanded
+n_mode_switches = 0     # TODO Count switches native/emulated (65816)
+n_size_switches = 0     # TODO Count 8/16 bit register switches (65816)
+n_warnings = 0          # How many warnings were generated
 
 
 ### ARGUMENTS ###
@@ -135,6 +137,8 @@ INDENT = ' '*12     # Indent in whitespace for inserted instructions
 
 LC0 = 0             # Start address of code ("location counter") 
 LCi = 0             # Index to where we are in code
+
+HEX_FILE = 'tink.hex'   # Name of hexdump file
 
 symbol_table = {}
 
@@ -514,7 +518,7 @@ for n, l in sc_end:
         sc_assign.append((n, l))
         continue 
 
-    # Sorry, Lisp and Forth coders, infix notation only here
+    # Sorry, Lisp and Forth coders, infix notation only
     a = w[1] 
 
     if '='or a == '.equ': 
@@ -635,9 +639,10 @@ for n, l in sc_modes:
     if not have_found:
         sc_axy.append((n, l)) 
 
-verbose('STEP AXY: Handled register size switches (8/16 bit for A, X, and Y)')
+verbose('STEP AXY: Registered register 8/16 bit switches')
 dump(sc_axy) 
 
+# HIER HIER 
 
 # -------------------------------------------------------------------
 # STEP PASS1: Create Intermediate File
@@ -1054,17 +1059,34 @@ verbose('STEP LIST: Created listing as {0}\n'.\
 # STEP HEXDUMP: Create hexdump file if requested
 
 if args.hexdump:
-    print("DUMMY creating hexdump file TINK.HEX")
+
+    with open(HEX_FILE, 'w') as f:
+        f.write(title_string)
+        f.write('Hexdump file of {0}\n'.format(args.source)) 
+        f.write('Generated on {0}\n\n'.format(time.asctime()))
+        a65 = LC0
+        f.write('{0:06x}: '.format(a65))
     
+        c = 0 
+
+        for e in sc_pass2:  # TODO change this to final binary file
+            f.write('{0:02x} '.format(e))
+            c += 1
+            if c % 16 == 0:
+                f.write('\n')
+                a65 += 16
+                f.write('{0:06x}: '.format(a65))
+        f.write('\n') 
+
+    verbose('STEP HEXDUMP: Create hexdump file {0}'.format(HEX_FILE))
 
 
-
-
-### END ###
+# -------------------------------------------------------------------
+# STEP END: Sign off
 
 time_end = timeit.default_timer() 
 verbose('All steps completed in {0:.5f} seconds.'.format(time_end - time_start))
 verbose('Enjoy the cake.')
 sys.exit(0) 
 
-
+### END ###
