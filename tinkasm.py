@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 04. Nov 2015 
+# This version: 06. Nov 2015 
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -141,14 +141,17 @@ LCi = 0             # Index to where we are in code
 HEX_FILE = 'tink.hex'   # Name of hexdump file
 
 symbol_table = {}
+local_labels = [] 
 
 # Positions in the opcode tables
+# TODO See if we need this 
 
 OT_OPCODE = 0 
 OT_MNEMONIC = 1 
 OT_N_BYTES = 2
 OT_N_OPERANDS = 3 
 
+# TODO add name etc
 title_string = "A Tinkerer's Assembler for the 65816 in Python\n"
 verbose(title_string)
 
@@ -164,9 +167,17 @@ mnemonics =\
 
 mnemonics['nop'] = 0xea
 
-
 verbose('Generated mnemonics list')
 
+
+# List of all directives
+# TODO see if we even need this
+
+directives = ['.a->8', '.a->16', '.a8', '.a16', '.append', '.origin',\
+        '.org', '.end', '.b', '.byte', '.w', '.word', '.l', '.long',\
+        '.native', '.emulated', '.s', '.string', '.s0', '.string0', '.slf',\
+        '.stringlf', '.xy->8', '.xy->16', '.xy8', '.xy16', COMMENT,\
+        CURRENT, LOCAL_LABEL]
 
 
 ### HELPER FUNCTIONS ###
@@ -395,7 +406,7 @@ for n, l in sc_lower:
         sc_breakup.append((n, l))
         continue 
 
-    # We know now we have a label, we just don't know if it is alone in its
+    # We now know we have a label, we just don't know if it is alone in its
     # line. 
     w = l.split() 
 
@@ -404,7 +415,7 @@ for n, l in sc_lower:
         sc_breakup.append((n, l))
         continue 
 
-    # Nope, there is some other stuff there
+    # Nope, there is something after the label
     sc_breakup.append((n, w[0]))
     rest = l.replace(w[0], '')  # Delete word from string
     sc_breakup.append((n, (len(w[0])*' ')+rest))
@@ -467,17 +478,21 @@ if args.dump:
 # -------------------------------------------------------------------
 # STEP ORIGIN: Find .ORIGIN directive
 
+# TODO see if we want to give the user the option of passing the origin at the
+# command line, possibly with -s --start option
+
+# We accept both ".origin" and ".org". 
+
 sc_origin = []
 
 # ORIGIN line should be in first line now 
 originline = sc_macros[0][1].strip().split() 
 
-# TODO rewrite so this works with ".org" as well
-if originline[0] != ".origin":
+if originline[0] != '.origin' and originline[0] != '.org':
     l = sc_macros[0][0]
     fatal(l, 'No ORIGIN directive found, must be first line after macros') 
 
-_, LC0 = convert_number(originline[1])  # ORIGIN may not take a symbol (yet)
+_, LC0 = convert_number(originline[1])  # ORIGIN may not take a symbol
 sc_origin = sc_macros[1:]
 
 verbose('STEP ORIGIN: Found ORIGIN directive, starting at {0:06x}'.\
@@ -513,7 +528,7 @@ for n, l in sc_end:
     w = l.split() 
 
     # An assigment line must have three words at least. The "at least" part
-    # is to be able to add math functions later
+    # is so we will be able to add math functions later
     if len(w) < 3:
         sc_assign.append((n, l))
         continue 
@@ -521,7 +536,7 @@ for n, l in sc_end:
     # Sorry, Lisp and Forth coders, infix notation only
     a = w[1] 
 
-    if '='or a == '.equ': 
+    if a == '=' or a == '.equ': 
         s, v = l.split(a)
         symbol = s.split()[-1] 
         _, value = convert_number(v.split()[0])  # Can't do symbol to symbol
@@ -534,7 +549,7 @@ verbose('STEP ASSIGN: Assigned {0} symbols to symbol table'.\
 dump(sc_assign)
 
 if args.verbose:
-    dump_symbol_table(symbol_table, "after ASSIGN (all numbers in hex)")
+    dump_symbol_table(symbol_table, "after ASSIGN (numbers in hex)")
 
 
 # -------------------------------------------------------------------
@@ -579,363 +594,191 @@ dump(sc_invoke)
 
 
 # -------------------------------------------------------------------
-# STEP MODES: Handle '.native' and '.emulated' directives
+# STEP MODES: Handle '.native' and '.emulated' directives on the 65816
+
+# TODO count and print number of mode switches
 
 # Since we have moved labels to their own lines, we assume that both .NATVIE
 # and .EMULATED alone in their respective lines
 
 sc_modes = []
 
-for n, l in sc_invoke:
+if MPU == '65816':
 
-    if '.native' in l:
-        # Spaces are for cosmetic reasons, as we have already handled labels
-        sc_modes.append((n, INDENT+'clc'))
-        sc_modes.append((n, INDENT+'xce'))
-        continue 
+    for n, l in sc_invoke:
 
-    if '.emulated' in l: 
-        # Spaces are for cosmetic reasons, as we have already handled labels
-        sc_modes.append((n, INDENT+'sec'))
-        sc_modes.append((n, INDENT+'xce'))
-        continue
-    
-    sc_modes.append((n, l))
- 
-verbose('STEP MODES: Handled mode switches')
-dump(sc_modes) 
+        if '.native' in l:
+            # Spaces are for cosmetic reasons, as we have already handled 
+            # labels
+            sc_modes.append((n, INDENT+'clc'))
+            sc_modes.append((n, INDENT+'xce'))
+            continue 
+
+        if '.emulated' in l: 
+            # Spaces are for cosmetic reasons, as we have already handled 
+            # labels
+            sc_modes.append((n, INDENT+'sec'))
+            sc_modes.append((n, INDENT+'xce'))
+
+            # Emulation drops us into 8-bit modes for A, X, and Y 
+            # automatically, no REP or SEP commands needed
+            sc_modes.append((n, INDENT+'.a->8'))
+            sc_modes.append((n, INDENT+'.xy->8'))
+            continue
+        
+        sc_modes.append((n, l))
+
+    verbose('STEP MODES: Handled mode switches')
+    dump(sc_modes) 
+
+else:
+    sc_modes = sc_invoke    # Keep the chain going 
 
 
 # -------------------------------------------------------------------
-# STEP AXY: Handle register size switches
+# STEP AXY: Handle register size switches on the 65816
+
+# TODO count and print number of mode switches
 
 # We add the actual REP/SEP instructions as well as internal directives for the
 # following steps 
 
 sc_axy = []
 
-# Indentation is cosmetic, as we have already handled labels
-axy_ins = {
-'.a8':    ((INDENT+'sep 20'), (INDENT+'.a->8')),
-'.a16':   ((INDENT+'rep 20'), (INDENT+'.a->16')), 
-'.xy8':   ((INDENT+'sep 10'), (INDENT+'.xy->8')) ,
-'.xy16':  ((INDENT+'rep 10'), (INDENT+'.xy->16')), 
-'.axy8':  ((INDENT+'sep 30'), (INDENT+'.a->8'), (INDENT+'.xy->8')),
-'.axy16': ((INDENT+'rep 30'), (INDENT+'.a->16'), (INDENT+'.xy->16')) } 
+if MPU == '65816':
 
-for n, l in sc_modes:
-    have_found = False
+    # Indentation is cosmetic, as we have already handled labels
+    axy_ins = {
+    '.a8':    ((INDENT+'sep 20'), (INDENT+'.a->8')),
+    '.a16':   ((INDENT+'rep 20'), (INDENT+'.a->16')), 
+    '.xy8':   ((INDENT+'sep 10'), (INDENT+'.xy->8')) ,
+    '.xy16':  ((INDENT+'rep 10'), (INDENT+'.xy->16')), 
+    '.axy8':  ((INDENT+'sep 30'), (INDENT+'.a->8'), (INDENT+'.xy->8')),
+    '.axy16': ((INDENT+'rep 30'), (INDENT+'.a->16'), (INDENT+'.xy->16')) } 
 
-    for a in axy_ins: 
+    for n, l in sc_modes:
+        have_found = False
 
-        # Because we moved labels to their own lines, we can assume that
-        # register switches are alone in the line
-        if a in l:
+        for a in axy_ins: 
 
-            for e in axy_ins[a]:
-                sc_axy.append((n, e))
-                have_found = True
+            # Because we moved labels to their own lines, we can assume that
+            # register switches are alone in the line
+            if a in l:
 
-    if not have_found:
-        sc_axy.append((n, l)) 
+                for e in axy_ins[a]:
+                    sc_axy.append((n, e))
+                    have_found = True
 
-verbose('STEP AXY: Registered register 8/16 bit switches')
-dump(sc_axy) 
+        if not have_found:
+            sc_axy.append((n, l)) 
 
-# HIER HIER 
+    verbose('STEP AXY: Registered register 8/16 bit switches')
+    dump(sc_axy) 
+
+else:
+    sc_axy = sc_modes    # Keep the chain going 
+
 
 # -------------------------------------------------------------------
-# STEP PASS1: Create Intermediate File
+# STEP LABELS - Construct symbol table by finding all labels 
 
-# Life is easier if we define the entry types down here. See "Although
-# practicality beats purity", https://www.python.org/dev/peps/pep-0020/
+# It is tempting to use the information we gain here to start assembling
+# already, but this violates our philosophy. All we need are the lengths of the
+# instructions and data storage directives
 
+sc_labels = []
+
+# These are only used for 65816
 cpu_mode = "emulated"
 a_mode = 8 
 xy_mode = 8 
 
-
-
-
-
-
-# Intermediate file Entry types 
-# TODO use ENUMERATE construct once we have sorted this all out 
-
-OPC_DONE = 0       # Contains completely assembled binary data from opcode
-DATA_DONE = 1      # Contains completely assembled binary data from data
-OPC_SYMBOL = 2     # Opcode with unresolved symbol
-ADV_SYMBOL = 3     # .ADVANCE directive with unresolved symbol
-MODE_EMULATED = 4  # Tell Pass 2 the following is emulated
-MODE_NATIVE = 5    # Tell Pass 2 the following is native
-
-# See if these are required
-A16 = 10
-A8 = 11
-XY16 = 12
-XY8 = 13
-AXY16 = 14
-AXY8 = 15
-
-pass1_entry_types = {
-        0: 'OPC_DONE',
-        1: 'DATA_DONE',
-        2: 'OPC_SYMBOL',
-        3: 'ADV_SYMBOL',
-        4: 'MODE_EMULATE',
-        5: 'MODE_NATIVE',
-       10: 'A16',  # See if these are required
-       11: 'A8',
-       12: 'XY16',
-       13: 'XY8'}
-
-pass1_axy_variants = {
-        '.a8': [0xe2, 0x20],  # sep 20 
-        '.a16': [0xc2, 0x20],  # rep 20 
-        '.xy8': [0xe2, 0x10],  # sep 10 
-        '.xy16': [0xc2, 0x10]}  # rep 10 
-
-
-# Intermediate file is a list of entries, each a list, with three elements: The
-# original line number, the entry type code (see above), and a "payload" list
-# with parameters that are unpacked depending on the type 
-
-# Elements of the intermediate file. These are indexes to the entries of the
-# lines in each entry
-
-IMF_LINE = 0
-IMF_STATUS = 1 
-IMF_PAYLOAD = 2
-
-sc_pass1 = []       # Immediate file
-
-# Loop through all lines 
-
 for n, l in sc_axy:
 
-    w = l.split()
-    w0 = w[0].strip() 
+    w = l.split() 
 
-
-    # -- Substep LABEL: See if we were given a label --
-    # TODO Make this the single focus of a pass
+    # SUBSTEP LABELS: Figure out where our labels are
+   
+    # Labels and local labels are the only thing that should be in the first
+    # column at this point
     
-    if w0 == '->':
+    if l[0] not in string.whitespace:
 
-        # If the labe name is missing, this is a local label
-        
-        try:
-            w1 = w[1].strip()
-        except IndexError:  
-            warning('Directive "->" found without label name in {0}, deleting'.\
-                    format(n))
-            n_warnings += 1
-            continue
+        # Local labels are easiest, start with them first
+        if w[0] == LOCAL_LABEL:
+            local_labels.append(LC0+LCi) 
+            continue 
 
-        # Make sure we haven't defined this symbol before. That is fatal. 
-        # Unknown symbol table entries must be initialized with None so we can
-        # know if we're trying to reference to address 0
-        
-        # TODO see if we need to do this differenty once we add forward
-        # references
-        
-        # TODO This sucks, rewrite once we know how this will work
-
-        if w1 not in symbol_table.keys():
-            verbose('Label {0} found in line {1}, address is {2:06x}'.\
-                    format(w1, n, LC0 + LCi))
-            symbol_table[w1] = LC0 + LCi
-        elif symbol_table[w1]: 
-            print('FATAL: Attempt to redefine symbol {0} in line {1}'.\
-                        format(w1, l))
-            sys.exit(1)
-        else:
-            symbol_table[w1] = LC0 + LCi
-            
-
-        # Some people put the label in the same line as another directive or an
-        # instruction, so even we think that's crude, we have to allow for it
-        w = w[2:]  
-
-        try:
-            w0 = w[0].strip()
-        except IndexError:
-            # That was all that was in the line
-            continue
-
-
-    # -- Substep MNEMONIC: See if we have a mnemonic --
+        # This must be a real label 
+        # TODO 
+        print('DUMMY: real label {0} found in {1}'.format(w[0], n))
+        continue 
     
-    try: 
-        oc = mnemonics[w0]
-    except KeyError:
+
+    # SUBSTEP MNEMONIC: See if we have a mnemonic 
+    # TODO 
+    
+    # Because we are using Typist's Assembler Notation and every mnemonic
+    # maps to one and only one opcode, we don't have to look at the operand of
+    # the instruction at all
+ 
+    # HIER HIER 
+
+    # SUBSTEP DATA: See if we were given data to store
+    # TODO we can probably combine these into a common routine without too much
+    # harm
+    
+    # .BYTE stores one byte per whitespace separated word
+    if w[0] == '.byte' or w[0] == '.b':
+        LCi += len(w)-1 
+        sc_labels.append((n, l)) 
+        continue 
+
+    # .WORD stores two bytes per whitespace separated word
+    if w[0] == '.word' or w[0] == '.w':
+        LCi += 2*(len(w)-1) 
+        sc_labels.append((n, l)) 
+        continue 
+    
+    # .LONG stores three bytes per whitespace separated word
+    if w[0] == '.long' or w[0] == '.l':
+        LCi += 3*(len(w)-1) 
+        sc_labels.append((n, l)) 
+        continue 
+
+
+    # For the 65816, we have to take care of the mode and register switches
+    # because the Immediate Mode instructions such as lda.# compile a different
+    # number of bytes
+
+    if MPU == '65816':
+
+        # SUBSTEP MODE_SWITCH
+        # TODO 
         pass
-    else:
-        nb = opcode_table[oc][OT_N_BYTES] 
+
+        # SUBSTEP REGISTER_SWITCH
+        # TODO 
+        pass
         
-        # Single byte instructions are easy because we don't have to look for
-        # symbols, so we get them out of the way fast
-        if nb == 1:
-            sc_pass1.append((n, OPC_DONE, [oc]))
-            LCi += 1
-            continue 
-            
-        # MVN and MVP are a serious pain, so we get them out of the way ASAP
-        # TODO code this. 
-        if oc == 0x44 or oc == 0x54:
-            print('DUMMY: Found MVN or MVP, not coded yet, skipping')
-            continue 
 
-        # Multi-byte instruction, but all with only one operand
-        is_number, opr = convert_number(w[1]) 
-
-        # If we have a symbol, we punt the problem to the next pass
-        if not is_number: 
-            # We've got a symbol
-            sc_pass1.append((n, OPC_SYMBOL, [oc, w[1]]))
-            continue 
-
-        # We've got a number, so we can convert everything right way
-        if nb == 2: 
-            li = [oc, lsb(opr)]  
-
-        elif nb == 3: 
-            oprl = little_endian_16(opr) 
-            li = [oc]
-            li.extend(oprl) 
-
-        elif nb == 4: 
-            oprl = little_endian_24(opr) 
-            li = [oc]
-            li.extend(oprl) 
-
-        else:
-            print('FATAL: Opcode claims to have length of more than 4 bytes')
-            sys.exit(1)
-
-        sc_pass1.append((n, OPC_DONE, li))
-        LCi += nb 
-        continue
-
-
-    # --- Substep ADVANCE: See if we have an .ADVANCE directive
-    # TODO Break this out and make it its own pass
-
-    if w0 == '.advance':
-
-        is_number, nz = convert_number(w[1]) 
-        
-        if not is_number:
-            sc_pass1.append((n, ADV_SYMBOL, [w[1]]))
-            continue 
-
-        bs = [00] * (nz - (LC0 + LCi))
-        sc_pass1.append((n, DATA_DONE, bs))
-
-        verbose('Advanced {0} bytes from {1:x} to {2:x}, line {3}'.\
-                format(len(bs), LC0+LCi, nz, n)) 
-
-        continue 
-
-# -------------------------------------------------------------------
-# STEP DATA: Handle directives that store data directly
-
-
-    # --- Substep BYTE: See if we have a .BYTE directive
-    # TODO Break these data out and make them their own pass
+    # SUBSTEP ADVANCE: See if we have .advance directive
+    # TODO This is tricky, figure it out last
     
-    if w0 == '.byte' or w0 == '.b':
-
-        bs = [convert_number(b)[1] for b in w[1:]]
-        sc_pass1.append((n, DATA_DONE, bs))
-        LCi += len(w[1:])
-
-        verbose('Stored {0} bytes of data from line {1} (BYTE directive)'.\
-                format(len(w[1:]), n))
-
-        continue 
-
-
-    # --- Substep WORD: See if we have a .WORD directive
-
-    if w0 == '.word' or w0 == '.w':
-
-        bl = []
-
-        for b in w[1:]:
-            bl.extend(little_endian_16(convert_number(b)[1])) 
-
-        verbose('Stored {0} bytes of data from line {1} (WORD directive)'.\
-                format(len(w[1:])*2, n))
-
-        sc_pass1.append((n, DATA_DONE, bl))
-        LCi += len(w[1:]) * 2 
-        continue 
    
 
-    # --- Substep LONG: See if we have a .LONG directive
+# TODO print out 65addresses
+verbose('STEP LABELS: Assigned value to all labels.') 
 
-    if w0 == '.long' or w0 == '.l':
+if args.verbose:
+    dump_symbol_table(symbol_table, "after LABELS (numbers in hex)")
 
-        bl = []
-        for b in w[1:]:
-            bl.extend(little_endian_24(convert_number(b)[1])) 
+dump(sc_labels) 
 
-        verbose('Stored {0} bytes of data from line {1} (LONG directive)'.\
-                format(len(w[1:])*3, n))
-
-        sc_pass1.append((n, DATA_DONE, bl))
-        LCi += len(w[1:]) * 3
-        continue 
-
-# -------------------------------------------------------------------
-# STEP STRINGS: Handle directives that store strings directly
-
-    # --- Substep STRING: See if we have a .STRING directive
-    # TODO see if we want to combine all string directives
-
-    if w0 == '.string' or w0 == '.str':
-
-        sn, sl = string2bytes(l) 
-        sc_pass1.append((n, DATA_DONE, sl))
-        LCi += sn
-        continue 
-
-
-    # --- Substep STRING_ZERO: See if we have a .STRING0 directive
-
-    if w0 == '.string0' or w0 == '.str0':
-
-        sn, sl = string2bytes(l) 
-        sl.append(00) 
-        sn += 1
-
-        sc_pass1.append((n, DATA_DONE, sl))
-        LCi += sn
-        continue 
-
-
-    # --- Substep STRING_LF: See if we have a .STRINGLF directive
-
-    if w0 == '.stringlf' or w0 == '.strlf':
-
-        sn, sl = string2bytes(l) 
-        sl.append(0x0a) 
-        sn += 1
-
-        sc_pass1.append((n, DATA_DONE, sl))
-        LCi += sn
-        continue 
-
-
-
-
-verbose('STEP PASS1: Created intermediate file')
-
+# TODO format this 
 if args.dump:
-    for l, t, bl in sc_pass1:
-        print('{0:5d}: {1} {2}'.format(l, pass1_entry_types[t], bl))
-    print()
+    print('Local Labels: {0}'.format(local_labels)) 
+
 
 # -------------------------------------------------------------------
 # STEP VALIDATE: Make sure we only have DATA_DONE and OPC_DONE entries
@@ -1050,6 +893,7 @@ with open(args.listing, 'w') as f:
     else:
         f.write('    (empty)\n')
 
+# TODO add local labels list
 
 verbose('STEP LIST: Created listing as {0}\n'.\
         format(args.listing))

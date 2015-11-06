@@ -120,6 +120,32 @@ future versions, this will be followed optional parameters.
 
 ### Structure 
 
+The program has the most simple structure possible: It starts at the beginning,
+runs to the end and then stops. No external routines are loaded, only system
+library files are referenced (got to have your batteries). There are no objects.
+The code just brute-forces its way top-down.
+
+On the next lower level, TinkAsm is built up out of passes. Each pass is a
+closed unit that ideally does one thing and one thing only. Information is
+transmitted from one pass to another through a list of two-element tuples. The
+first element of the tuple always contains the original line number of the
+instruction so any problems can be referenced to the source code. The structure
+of the second element depends on the pass. In the beginning, it is a simple
+string with the content of the source code line. In the end, it is a list of
+binary data representing the machine code. 
+
+Information is only passed through these lists, not through "side channels". For
+example, we don't define a flag in one pass to signal something to a pass lower
+down. All information is contained in the lists that are passed. This doesn't
+mean that the passes can't "collect" other information for later use. For
+instance, full-line comments are put in a separate list so that the list file
+can later access them. These, however, are not used by the following step but
+only at the end.
+
+(The sorta, kinda exception are counters for statistical use, for instance, how
+many macros are defined and expanded. These are defined at the beginning of the
+program to show that they are "global", so to speak.) 
+
 Each pass starts by defining the empty list that will filled with the output of
 this stage. Processing the previous list is usually handled by walking through
 each line, modifying what needs to be changed, and then appending the processed
@@ -128,8 +154,14 @@ line to the new list.
 At the end, we offer the options of printing an
 information string if we are in verbose mode, or dumping the complete list.
 
+TinkAsm was developed primarily to code 65816 assembler, because there are lots
+of great assemblers for the 6502 and 65c02 already out there; see FEHLT for an
+overview.
+
+
 
 ### Coding Style
+
 
 We try to avoid complicated IF/ELIF/ELSE constructs, using IF/CONTINUE instead.
 For example, 
@@ -201,9 +233,9 @@ DIRECTIVES
         .LONG / .L
         .NATIVE
         .ORIGIN
-        .STRING / .STR
-        .STRING0 / .STR0
-        .STRINGLF / .STRLF
+        .STRING / .S
+        .STRING0 / .S0
+        .STRINGLF / .SLF
         .WORD / .W
         .XY16
         .XY8

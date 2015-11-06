@@ -2,31 +2,19 @@
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 
             .mpu 65816
+            .origin 0e000
 
-    .macro frogsbreath
-            nop
-            nop
-            nop
-    .endmacro
-
-            .origin 0e000   ; must come first
-
-#!?*        jack = 1000
-            jill .equ 03
-
-            .native
-            .axy16
-    .invoke frogsbreath
-
-            lda jack 
+begin       silver = 0f
+            gold = 0e
+            
+@           lda data
             sta 2000
+            bra - 
 
-            jmp #!?*
-
-    .invoke frogsbreath
+            jmp begin
 
             stp
 
-            .long 010203 
+data        .byte 0ef
 
             .end
