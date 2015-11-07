@@ -251,11 +251,23 @@ def convert_number(s):
 
 
 def dump(l):
+    # TODO handle various formats more gracefully once we know what they are
     """At each assembly stage, print the complete stage as a list. Produces
     an enormous amount of output, probably only interesting for debugging."""
     if args.dump:
         for line in l:
-            print('{0:5d}: {1}'.format(line[0], repr(line[1])))
+
+            # For lines without status codes
+            if len(line) == 2: 
+                print('{0:5d}: {1}'.format(line[0], repr(line[1])))
+                continue 
+
+            # For lines with status codes
+            # TODO make the final line dump numbers in hex
+            if len(line) == 3: 
+                print('{0:5d}: {1}{2} {3}'\
+                        .format(line[0], INDENT, repr(line[1]),\
+                        repr([hex(n)[2:] for n in line[2]])))
         print()
 
 def dump_symbol_table(d=symbol_table, s=""):
@@ -707,6 +719,7 @@ for n, l in sc_axy:
 
     w = l.split() 
 
+
     # --- SUBSTEP MNEMONIC: See if we have a mnemonic ---
     
     # Because we are using Typist's Assembler Notation and every mnemonic
@@ -740,7 +753,7 @@ for n, l in sc_axy:
 
         # Local labels are easiest, start with them first
         if w[0] == LOCAL_LABEL:
-            local_labels.append(LC0+LCi) 
+            local_labels.append((n, LC0+LCi))
             verbose('New local label found in line {0}, address {1:06x}'.\
                     format(n, LC0+LCi))
             continue 
@@ -870,20 +883,113 @@ if args.verbose:
 
 if args.dump:
     print('Local Labels:')
-    print('    ', end=' ') 
     if len(local_labels) > 0: 
-        for ll in local_labels:
-            print('{0:x} '.format(ll), end=' ')
+        for ln, ll in local_labels:
+            print('{0:5}: {1:06x} '.format(ln, ll))
         print('\n') 
     else: 
         print('  (none)\n')
 
 dump(sc_labels) 
 
-# At this point we should have all symbols present and known in the symbol
-# table, and local labels in the local label list
+
+# ASSERT: At this point we should have all symbols present and known in the
+# symbol table, and local labels in the local label list
 
 
+# -------------------------------------------------------------------
+# STEP REPLACE: Replace all symbols in code by correct numbers
+
+sc_replace = []
+
+for n, l in sc_labels:
+
+    # We need to go word-by-word because somebody might have the bright idea of
+    # defining lots of .byte data as symbols 
+    ws = l.split() 
+
+    # TODO This might be a bit too compact for this project, consider 
+    # rewriting with normal loops and whatnot
+    for s in symbol_table.keys(): 
+        ws = [hex(symbol_table[w])[2:] if w == s else w for w in ws]
+
+    sc_replace.append((n, INDENT+' '.join(ws))) 
+        
+verbose('STEP REPLACED: Replaced all symbols with their number values') 
+dump(sc_replace) 
+
+
+# -------------------------------------------------------------------
+# STEP LOCALS: Replace all local label references by correct numbers
+
+# Note the current format makes arithmetic functions pretty much impossible at
+# the moment TODO recode with arithmetic 
+
+sc_locals = [] 
+
+for n, l in sc_replace:
+
+    if ' +' in l:
+        for ln, ll in local_labels: 
+            if ln > n: 
+                l = l.replace('+', hex(ll)[2:])
+                break
+
+    if ' -' in l: 
+        for ln, ll in reversed(local_labels): 
+            if ln < n: 
+                l = l.replace('-', hex(ll)[2:])
+                break
+
+    sc_locals.append((n, l))
+
+verbose('STEP LOCALS: Replaced all local labels with address values')
+dump(sc_locals)
+
+
+# ASSERT: At this point we should have comletely replaced all labels and symbols
+# with numerical values.
+
+
+# -------------------------------------------------------------------
+# STEP BRANCHES: Assemble branch instructions
+
+# Must do this before anything else because we have to calculate the relative
+# distances 
+
+sc_branches = []
+
+# HIER HIER 
+
+sc_1byte = sc_branches
+
+
+# -------------------------------------------------------------------
+# STEP 1BYTE: Assemble simple one-byte opcodes
+
+sc_1byte = []
+
+# We start using status strings starting this step
+CODE_DONE = 'CODE_DONE'
+
+for n, l in sc_locals: 
+
+    w = l.split() 
+
+    try:
+        oc = mnemonics[w[0]]
+    except KeyError:
+        sc_1byte.append((n, l)) 
+    else: 
+
+        if opcode_table[oc][OPCT_N_BYTES] == 1: 
+            sc_1byte.append((n, CODE_DONE, [oc]))
+        else:
+            sc_1byte.append((n, l)) 
+
+
+verbose('STEP 1BYTE: Assembled single byte instructions')
+dump(sc_1byte)
 
 
 # -------------------------------------------------------------------

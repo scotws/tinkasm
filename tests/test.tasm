@@ -4,16 +4,14 @@
             .mpu 65816
             .origin 0e000
 
-            vectors = 00:e010
-
-            ; we start out in emulated mode
-@           lda.# 0011
-
-@           .native
-            .a16
-@           lda.# 0011
 @           nop 
 
-            stp
+@           nop 
+            jmp - 
+            bra + 
+@           nop
+            nop 
+
+@           stp
 
             .end
