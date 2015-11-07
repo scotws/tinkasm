@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 07. Nov 2015 
+# This version: 07. Nov 2015 (N7 Day) 
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -720,6 +720,26 @@ for n, l in sc_axy:
     w = l.split() 
 
 
+    # --- SUBSTEP CURRENT: Replace the CURRENT symbol by current address
+    
+    # This must come before we handle mnemonics. Don't add a continue because
+    # that will screw up the line count; we replace in-place, so to speak
+
+    # TODO This version is too primitive because CURRENT is probably the star
+    # which will also be used for multiplication at some point. Right now, we
+    # just brute force it.
+
+    # TODO consider giving this its own full pass
+    
+    if CURRENT in l:
+        hc = hex(LC0+LCi)[2:]   # TODO make this a separate function
+        l = l.replace(CURRENT, hc)
+        w = l.split() 
+        verbose('Current marker "{0}" in line {1}, replaced with {2}'.\
+                format(CURRENT, n, hc))
+
+
+
     # --- SUBSTEP MNEMONIC: See if we have a mnemonic ---
     
     # Because we are using Typist's Assembler Notation and every mnemonic
@@ -743,6 +763,7 @@ for n, l in sc_axy:
 
         sc_labels.append((n, l))
         continue 
+
 
     # --- SUBSTEP LABELS: Figure out where our labels are ---
    
@@ -922,20 +943,22 @@ dump(sc_replace)
 # -------------------------------------------------------------------
 # STEP LOCALS: Replace all local label references by correct numbers
 
-# Note the current format makes arithmetic functions pretty much impossible at
-# the moment TODO recode with arithmetic 
-
 sc_locals = [] 
 
 for n, l in sc_replace:
 
-    if ' +' in l:
+    w = l.split() 
+
+    # We only allow the local references to be in the second word of the line,
+    # that is, as an operand to an opcode. To be sure, we might want to check to
+    # see if the first word is a mnemonic, but so far this is unnecessary
+    if len(w) > 1 and w[1] == '+': 
         for ln, ll in local_labels: 
             if ln > n: 
                 l = l.replace('+', hex(ll)[2:])
                 break
 
-    if ' -' in l: 
+    if len(w) > 1 and w[1] == '-': 
         for ln, ll in reversed(local_labels): 
             if ln < n: 
                 l = l.replace('-', hex(ll)[2:])

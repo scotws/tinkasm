@@ -11,6 +11,7 @@
             bra + 
 @           nop
             nop 
+            lda *  ; weird, just for testing
 
 @           stp
 
