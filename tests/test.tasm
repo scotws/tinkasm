@@ -4,17 +4,16 @@
             .mpu 65816
             .origin 0e000
 
-begin       silver = 0f
-            gold = 0e
-            
-@           lda data
-            sta 2000
-            bra - 
+            vectors = 00:e010
 
-            jmp begin
+            ; we start out in emulated mode
+@           lda.# 0011
+
+@           .native
+            .a16
+@           lda.# 0011
+@           nop 
 
             stp
-
-data        .byte 0ef
 
             .end

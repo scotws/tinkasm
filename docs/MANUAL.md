@@ -227,12 +227,14 @@ DIRECTIVES
         .A8
         .AXY16
         .AXY8
+        .ADVANCE / .ADV
         .BYTE / .B
         .EMULATED
         .END 
         .LONG / .L
         .NATIVE
-        .ORIGIN
+        .ORIGIN / .ORG
+        .SKIP 
         .STRING / .S
         .STRING0 / .S0
         .STRINGLF / .SLF
@@ -240,6 +242,7 @@ DIRECTIVES
         .XY16
         .XY8
         = 
+        @ 
 
 ### INTERNAL STRUCTURE
 

@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 06. Nov 2015 
+# This version: 07. Nov 2015 
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -146,10 +146,10 @@ local_labels = []
 # Positions in the opcode tables
 # TODO See if we need this 
 
-OT_OPCODE = 0 
-OT_MNEMONIC = 1 
-OT_N_BYTES = 2
-OT_N_OPERANDS = 3 
+OPCT_OPCODE = 0 
+OPCT_MNEMONIC = 1 
+OPCT_N_BYTES = 2
+OPCT_N_OPERANDS = 3 
 
 # TODO add name etc
 title_string = "A Tinkerer's Assembler for the 65816 in Python\n"
@@ -686,18 +686,52 @@ else:
 # already, but this violates our philosophy. All we need are the lengths of the
 # instructions and data storage directives
 
+# We assume that the most common line by far will be mnemonics, and that then
+# we'll see lots of labels (at some point, we should measure this). Put the
+# mnemonics first then to speed stuff up slightly at least.
+
 sc_labels = []
 
-# These are only used for 65816
-cpu_mode = "emulated"
-a_mode = 8 
-xy_mode = 8 
+# These are only used for 65816. The offsets are used to calculate if an extra
+# byte is needed for immediate forms such as lda.# with the 65816
+
+a_len_offset = 0 
+xy_len_offset = 0 
+
+a_imm = ['adc.#', 'and.#', 'bit.#', 'cmp.#',
+         'eor.#', 'lda.#', 'ora.#', 'sbc.#'] 
+xy_imm = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
+
 
 for n, l in sc_axy:
 
     w = l.split() 
 
-    # SUBSTEP LABELS: Figure out where our labels are
+    # --- SUBSTEP MNEMONIC: See if we have a mnemonic ---
+    
+    # Because we are using Typist's Assembler Notation and every mnemonic
+    # maps to one and only one opcode, we don't have to look at the operand of
+    # the instruction at all
+ 
+    try:
+        oc = mnemonics[w[0]]
+    except KeyError:
+        pass
+    else: 
+        LCi += opcode_table[oc][OPCT_N_BYTES]
+
+        # Factor in register mode switches if this is a 65816
+        if MPU == '65816':
+
+            if w[0] in a_imm:
+                LCi += a_len_offset 
+            elif w[0] in xy_imm:
+                LCi += xy_len_offset 
+
+        sc_labels.append((n, l))
+        continue 
+
+    # --- SUBSTEP LABELS: Figure out where our labels are ---
    
     # Labels and local labels are the only thing that should be in the first
     # column at this point
@@ -707,26 +741,26 @@ for n, l in sc_axy:
         # Local labels are easiest, start with them first
         if w[0] == LOCAL_LABEL:
             local_labels.append(LC0+LCi) 
+            verbose('New local label found in line {0}, address {1:06x}'.\
+                    format(n, LC0+LCi))
             continue 
 
-        # This must be a real label 
-        # TODO 
-        print('DUMMY: real label {0} found in {1}'.format(w[0], n))
-        continue 
-    
+        # This must be a real label. If we don't have it in the symbol table,
+        # all is well and we add a new entry
+        if w[0] not in symbol_table.keys():
+            verbose('New label "{0}" found in line {1}, address {2:06x}'.\
+                    format(w[0], n, LC0+LCi))
+            symbol_table[w[0]] = LC0+LCi
 
-    # SUBSTEP MNEMONIC: See if we have a mnemonic 
-    # TODO 
-    
-    # Because we are using Typist's Assembler Notation and every mnemonic
-    # maps to one and only one opcode, we don't have to look at the operand of
-    # the instruction at all
- 
-    # HIER HIER 
+        # If it is already known, something went wrong, because we can't
+        # redefine a label. 
+        else: 
+            print('FATAL: Attempt to redefine symbol "{0}" in line {1}'.\
+                    format(w[0], l))
+            sys.exit(1)
 
-    # SUBSTEP DATA: See if we were given data to store
-    # TODO we can probably combine these into a common routine without too much
-    # harm
+
+    # --- SUBSTEP DATA: See if we were given data to store ---
     
     # .BYTE stores one byte per whitespace separated word
     if w[0] == '.byte' or w[0] == '.b':
@@ -747,37 +781,109 @@ for n, l in sc_axy:
         continue 
 
 
-    # For the 65816, we have to take care of the mode and register switches
+    # --- SUBSTEP SWITCHES: Handle Register Switches on the 65816 --- 
+    
+    # For the 65816, we have to take care of the register size switches
     # because the Immediate Mode instructions such as lda.# compile a different
-    # number of bytes
+    # number of bytes. We need to keep the directives themselves for the later
+    # stages
 
     if MPU == '65816':
 
-        # SUBSTEP MODE_SWITCH
-        # TODO 
-        pass
+        # TODO Rewrite this horrible code once we are sure this is what we want
+        # to do 
+        if w[0] == '.a->8':
+            a_len_offset = 0 
+            sc_labels.append((n, l)) 
+            continue 
 
-        # SUBSTEP REGISTER_SWITCH
-        # TODO 
-        pass
+        elif w[0] == '.a->16':
+            a_len_offset = 1 
+            sc_labels.append((n, l)) 
+            continue 
+
+        elif w[0] == '.xy->8':
+            xy_len_offset = 0 
+            sc_labels.append((n, l)) 
+            continue 
+
+        elif w[0] == '.xy->16':
+            xy_len_offset = 1 
+            sc_labels.append((n, l)) 
+            continue 
+
+
+    # --- SUBSTEP ADVANCE: See if we have the .advance directive ---
+    if w[0] == '.advance' or w[0] == '.adv':
+        is_number, r = convert_number(w[1]) 
         
+        # If this is a symbol, it must be defined already or we're screwed
+        if not is_number:
 
-    # SUBSTEP ADVANCE: See if we have .advance directive
-    # TODO This is tricky, figure it out last
+            try: 
+                new_r = symbol_table[r]
+            except KeyError:
+                fatal(n, '.advance directive has undefined symbol "{0}"'.\
+                        format(r))
+                sys.exit(1) 
+
+        else:
+            new_r = r
+
+        # Make sure the user is not attempting to advance backwards
+        if new_r < (LCi+LC0):
+            fatal(n, '.advance directive attempting to march backwards')
+            sys.exit(1) 
+
+        LCi = new_r-(LCi+LC0)
+        # While we're here, we might as well already convert the symbol
+        # ("Do as I say, don't do as I do") 
+        sc_labels.append((n, '{0}{1} {2:x}'.format(INDENT, w[0], new_r)))
+
     
-   
+    # --- SUBSTEP SKIP: See if we have a .skip directive ---
+    if w[0] == '.skip':
+        is_number, r = convert_number(w[1]) 
 
-# TODO print out 65addresses
+        # If this is a symbol, it must be defined already or we're screwed
+        if not is_number:
+
+            try: 
+                new_r = symbol_table[r]
+            except KeyError:
+                fatal(n, '.skip directive has undefined symbol "{0}"'.\
+                        format(r))
+                sys.exit(1) 
+
+        else:
+            new_r = r
+
+        LCi += new_r
+        # While we're here, we might as well already convert the symbol
+        # ("Do as I say, don't do as I do") 
+        sc_labels.append((n, '{0}{1} {2}'.format(INDENT, w[0], new_r)))
+
 verbose('STEP LABELS: Assigned value to all labels.') 
 
 if args.verbose:
     dump_symbol_table(symbol_table, "after LABELS (numbers in hex)")
 
+if args.dump:
+    print('Local Labels:')
+    print('    ', end=' ') 
+    if len(local_labels) > 0: 
+        for ll in local_labels:
+            print('{0:x} '.format(ll), end=' ')
+        print('\n') 
+    else: 
+        print('  (none)\n')
+
 dump(sc_labels) 
 
-# TODO format this 
-if args.dump:
-    print('Local Labels: {0}'.format(local_labels)) 
+# At this point we should have all symbols present and known in the symbol
+# table, and local labels in the local label list
+
+
 
 
 # -------------------------------------------------------------------
@@ -849,7 +955,7 @@ if n_warnings != 0 and args.warnings:
 with open(args.listing, 'w') as f:
     f.write(title_string)
     f.write('Code listing for file {0}\n'.format(args.source))
-    f.write('Generated on {0}\n'.format(time.asctime()))
+    f.write('Generated on {0}\n'.format(time.asctime(time.localtime())))
     f.write('Target MPU was {0}\n'.format(MPU))
     time_end = timeit.default_timer() 
     f.write('Assembly time was {0:.5f} seconds\n'.format(time_end - time_start))
@@ -907,7 +1013,7 @@ if args.hexdump:
     with open(HEX_FILE, 'w') as f:
         f.write(title_string)
         f.write('Hexdump file of {0}\n'.format(args.source)) 
-        f.write('Generated on {0}\n\n'.format(time.asctime()))
+        f.write('Generated on {0}\n\n'.format(time.asctime(time.localtime())))
         a65 = LC0
         f.write('{0:06x}: '.format(a65))
     
