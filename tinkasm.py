@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 07. Nov 2015 (N7 Day) 
+# This version: 08. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -153,11 +153,11 @@ OPCT_N_BYTES = 2
 # SOURCE and end up with everything either as CODE_DONE or DATA_DONE. Make
 # the strings the same length to make formatting easier
 ADDED     = 'ADDED     '  # Line that was added by the assembler automatically 
-CODE_DONE = 'ok (CODE) '  # Finished entry from code, now machine code bytes
+CODE_DONE = 'ok (code) '  # Finished entry from code, now machine code bytes
 CONTROL   = 'CONTROL   '  # Entry for flow control that procudes no code or data
-DATA_DONE = 'ok (DATA) '  # Finished entry from data, now pure bytes
+DATA_DONE = 'ok (data) '  # Finished entry from data, now pure bytes
 MACRO     = 'MACRO     '  # Line created by macro expansion 
-SOURCE    = 'src       '  # Entry that hasn't been touched except for whitespace
+SOURCE    = 'SOURCE    '  # Entry that hasn't been touched except for whitespace
 TOUCHED   = 'TOUCHED   '  # Entry that has been partially processed
 
 # TODO add name etc
@@ -1173,7 +1173,75 @@ for n, s, p in sc_bytedata:
 verbose('STEP 1BYTE: Assembled single byte instructions')
 dump(sc_1byte)
 
+# -------------------------------------------------------------------
+# STEP BRANCHES: Assemble branch instructions
 
+# All our branch instructions, including bra.l and phe.r on the 65816, should
+# include the line they are on as the last entry in the payload 
+
+# TODO These can be fused 
+
+sc_branches = []
+
+branches_8 = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs']
+branches_16 = ['bra.l', 'phe.r']  
+
+for n, s, p in sc_1byte: 
+
+    w = p.split() 
+
+    if w[0] in branches_8:
+        new_p = '.byte '+hex(mnemonics[w[0]])[2:]+' '  
+        is_number,  branch_addr = convert_number(w[-1])
+
+        # Paranoid, we should have converted all symbols
+        if not is_number:
+            fatal(n, 'Found unconverted symbol "{0}" during branch handling'.\
+                    format(w[-1]))
+        
+        is_number,  target_addr = convert_number(w[-2])
+        
+        # Paranoid, we should have converted all symbols
+        if not is_number:
+            fatal(n, 'Found unconverted symbol "{0}" during branch handling'.\
+                    format(w[-2]))
+
+        opr = hex(lsb(target_addr - branch_addr - 2))[2:]  
+        sc_branches.append((n, CODE_DONE, INDENT+new_p+opr)) 
+        continue 
+
+    # 16-bit branches (65816 only) 
+    if MPU == '65816' and w[0] in branches_16:
+
+        oc_p = '.byte '+hex(mnemonics[w[0]])[2:]+' '  
+        is_number,  branch_addr = convert_number(w[-1])
+
+        # Paranoid, we should have converted all symbols
+        if not is_number:
+            fatal(n, 'Found unconverted symbol "{0}" during branch handling'.\
+                    format(w[-1]))
+        
+        is_number,  target_addr = convert_number(w[-2])
+        
+        # Paranoid, we should have converted all symbols
+        if not is_number:
+            fatal(n, 'Found unconverted symbol "{0}" during branch handling'.\
+                    format(w[-2]))
+
+        bl, bm = little_endian_16(target_addr - branch_addr - 3)
+        opr = INDENT+oc_p+' '+hex(bl)[2:]+' '+hex(bm)[2:] 
+        sc_branches.append((n, CODE_DONE, opr)) 
+        continue 
+ 
+    # Everything else 
+    sc_branches.append((n, s, p)) 
+
+
+verbose('STEP BRANCHES: Encoded all branch instructions')
+dump(sc_branches) 
+
+
+print('---- HERE HERE HERE ---') 
 
 # -------------------------------------------------------------------
 # STEP 4BYTE: Assemble four-byte opcodes (65816 only) 
@@ -1221,63 +1289,6 @@ if MPU == '65816':
 else:
     sc_4byte = sc_1byte
 
-print('---- HERE HERE HERE ---') 
-
-# -------------------------------------------------------------------
-# STEP BRANCHES: Assemble branch instructions
-
-# Must do this before anything else because we have to calculate the relative
-# distances and that is easier if none of the other opcodes have been converted
-# yet
-
-sc_branches = []
-
-
-LCi = 0
-
-for n, l, s in sc_skip: 
-
-    # Walk through mnemonics
-    try:
-        oc = mnemonics[w[0]]
-    except KeyError:
-        pass
-    else: 
-
-        # Main routine: see if we have a branch
-        if w[0] in branches_8:
-
-            print('Found branch {0} in line {1}'.\
-                    format(w[0], n))
-
-            LCi += 2
-            sc_branches.append((n, l, CODE_DONE))
-
-        else:
-
-            LCi += opcode_table[oc][OPCT_N_BYTES]
-
-         # Factor in register mode switches if this is a 65816
-            if MPU == '65816':
-
-                if w[0] in a_imm:
-                    LCi += a_len_offset 
-                elif w[0] in xy_imm:
-                    LCi += xy_len_offset 
-
-            sc_labels.append((n, l, s))
-            continue 
-
-
-    # Handle long branches and phe.r instruction 
-    if MPU == '65816':
-        pass
-
-
-
-
-verbose('STEP BRANCHES: Encoded all branch instructions')
-dump(sc_branches) 
 
 
 
