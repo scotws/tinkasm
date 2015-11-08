@@ -152,13 +152,13 @@ OPCT_N_BYTES = 2
 # Line Status. Leave these as strings so humans can read them. We start with
 # SOURCE and end up with everything either as CODE_DONE or DATA_DONE. Make
 # the strings the same length to make formatting easier
-ADDED     = 'ADDED    '  # Line that was added by the assembler automatically 
-CODE_DONE = 'CODE_DONE'  # Finished entry from code, now machine code bytes
-CONTROL   = 'CONTROL  '  # Entry for flow control that procudes no code or data
-DATA_DONE = 'DATA_DONE'  # Finished entry from data, now pure bytes
-MACRO     = 'MACRO    '  # Line created by macro expansion 
-SOURCE    = 'src      '  # Entry that hasn't been touched except for whitespace
-TOUCHED   = 'TOUCHED  '  # Entry that has been partially processed
+ADDED     = 'ADDED     '  # Line that was added by the assembler automatically 
+CODE_DONE = 'ok (CODE) '  # Finished entry from code, now machine code bytes
+CONTROL   = 'CONTROL   '  # Entry for flow control that procudes no code or data
+DATA_DONE = 'ok (DATA) '  # Finished entry from data, now pure bytes
+MACRO     = 'MACRO     '  # Line created by macro expansion 
+SOURCE    = 'src       '  # Entry that hasn't been touched except for whitespace
+TOUCHED   = 'TOUCHED   '  # Entry that has been partially processed
 
 # TODO add name etc
 title_string = "A Tinkerer's Assembler for the 65816 in Python\n"
@@ -846,9 +846,10 @@ for n, s, p in sc_axy:
     # --- SUBSTEP DATA: See if we were given data to store ---
     
     # .BYTE stores one byte per whitespace separated word
+    # This is a freebee because that is where we want to end up
     if w[0] == '.byte' or w[0] == '.b':
         LCi += len(w)-1 
-        sc_labels.append((n, s, p)) 
+        sc_labels.append((n, DATA_DONE, p)) 
         continue 
 
     # .WORD stores two bytes per whitespace separated word
@@ -919,7 +920,7 @@ for n, s, p in sc_axy:
         offset = r - (LCi+LC0)  
         zl = ' '.join(['00']*offset)
         new_p = INDENT+'.byte '+zl
-        sc_labels.append((n, TOUCHED, new_p))
+        sc_labels.append((n, DATA_DONE, new_p))
         LCi = r-(LCi+LC0)
         verbose('Replaced .advance directive in line {0} by .byte directive'.\
                 format(n)) 
@@ -943,7 +944,7 @@ for n, s, p in sc_axy:
         # (This is called "Do as I say, don't do as I do") 
         zl = ' '.join(['00']*r)
         new_p = INDENT+'.byte '+zl
-        sc_labels.append((n, TOUCHED, new_p))
+        sc_labels.append((n, DATA_DONE, new_p))
         LCi += r
         verbose('Replaced .skip directive in line {0} by .byte directive'.\
                 format(n)) 
@@ -970,8 +971,10 @@ if args.dump:
 dump(sc_labels) 
 
 
+# -------------------------------------------------------------------
 # ASSERT: At this point we should have all symbols present and known in the
 # symbol table, and local labels in the local label list
+verbose('ASSERT: All symbols should now be known')
 
 
 # -------------------------------------------------------------------
@@ -1070,7 +1073,7 @@ for n, s, p in sc_locals:
                 bl.append(hex(b)[2:]) 
 
         p = INDENT+'.byte '+' '.join(bl) 
-        sc_bytedata.append((n, TOUCHED, p))
+        sc_bytedata.append((n, DATA_DONE, p))
         verbose('Converted .word directive in line {0} to .byte directive'.\
                 format(n)) 
         continue
@@ -1092,7 +1095,7 @@ for n, s, p in sc_locals:
                 bl.append(hex(b)[2:]) 
 
         p = INDENT+'.byte '+' '.join(bl) 
-        sc_bytedata.append((n, TOUCHED, p))
+        sc_bytedata.append((n, DATA_DONE, p))
         verbose('Converted .long directive in line {0} to .byte directive'.\
                 format(n)) 
         continue
@@ -1102,7 +1105,7 @@ for n, s, p in sc_locals:
         s = p.split('"')[1] 
         _, bl = string2bytes(s)  
         p = INDENT+'.byte '+' '.join(bl) 
-        sc_bytedata.append((n, TOUCHED, p))
+        sc_bytedata.append((n, DATA_DONE, p))
         verbose('Converted .string directive in line {0} to .byte directive'.\
                 format(n)) 
         continue 
@@ -1113,7 +1116,7 @@ for n, s, p in sc_locals:
         _, bl = string2bytes(s)  
         bl.append(hex(00)[2:]) 
         p = INDENT+'.byte '+' '.join(bl)
-        sc_bytedata.append((n, TOUCHED, p))
+        sc_bytedata.append((n, DATA_DONE, p))
         verbose('Converted .string0 directive in line {0} to .byte directive'.\
                 format(n)) 
         continue 
@@ -1124,7 +1127,7 @@ for n, s, p in sc_locals:
         _, bl = string2bytes(s)  
         bl.append(hex(ord('\n'))[2:]) 
         p = INDENT+'.byte '+' '.join(bl)
-        sc_bytedata.append((n, TOUCHED, p))
+        sc_bytedata.append((n, DATA_DONE, p))
         verbose('Converted .stringlf directive in line {0} to .byte directive'.\
                 format(n)) 
         continue 
@@ -1136,14 +1139,87 @@ for n, s, p in sc_locals:
 verbose('STEP BYTEDATA: Converted all other data formats to .byte')
 dump(sc_bytedata)
 
+
 # -------------------------------------------------------------------
 # ASSERT: At this point there should only be .byte data directives in the code
 # with numerical values.
 verbose('ASSERT: All data should now be handled by .byte directives')
 
 
+# -------------------------------------------------------------------
+# STEP 1BYTE: Convert all single-byte instructions to .byte directives
+
+# Low-hanging fruit first: Compile the opcodes without operands
+
+sc_1byte = []
+
+for n, s, p in sc_bytedata: 
+
+    w = p.split() 
+
+    try:
+        oc = mnemonics[w[0]]
+    except KeyError:
+        sc_1byte.append((n, s, p)) 
+    else: 
+
+        if opcode_table[oc][OPCT_N_BYTES] == 1: 
+            bl = INDENT+'.byte '+hex(oc)[2:] 
+            sc_1byte.append((n, CODE_DONE, bl))
+        else:
+            sc_1byte.append((n, s, p)) 
 
 
+verbose('STEP 1BYTE: Assembled single byte instructions')
+dump(sc_1byte)
+
+
+
+# -------------------------------------------------------------------
+# STEP 4BYTE: Assemble four-byte opcodes (65816 only) 
+
+# These are easy, too. Assumes that all symbols and math stuff has resulted in
+# a simple number as the second word in the line
+sc_4byte = []
+
+if MPU == '65816':
+
+    # Note we now can have three entries in the source listing
+    for n, s, p  in sc_1byte: 
+
+        # Skip the finished stuff
+        if s == CODE_DONE or s == DATA_DONE:
+            sc_4byte.append((n, s, p))
+            continue
+
+        w = p.split() 
+
+        try:
+            oc = mnemonics[w[0]]
+        except KeyError:
+            sc_4byte.append((n, s, p)) 
+        else: 
+
+            if opcode_table[oc][OPCT_N_BYTES] == 4: 
+
+                is_number, opr = convert_number(w[1])     
+
+                # Test for is_number is paranoid
+                if not is_number:
+                    fatal(n, 'STEP 4BYTE found non-number "{0}"'.\
+                            format(opr))
+
+                [oc].extend(little_endian_24(opr)) 
+                sc_4byte.append((n, CODE_DONE, li))
+
+            else:
+                sc_4byte.append((n, s, p)) 
+
+    verbose('STEP 4BYTE: Assembled all four-byte instructions')
+    dump(sc_4byte)
+
+else:
+    sc_4byte = sc_1byte
 
 print('---- HERE HERE HERE ---') 
 
@@ -1204,80 +1280,6 @@ verbose('STEP BRANCHES: Encoded all branch instructions')
 dump(sc_branches) 
 
 
-# -------------------------------------------------------------------
-# STEP 1BYTE: Assemble simple one-byte opcodes
-
-# Low-hanging fruit first: Compile the opcodes without operands
-
-sc_1byte = []
-
-
-for n, l, s in sc_branches: 
-
-    w = l.split() 
-
-    try:
-        oc = mnemonics[w[0]]
-    except KeyError:
-        sc_1byte.append((n, l, s)) 
-    else: 
-
-        if opcode_table[oc][OPCT_N_BYTES] == 1: 
-            sc_1byte.append((n, [oc], CODE_DONE))
-        else:
-            sc_1byte.append((n, l, s)) 
-
-
-verbose('STEP 1BYTE: Assembled single byte instructions')
-dump(sc_1byte)
-
-# -------------------------------------------------------------------
-# STEP 4BYTE: Assemble four-byte opcodes (65816 only) 
-
-# These are easy, too. Assumes that all symbols and math stuff has resulted in
-# a simple number as the second word in the line
-sc_4byte = []
-
-if MPU == '65816':
-
-    # Note we now can have three entries in the source listing
-    for n, s, l  in sc_1byte: 
-
-        # Skip the finished stuff
-        if s == CODE_DONE:
-            sc_4byte.append((n, s, l))
-            continue
-
-        w = l.split() 
-
-        try:
-            oc = mnemonics[w[0]]
-        except KeyError:
-            sc_4byte.append((n, l)) 
-        else: 
-
-            if opcode_table[oc][OPCT_N_BYTES] == 4: 
-
-                is_number, opr = convert_number(w[1])     
-
-                # Test for is_number is paranoid
-                if not is_number:
-                    fatal(n, 'STEP 4BYTE found non-number "{0}"'.\
-                            format(opr))
-
-                [oc].extend(little_endian_24(opr)) 
-                sc_4byte.append((n, CODE_DONE, li))
-
-            else:
-                sc_4byte.append((n, l)) 
-
-    verbose('STEP 4BYTE: Assembled all four-byte instructions')
-    dump(sc_4byte)
-
-else:
-    sc_4byte = sc_1byte
-
-
 
 
 # -------------------------------------------------------------------
@@ -1288,46 +1290,6 @@ sc_validate = []
 verbose('STEP VALIDATE: Confirmed all lines assembled as binary data')
 dump(sc_validate)
 
-
-# -------------------------------------------------------------------
-
-# TODO use bytearray because it is faster (http://www.dotnetperls.com/bytes)
-sc_pass2 = []
-
-def p2_done(l): 
-    """Handle lines that are completely done, opcode or data"""
-    sc_pass2.extend(l[IMF_PAYLOAD])
-
-def p2_adv_symbol(l): 
-    """Handle lines that contain an advance and an unresolved symbol"""
-    print('DUMMY: Found ADVANCE with unresolved symbol, skipping') 
-
-def p2_opc_symbol(l):
-    """Handle lines that contain an opcode and an unresolved symbol"""
-    print('DUMMY: Found opcode with unresolved symbol, skipping')
-
-pass2_routines = {
-        OPC_DONE: p2_done, DATA_DONE: p2_done, 
-        ADV_SYMBOL: p2_adv_symbol, OPC_SYMBOL: p2_opc_symbol}
-
-for l in sc_pass1:
-    
-    try:
-        pass2_routines[l[IMF_STATUS]](l)
-    except:
-        # TODO change this to real error code
-        print('DUMMY Intermediate File, entry not found.')
-        print('Line was:', l) 
-
-object_code = bytes(sc_pass2) 
-code_size = len(object_code)
-
-verbose('STEP PASS2: Generated binary object code') 
-
-# TODO add dump of file
-
-if args.dump:
-    hexdump(sc_pass2, LC0)
 
 
 # -------------------------------------------------------------------

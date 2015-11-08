@@ -5,13 +5,18 @@
     .origin 0e000
 
 jack        nop
-            nop
             bra jack 
 
 @           nop
-            nop
             bra - 
 
+    .advance e010
+            nop
+    .skip 2 
+
             stp
+
+data    .byte 01 02 03 04 05 06
+        .word 1122 3344
 
     .end
