@@ -1,7 +1,7 @@
 # Opcodes for the Tinkerer's Assembler for the 65816 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 23. Okt 2015
-# This version: 03. Nov 2015
+# This version: 08. Nov 2015
 
 opcode_table = (
     (0x00, 'brk', 1, 0),

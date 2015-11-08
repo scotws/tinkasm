@@ -157,7 +157,7 @@ CODE_DONE = 'ok (code) '  # Finished entry from code, now machine code bytes
 CONTROL   = 'CONTROL   '  # Entry for flow control that procudes no code or data
 DATA_DONE = 'ok (data) '  # Finished entry from data, now pure bytes
 MACRO     = 'MACRO     '  # Line created by macro expansion 
-SOURCE    = 'SOURCE    '  # Entry that hasn't been touched except for whitespace
+SOURCE    = 'src       '  # Entry that hasn't been touched except for whitespace
 TOUCHED   = 'TOUCHED   '  # Entry that has been partially processed
 
 # TODO add name etc
@@ -849,7 +849,7 @@ for n, s, p in sc_axy:
     # This is a freebee because that is where we want to end up
     if w[0] == '.byte' or w[0] == '.b':
         LCi += len(w)-1 
-        sc_labels.append((n, DATA_DONE, p)) 
+        sc_labels.append((n, s, p)) 
         continue 
 
     # .WORD stores two bytes per whitespace separated word
@@ -988,7 +988,7 @@ for n, s, p in sc_labels:
     # defining lots of .byte data as symbols 
     wc = []
     ws = p.split() 
-    stemp = s
+    s_temp = s
 
     for w in ws: 
         
@@ -997,11 +997,11 @@ for n, s, p in sc_labels:
         except KeyError:
             pass
         else:
-            stemp = TOUCHED
+            s_temp = TOUCHED
         finally:
             wc.append(w)
                 
-    sc_replace.append((n, stemp, INDENT+' '.join(wc))) 
+    sc_replace.append((n, s_temp, INDENT+' '.join(wc))) 
         
 verbose('STEP REPLACED: Replaced all symbols with their number values') 
 dump(sc_replace) 
@@ -1048,13 +1048,19 @@ verbose('ASSERT: There should be no labels or symbols left in the source code')
 # -------------------------------------------------------------------
 # STEP BYTEDATA: Convert various data formats like .word and .string to .byte
 
-# TODO these can be very easily condensed once we know what is going on 
+# TODO these can be condensed once we know what is going on 
 
 sc_bytedata = []
 
 for n, s, p in sc_locals:
 
     w = p.split()
+
+    # SUBSTEP BYTE: Change status of .byte instructions
+    if w[0] == '.byte':
+        sc_bytedata.append((n, DATA_DONE, p)) 
+        continue 
+
 
     # SUBSTEP WORD: Produce two byte per word
     if w[0] == '.word':
@@ -1188,6 +1194,11 @@ branches_16 = ['bra.l', 'phe.r']
 
 for n, s, p in sc_1byte: 
 
+    # Skip the finished stuff
+    if s == CODE_DONE or s == DATA_DONE:
+            sc_branches.append((n, s, p))
+            continue
+
     w = p.split() 
 
     if w[0] in branches_8:
@@ -1241,8 +1252,6 @@ verbose('STEP BRANCHES: Encoded all branch instructions')
 dump(sc_branches) 
 
 
-print('---- HERE HERE HERE ---') 
-
 # -------------------------------------------------------------------
 # STEP 4BYTE: Assemble four-byte opcodes (65816 only) 
 
@@ -1252,8 +1261,7 @@ sc_4byte = []
 
 if MPU == '65816':
 
-    # Note we now can have three entries in the source listing
-    for n, s, p  in sc_1byte: 
+    for n, s, p  in sc_branches: 
 
         # Skip the finished stuff
         if s == CODE_DONE or s == DATA_DONE:
@@ -1270,15 +1278,16 @@ if MPU == '65816':
 
             if opcode_table[oc][OPCT_N_BYTES] == 4: 
 
+                oc_p = INDENT+'.byte '+hex(mnemonics[w[0]])[2:]+' '  
                 is_number, opr = convert_number(w[1])     
 
-                # Test for is_number is paranoid
+                # Paranoid, we should have converted all symbols
                 if not is_number:
-                    fatal(n, 'STEP 4BYTE found non-number "{0}"'.\
+                    fatal(n, 'Symbol "{0}" mysteriously unconvert'.\
                             format(opr))
-
-                [oc].extend(little_endian_24(opr)) 
-                sc_4byte.append((n, CODE_DONE, li))
+                
+                oprs = [hex(a)[2:] for a in little_endian_24(opr)] 
+                sc_4byte.append((n, CODE_DONE, oc_p+' '.join(oprs)))
 
             else:
                 sc_4byte.append((n, s, p)) 
@@ -1291,25 +1300,128 @@ else:
 
 
 
+print('---- HERE HERE HERE ---') 
 
 
 # -------------------------------------------------------------------
-# STEP VALIDATE: Make sure we only have DATA_DONE and OPC_DONE entries
+# STEP 3BYTES: Convert three-byte insructions
 
-sc_validate = []
+sc_3byte = []
 
-verbose('STEP VALIDATE: Confirmed all lines assembled as binary data')
-dump(sc_validate)
+# TODO DUMMY
+sc_3byte = sc_4byte
 
+
+verbose('STEP 3BYTE: Assembled all three-byte instructions')
+dump(sc_3byte) 
 
 
 # -------------------------------------------------------------------
-# STEP BIN: Save binary file 
+# STEP 2BYTES: Convert two-byte insructions
+
+sc_2byte = []
+
+# TODO DUMMY
+sc_2byte = sc_3byte
+
+
+verbose('STEP 2BYTE: Assembled all two-byte instructions')
+dump(sc_2byte) 
+
+
+# -------------------------------------------------------------------
+# ASSERT: At this point we should only have .byte instructions
+verbose('ASSERT: All data should now be converted in .byte lines')
+
+
+# -------------------------------------------------------------------
+# PASS VALIDATE: At this point we should only have CODE_DONE, DATA_DONE, and
+# CONTROL instructions 
+
+# Note this pass does not store or save any data
+
+legal_status = [CODE_DONE, DATA_DONE, CONTROL]
+
+for n, s, p in sc_2byte:
+
+    if s not in legal_status: 
+        fatal(n, 'Illegal status "{0}" in validiation pass'.\
+                    format(s))
+
+verbose('STEP VALIDATE: Confirmed all lines assembled')
+dump(sc_2byte) 
+
+
+# -------------------------------------------------------------------
+# PASS BINONLY: strip out everything that isn't a .byte directive
+
+# This is the last human-readable source listing. We need to keep the line
+# numbers for the next step 
+
+sc_binonly = [(n, s, p) for n, s, p in sc_2byte if '.byte' in p] 
+
+verbose('PASS BINONLY: Source completely converted to byte list') 
+dump(sc_binonly) 
+
+
+# -------------------------------------------------------------------
+# PASS OPTIMIZE: Analyze and optimize code
+
+# We don't perform automatic optimizations at the moment, but only give
+# suggestions and warnings here. We need the line numbers here so we can offer
+# the user suggestions
+
+verbose('PASS ANALYZE: Code scanned (DUMMY, no analyses performed)') 
+
+
+# -------------------------------------------------------------------
+# PASS PUREBYTES: Remove everything except the byte strings
+
+def strip_byte(s):
+    """Strip out the '.byte' directive from a string"""
+    return s.replace('.byte ', '').strip()  
+
+sc_purebytes = []
+
+for _, _, p in sc_binonly: 
+    p_bytes = strip_byte(p) 
+    bl = [int(b, 16) for b in p_bytes.split()] 
+    sc_purebytes.append(bl)
+
+verbose('PASS PUREBYTES: Converted line to pure byte lists')
+
+if args.dump: 
+
+    for l in sc_purebytes:
+        print('  ', end=' ') 
+        for b in l:
+            print('{0:02x}'.format(b), end=' ') 
+        print() 
+    print() 
+
+
+# -------------------------------------------------------------------
+# PASS TOBIN: Convert assembly lines to bin 
+
+sc_tobin = []
+
+for i in sc_purebytes:
+    sc_tobin.extend(i) 
+    
+objectcode = bytes(sc_tobin) 
+code_size = len(objectcode) 
+
+verbose('PASS TOBIN: Converted byte list to {0} bytes'.\
+        format(code_size))
+
+
+# -------------------------------------------------------------------
+# STEP SAVEBIN: Save binary file 
 
 with open(args.output, 'wb') as f:
-    f.write(object_code)
+    f.write(objectcode)
 
-verbose('STEP BIN: Saved {0} bytes of object code as {1}'.\
+verbose('STEP SAVEBIN: Saved {0} bytes of object code as {1}'.\
         format(code_size, args.output))
 
 if n_warnings != 0 and args.warnings:
@@ -1386,7 +1498,7 @@ if args.hexdump:
     
         c = 0 
 
-        for e in sc_pass2:  # TODO change this to final binary file
+        for e in objectcode: 
             f.write('{0:02x} '.format(e))
             c += 1
             if c % 16 == 0:

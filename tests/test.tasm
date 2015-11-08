@@ -2,20 +2,23 @@
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 ; branch testing
 
-    .mpu 65816
-    .origin 0e000
+            .mpu 65816
+            .origin 0e000
 
-jack        nop 
-            bra.l jack 
+            jack = 01
+            jill = 02
 
-@           nop
-            bra.l - 
+@           nop 
+            nop 
+            bra - 
 
-    .native
-    
-            bra.l jill 
-jill        nop
+            .native
 
-            stp  
+            nop
+            nop 
 
-    .end
+            stp 
+
+data        .byte jack jill jack jill
+
+            .end
