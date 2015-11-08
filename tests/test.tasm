@@ -1,18 +1,18 @@
 ; Test file for 
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 
-            .mpu 65816
-            .origin 0e000
+    .mpu 65816
+    .origin 0e000
 
-@           nop 
+    jill = 0ff
+    jack = 01000
 
-@           nop 
-            jmp - 
-            bra + 
-@           nop
-            nop 
-            lda *  ; weird, just for testing
+    .byte 01 jill 03 jill
+    .word jack 02000
+    .long 112233 445566
 
-@           stp
+    .string "a z"
+    .string0 "cats"
+    .stringlf "cats"
 
-            .end
+    .end
