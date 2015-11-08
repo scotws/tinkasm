@@ -745,12 +745,12 @@ else:
 
 sc_labels = []
 
-branches_8 = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs'] 
+branches = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
+        'bra.l', 'phe.r']  
 
 # These are only used for 65816. The offsets are used to calculate if an extra
 # byte is needed for immediate forms such as lda.# with the 65816
 
-branches_16 = ['bra.l', 'phe.r']  
 a_len_offset = 0 
 xy_len_offset = 0 
 a_imm = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#'] 
@@ -792,6 +792,14 @@ for n, s, p in sc_axy:
     except KeyError:
         pass
     else: 
+        # For branches, we want to remember were the instruction is to make our
+        # life easier later
+        if w[0] in branches: 
+            p = p + ' ' + hex(LC0+LCi)[2:] 
+            s = TOUCHED 
+            verbose('Added address of branch to its payload in line {0}'.\
+                    format(n)) 
+
         LCi += opcode_table[oc][OPCT_N_BYTES]
 
         # Factor in register mode switches if this is a 65816
@@ -826,6 +834,7 @@ for n, s, p in sc_axy:
             verbose('New label "{0}" found in line {1}, address {2:06x}'.\
                     format(w[0], n, LC0+LCi))
             symbol_table[w[0]] = LC0+LCi
+            continue
 
         # If it is already known, something went wrong, because we can't
         # redefine a label. 

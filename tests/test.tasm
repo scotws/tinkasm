@@ -4,15 +4,14 @@
     .mpu 65816
     .origin 0e000
 
-    jill = 0ff
-    jack = 01000
+jack        nop
+            nop
+            bra jack 
 
-    .byte 01 jill 03 jill
-    .word jack 02000
-    .long 112233 445566
+@           nop
+            nop
+            bra - 
 
-    .string "a z"
-    .string0 "cats"
-    .stringlf "cats"
+            stp
 
     .end
