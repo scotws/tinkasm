@@ -5,6 +5,8 @@
             .mpu 65816
             .origin 0e000
 
+            .include tests/includeme.tasm
+
             jack = 01
             jill = 02
 

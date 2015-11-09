@@ -1,0 +1,5 @@
+; Include Directive test file 
+
+            nop         ; this is where included data starts
+            nop
+            nop         ; this is where included data ends

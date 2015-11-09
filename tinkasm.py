@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 08. Nov 2015
+# This version: 09. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,15 +24,12 @@
 ### SETUP ### 
 
 import argparse
+import operator
 import re
 import string
 import sys
 import time
 import timeit
-
-# dictionary of special routines special.opc 
-# TODO do this differently 
-import special     
 
 # Check for correct version of Python
 if sys.version_info.major != 3:
@@ -40,6 +37,7 @@ if sys.version_info.major != 3:
     sys.exit(1) 
 
 # Initialize various counts. Some of these are just for general data collection
+n_external_files = 0    # How many external files were loaded
 n_invocations = 0       # How many macros were expanded
 n_mode_switches = 0     # TODO Count switches native/emulated (65816)
 n_size_switches = 0     # TODO Count 8/16 bit register switches (65816)
@@ -71,9 +69,9 @@ args = parser.parse_args()
 
 ### BASIC OUTPUT FUNCTIONS ###
 
-def fatal(p,s): 
+def fatal(n, s): 
     """Abort program because of fatal error during assembly"""
-    print('FATAL ERROR in line {0}: {1}'.format(p, s))
+    print('FATAL ERROR in line {0}: {1}'.format(n, s))
     sys.exit(1) 
 
 def verbose(s):
@@ -82,6 +80,11 @@ def verbose(s):
     if args.verbose:
         print(s)
 
+# TODO code this for PASS ANALYZE 
+def suggestion(n, s):
+    """Print a suggestion of how the code could be better"""
+    print('SUGGESTION: DUMMY, ROUTINE NOT CODED YET')
+    
 def warning(s):
     """If program called with -w or --warnings, print a warning string"""
     if args.warnings:
@@ -138,12 +141,14 @@ INDENT = ' '*12     # Indent in whitespace for inserted instructions
 LC0 = 0             # Start address of code ("location counter") 
 LCi = 0             # Index to where we are in code
 
-HEX_FILE = 'tink.hex'   # Name of hexdump file
+LIST_FILE = 'tink.lst'   # Name of listing file 
+HEX_FILE  = 'tink.hex'   # Name of hexdump file
 
 symbol_table = {}
 local_labels = [] 
 
 # Positions in the opcode tables
+# TODO see if we need these
 OPCT_OPCODE = 0 
 OPCT_MNEMONIC = 1 
 OPCT_N_BYTES = 2
@@ -180,13 +185,12 @@ verbose('Generated mnemonics list')
 
 
 # List of all directives
-# TODO see if we even need this
-
 directives = ['.a->8', '.a->16', '.a8', '.a16', '.append', '.origin',\
         '.org', '.end', '.b', '.byte', '.w', '.word', '.l', '.long',\
         '.native', '.emulated', '.s', '.string', '.s0', '.string0', '.slf',\
         '.stringlf', '.xy->8', '.xy->16', '.xy8', '.xy16', COMMENT,\
-        CURRENT, LOCAL_LABEL]
+        '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
+        '.and', '.or', '.xor', CURRENT, LOCAL_LABEL]
 
 
 ### HELPER FUNCTIONS ###
@@ -219,9 +223,6 @@ def string2bytes(s):
     return len(s), [hex(ord(c))[2:] for c in s]
 
 def convert_number(s): 
-    # TODO We need to handle CURRENT marker as well
-    # TODO Rename this to "analyze_operand" and return code for type
-    #      This will let us use the routine to find math routines
     """Convert a number string provided by the user in one of various 
     formats to an integer we can use internally. See Manual for details 
     on supported formats."""
@@ -276,6 +277,7 @@ def dump(l):
                         format(line[0], line[1], line[2]))
         print()
 
+
 def dump_symbol_table(d=symbol_table, s=""):
     """Print Symbol Tabel to screen"""
     print('Symbol Table', s)
@@ -290,8 +292,69 @@ def dump_symbol_table(d=symbol_table, s=""):
         print('    (empty)\n')
 
 
+### MODIFIER AND MATH FUNCTIONS ###
 
-### PASSES ###
+# The math functions for TinkAsm are very primative. For the assignments and
+# instructions with as single operand such as an address, there are two cases:
+#
+# 1) If the operand is split into two words, it's a "modifier" case with an
+#    action and a number or symbol (eg "lda.# .lsb muggle'). 
+# 2) If the operand is split into three words, it's a "math" case with an action
+#    between two numbers of symbols (eg "lda.# muggle + 1")
+#
+# Note that in both cases, white space is significant. Also, the mvp and mvn
+# instructions of the 65816 are treated separately because their structure does
+# not fit the single-operand mode. 
+
+modifier_funcs = { '.lsb': lsb, '.msb': msb, '.bank': bank,\
+        '.invert': operator.invert}
+
+def modify_operand(lw, n): 
+    """Given a list lw of two strings, apply the modifier function that is 
+    the first word to the actual operand that is the second word."""
+    is_number, opr = convert_number(lw[1])
+
+    # Paranoid, we shouldn't have symbols anymore
+    if not is_number:
+        fatal(n, 'Symbol found during modify function {0}'.format(lw[0]))
+
+    try:
+        r = modifier_funcs[lw[0]](opr)
+    except KeyError:
+        fatal(n, 'Illegal modifier {0} given'.format(lw[0]))
+
+    return r 
+
+
+math_funcs = { '+': operator.add, '-': operator.sub, '*': operator.mul,\
+        '/': operator.floordiv, '.and': operator.and_, '.or': operator.or_,\
+        '.xor': operator.xor, '.lshift': operator.lshift,\
+        '.rshift': operator.rshift} 
+
+def math_operand(lw, n):
+    """Given a list lw of three strings, apply the math function in
+    the second word to the two other operands"""
+    is_number, a1 = convert_number(lw[0])
+
+    # Paranoid, we shouldn't have symbols anymore
+    if not is_number:
+        fatal(n, 'Symbol found during modify function {0}'.format(lw[1]))
+
+    is_number, a2 = convert_number(lw[2])
+
+    # Paranoid, we shouldn't have symbols anymore
+    if not is_number:
+        fatal(n, 'Symbol found during modify function {0}'.format(lw[1]))
+
+    try:
+        r = math_funcs[lw[1]](opr)
+    except KeyError:
+        fatal(n, 'Illegal modifier {0} given'.format(lw[1]))
+
+    return r 
+
+
+### PASSES AND STEPS ###
 
 # The assembler works by connecting as many little steps as possible (see the 
 # Manual for details). Each step is given a title such as STATUS, and all
@@ -318,34 +381,68 @@ verbose('Beginning assembly, timer started.')
 
 
 # -------------------------------------------------------------------
-# STEP IMPORT: Import original source code and add line numbers
+# STEP LOAD: Load original source code and add line numbers
 
 # Line numbers start with 1 because this is for humans. Note that at this point,
 # the tuples in the list entries only have two elements, line number and payload
 
-sc_import = []
+sc_load = []
 
 with open(args.source, "r") as f:
-    sc_import = list(enumerate(f.readlines(), 1))
+    sc_load = list(enumerate(f.readlines(), 1))
 
 verbose('STEP IMPORT: Read {0} lines from {1}'.\
-        format(len(sc_import), args.source))
-dump(sc_import) 
+        format(len(sc_load), args.source))
+dump(sc_load) 
 
 
 # -------------------------------------------------------------------
-# Step EMPTY: Remove empty lines
+# PASS INLCUDE: Add content from extermal files specified by the INCLUDE
+# directive
+
+# The .include directive must be alone in the line and the second string must be
+# the name of the file without spaces. 
+
+sc_include = []
+
+for n, p in sc_load:
+
+    w = p.split() 
+
+    try: 
+        if w[0].lower() == '.include':
+
+            # We keep the line number for later reference
+            with open(w[1], "r") as f:
+                sc_include.extend([(n, l) for l in f.readlines()])
+
+            n_external_files += 1
+            verbose('Included code from file "{0}"'.format(w[1]))
+            continue 
+
+    # TODO This looks stupid, rewrite
+    except IndexError:
+        sc_include.append((n, p)) 
+    else:
+        sc_include.append((n, p)) 
+
+verbose('STEP INCLUDE: Added {0} external files'.format(n_external_files))  
+dump(sc_include) 
+
+
+# -------------------------------------------------------------------
+# PASS EMPTY: Remove empty lines
 
 # TODO keep empty lines in separate list to reconstruct listing file
 
 sc_empty = []
 
-for n, p in sc_import:
+for n, p in sc_include:
     if p.strip():
         sc_empty.append((n, p)) 
 
 verbose('STEP EMPTY: Removed {0} empty lines'\
-        .format(len(sc_import)-len(sc_empty)))
+        .format(len(sc_include)-len(sc_empty)))
 dump(sc_empty) 
 
 
@@ -1440,6 +1537,8 @@ with open(args.listing, 'w') as f:
     f.write('Assembly time was {0:.5f} seconds\n'.format(time_end - time_start))
     if n_warnings != 0:
         f.write('Generated {0} warnings.\n'.format(n_warnings))
+    if n_external_files != 0:
+        f.write('Loaded {0} external files.\n'.format(n_external_files))
     f.write('Code origin is {0:06x}\n'.format(LC0))
     f.write('Generated {0} bytes of machine code\n'.format(code_size))
 
