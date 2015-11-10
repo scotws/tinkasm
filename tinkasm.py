@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 09. Nov 2015
+# This version: 10. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -68,6 +68,12 @@ args = parser.parse_args()
 
 
 ### BASIC OUTPUT FUNCTIONS ###
+
+def hexstr(i):
+    """Given an integer, return a hex number as a string that has the '0x' 
+    portion stripped out and is limited to 24 bit (to correctly handle the
+    negative numbers)"""
+    return hex(i & 0x0ffffff).replace('0x', '')
 
 def fatal(n, s): 
     """Abort program because of fatal error during assembly"""
@@ -220,7 +226,7 @@ def string2bytes(s):
     and return the number of characters and a list of the hex ASCII values of
     the characters in that string. Assumes that there is one and only one
     string in the line that is delimited by quotation marks"""
-    return len(s), [hex(ord(c))[2:] for c in s]
+    return len(s), [hexstr(ord(c)) for c in s]
 
 def convert_number(s): 
     """Convert a number string provided by the user in one of various 
@@ -347,7 +353,7 @@ def math_operand(lw, n):
         fatal(n, 'Symbol found during modify function {0}'.format(lw[1]))
 
     try:
-        r = math_funcs[lw[1]](opr)
+        r = math_funcs[lw[1]](a1, a2)
     except KeyError:
         fatal(n, 'Illegal modifier {0} given'.format(lw[1]))
 
@@ -660,7 +666,9 @@ dump(sc_end)
 
 
 # -------------------------------------------------------------------
-# STEP ASSIGN: Handle assignments
+# PASS ASSIGN: Handle assignments
+
+# TODO add math and modifiers
 
 # We accept two kinds of assignment directives , "=" and ".equ". Since we've
 # moved all labels to their own lines, any such directive must be the second
@@ -730,7 +738,7 @@ for n, s, p in sc_assign:
         sc_invoke.append(ml)
 
     n_invocations += 1
-    verbose('Expanding macro {0} into line {1}'.\
+    verbose('Expanding macro "{0}" into line {1}'.\
                 format(w[1], n))
 
 post_len = len(sc_invoke)
@@ -743,7 +751,7 @@ dump(sc_invoke)
 
 
 # -------------------------------------------------------------------
-# STEP MODES: Handle '.native' and '.emulated' directives on the 65816
+# PASS MODES: Handle '.native' and '.emulated' directives on the 65816
 
 # TODO count and print number of mode switches
 
@@ -785,7 +793,7 @@ else:
 
 
 # -------------------------------------------------------------------
-# STEP AXY: Handle register size switches on the 65816
+# PASS AXY: Handle register size switches on the 65816
 
 # TODO count and print number of mode switches
 
@@ -870,7 +878,7 @@ for n, s, p in sc_axy:
     # TODO consider giving this its own full pass
     
     if CURRENT in p:
-        hc = hex(LC0+LCi)[2:]     # TODO make this a separate function
+        hc = hexstr(LC0+LCi)     # TODO make this a separate function
         p = p.replace(CURRENT, hc)
         w = p.split() 
         verbose('Current marker "{0}" in line {1}, replaced with {2}'.\
@@ -892,14 +900,14 @@ for n, s, p in sc_axy:
         # For branches, we want to remember were the instruction is to make our
         # life easier later
         if w[0] in branches: 
-            p = p + ' ' + hex(LC0+LCi)[2:] 
+            p = p + ' ' + hexstr(LC0+LCi)
             s = TOUCHED 
             verbose('Added address of branch to its payload in line {0}'.\
                     format(n)) 
 
         LCi += opcode_table[oc][OPCT_N_BYTES]
 
-        # Factor in register mode switches if this is a 65816
+        # Factor in register size if this is a 65816
         if MPU == '65816':
 
             if w[0] in a_imm:
@@ -973,6 +981,7 @@ for n, s, p in sc_axy:
 
         # TODO Rewrite this horrible code once we are sure this is what we want
         # to do 
+        # TODO make sure the switch to 16 bits only works in native mode
         if w[0] == '.a->8':
             a_len_offset = 0 
             sc_labels.append((n, s, p)) 
@@ -1071,11 +1080,11 @@ dump(sc_labels)
 # -------------------------------------------------------------------
 # ASSERT: At this point we should have all symbols present and known in the
 # symbol table, and local labels in the local label list
-verbose('ASSERT: All symbols should now be known')
+verbose('ASSERTING that all symbols should now be known')
 
 
 # -------------------------------------------------------------------
-# STEP REPLACE: Replace all symbols in code by correct numbers
+# PASS STEP REPLACE: Replace all symbols in code by correct numbers
 
 sc_replace = []
 
@@ -1090,7 +1099,7 @@ for n, s, p in sc_labels:
     for w in ws: 
         
         try:
-            w = hex(symbol_table[w])[2:]
+            w = hexstr(symbol_table[w])
         except KeyError:
             pass
         else:
@@ -1105,7 +1114,9 @@ dump(sc_replace)
 
 
 # -------------------------------------------------------------------
-# STEP LOCALS: Replace all local label references by correct numbers
+# PASS LOCALS: Replace all local label references by correct numbers
+
+# Note we can't do math or modify local labels 
 
 sc_locals = [] 
 
@@ -1119,14 +1130,14 @@ for n, s, p in sc_replace:
     if len(w) > 1 and w[1] == '+': 
         for ln, ll in local_labels: 
             if ln > n: 
-                p = p.replace('+', hex(ll)[2:])
+                p = p.replace('+', hexstr(ll))
                 s = TOUCHED
                 break
 
     if len(w) > 1 and w[1] == '-': 
         for ln, ll in reversed(local_labels): 
             if ln < n: 
-                p = p.replace('-', hex(ll)[2:])
+                p = p.replace('-', hexstr(ll))
                 s = TOUCHED
                 break
 
@@ -1139,11 +1150,11 @@ dump(sc_locals)
 # -------------------------------------------------------------------
 # ASSERT: At this point we should have comletely replaced all labels and symbols
 # with numerical values.
-verbose('ASSERT: There should be no labels or symbols left in the source code')
+verbose('ASSERTING there should be no labels or symbols left in the source')
 
 
 # -------------------------------------------------------------------
-# STEP BYTEDATA: Convert various data formats like .word and .string to .byte
+# PASS BYTEDATA: Convert various data formats like .word and .string to .byte
 
 # TODO these can be condensed once we know what is going on 
 
@@ -1173,7 +1184,7 @@ for n, s, p in sc_locals:
                 fatal(n, 'Found symbol left over in .word directive')
 
             for b in little_endian_16(r):
-                bl.append(hex(b)[2:]) 
+                bl.append(hexstr(b)) 
 
         p = INDENT+'.byte '+' '.join(bl) 
         sc_bytedata.append((n, DATA_DONE, p))
@@ -1195,7 +1206,7 @@ for n, s, p in sc_locals:
                 fatal(n, 'Found symbol left over in .long directive')
 
             for b in little_endian_24(r):
-                bl.append(hex(b)[2:]) 
+                bl.append(hexstr(b)) 
 
         p = INDENT+'.byte '+' '.join(bl) 
         sc_bytedata.append((n, DATA_DONE, p))
@@ -1217,7 +1228,7 @@ for n, s, p in sc_locals:
     if w[0] == '.string0' or w[0] == '.str0':
         s = p.split('"')[1] 
         _, bl = string2bytes(s)  
-        bl.append(hex(00)[2:]) 
+        bl.append(hexstr(00)) 
         p = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((n, DATA_DONE, p))
         verbose('Converted .string0 directive in line {0} to .byte directive'.\
@@ -1228,7 +1239,7 @@ for n, s, p in sc_locals:
     if w[0] == '.stringlf' or w[0] == '.strlf':
         s = p.split('"')[1] 
         _, bl = string2bytes(s)  
-        bl.append(hex(ord('\n'))[2:]) 
+        bl.append(hexstr(ord('\n'))) 
         p = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((n, DATA_DONE, p))
         verbose('Converted .stringlf directive in line {0} to .byte directive'.\
@@ -1246,11 +1257,11 @@ dump(sc_bytedata)
 # -------------------------------------------------------------------
 # ASSERT: At this point there should only be .byte data directives in the code
 # with numerical values.
-verbose('ASSERT: All data should now be handled by .byte directives')
+verbose('ASSERTING that all data is now contained in .byte directives')
 
 
 # -------------------------------------------------------------------
-# STEP 1BYTE: Convert all single-byte instructions to .byte directives
+# PASS 1BYTE: Convert all single-byte instructions to .byte directives
 
 # Low-hanging fruit first: Compile the opcodes without operands
 
@@ -1267,7 +1278,7 @@ for n, s, p in sc_bytedata:
     else: 
 
         if opcode_table[oc][OPCT_N_BYTES] == 1: 
-            bl = INDENT+'.byte '+hex(oc)[2:] 
+            bl = INDENT+'.byte '+hexstr(oc)
             sc_1byte.append((n, CODE_DONE, bl))
         else:
             sc_1byte.append((n, s, p)) 
@@ -1299,7 +1310,7 @@ for n, s, p in sc_1byte:
     w = p.split() 
 
     if w[0] in branches_8:
-        new_p = '.byte '+hex(mnemonics[w[0]])[2:]+' '  
+        new_p = '.byte '+hexstr(mnemonics[w[0]])+' '  
         is_number,  branch_addr = convert_number(w[-1])
 
         # Paranoid, we should have converted all symbols
@@ -1314,14 +1325,14 @@ for n, s, p in sc_1byte:
             fatal(n, 'Found unconverted symbol "{0}" during branch handling'.\
                     format(w[-2]))
 
-        opr = hex(lsb(target_addr - branch_addr - 2))[2:]  
+        opr = hexstr(lsb(target_addr - branch_addr - 2))
         sc_branches.append((n, CODE_DONE, INDENT+new_p+opr)) 
         continue 
 
     # 16-bit branches (65816 only) 
     if MPU == '65816' and w[0] in branches_16:
 
-        oc_p = '.byte '+hex(mnemonics[w[0]])[2:]+' '  
+        oc_p = '.byte '+hexstr(mnemonics[w[0]])+' '  
         is_number,  branch_addr = convert_number(w[-1])
 
         # Paranoid, we should have converted all symbols
@@ -1337,7 +1348,7 @@ for n, s, p in sc_1byte:
                     format(w[-2]))
 
         bl, bm = little_endian_16(target_addr - branch_addr - 3)
-        opr = INDENT+oc_p+' '+hex(bl)[2:]+' '+hex(bm)[2:] 
+        opr = INDENT+oc_p+' '+hexstr(bl)+' '+hexstr(bm)
         sc_branches.append((n, CODE_DONE, opr)) 
         continue 
  
@@ -1350,112 +1361,157 @@ dump(sc_branches)
 
 
 # -------------------------------------------------------------------
-# STEP 4BYTE: Assemble four-byte opcodes (65816 only) 
+# PASS MOVE: Handle the 65816 move instructions MVP and MVN
 
-# These are easy, too. Assumes that all symbols and math stuff has resulted in
-# a simple number as the second word in the line
-sc_4byte = []
+# TODO code this 
+
+# These two instructions are really, really annoying because they have two
+# operands where every other instruction has one. 
+
+sc_move = []
 
 if MPU == '65816':
 
-    for n, s, p  in sc_branches: 
+    for n, s, p in sc_branches:
 
-        # Skip the finished stuff
-        if s == CODE_DONE or s == DATA_DONE:
-            sc_4byte.append((n, s, p))
-            continue
+        w = p.split()
 
-        w = p.split() 
+        if w[0] == 'mvp' or w[0] == 'mvn':
+            print('DUMMY Found move instruction, skipping') 
+            continue 
+        else:
+            sc_move.append((n, s, p)) 
 
-        try:
-            oc = mnemonics[w[0]]
-        except KeyError:
-            sc_4byte.append((n, s, p)) 
-        else: 
-
-            if opcode_table[oc][OPCT_N_BYTES] == 4: 
-
-                oc_p = INDENT+'.byte '+hex(mnemonics[w[0]])[2:]+' '  
-                is_number, opr = convert_number(w[1])     
-
-                # Paranoid, we should have converted all symbols
-                if not is_number:
-                    fatal(n, 'Symbol "{0}" mysteriously unconvert'.\
-                            format(opr))
-                
-                oprs = [hex(a)[2:] for a in little_endian_24(opr)] 
-                sc_4byte.append((n, CODE_DONE, oc_p+' '.join(oprs)))
-
-            else:
-                sc_4byte.append((n, s, p)) 
-
-    verbose('STEP 4BYTE: Assembled all four-byte instructions')
-    dump(sc_4byte)
+    verbose('PASS MOVE: Handled mvn/mvp instructions on the 65816')
+    dump(sc_move) 
 
 else:
-    sc_4byte = sc_1byte
-
-
-
-print('---- HERE HERE HERE ---') 
+    sc_move = sc_branches
 
 
 # -------------------------------------------------------------------
-# STEP 3BYTES: Convert three-byte insructions
+# STEP MATH: Handle modifiers and math functions
 
-sc_3byte = []
+# As discussed above, we distingish between "modifiers" and "math" by the number
+# of whitespace delimited words the operand is made up of. Assumes that all
+# symbols have been converted to numbers. At the end of this step, each opcode
+# remaining should have one and only one operand
 
-# TODO DUMMY
-sc_3byte = sc_4byte
+sc_math = [] 
 
+for n, s, p  in sc_branches: 
 
-verbose('STEP 3BYTE: Assembled all three-byte instructions')
-dump(sc_3byte) 
+    w = p.split() 
+
+    try:
+        oc = mnemonics[w[0]]
+    except KeyError:
+        pass 
+    else: 
+
+        n_words = len(w)-1
+
+        if n_words == 1:
+            _, res = convert_number(w[1])
+        elif n_words == 2:
+            res = modify_operand(w[1:], n)
+        elif n_words == 3:
+            res = math_operand(w[1:], n)
+        else:
+            fatal(n, 'Too many termn for modifier or math routines')
+
+        # Reassemble p as a string
+        p = INDENT+w[0]+' '+hexstr(res)
+        s = TOUCHED
+
+    sc_math.append((n, s, p)) 
+
+verbose('STEP MATH: Calculated all modifiers and math terms.')
+dump(sc_math)
 
 
 # -------------------------------------------------------------------
-# STEP 2BYTES: Convert two-byte insructions
+# PASS ALLOPR: Assemble all remaining operands
 
-sc_2byte = []
+sc_allopr = []
 
-# TODO DUMMY
-sc_2byte = sc_3byte
+for n, s, p in sc_math:
 
+    w = p.split() 
 
-verbose('STEP 2BYTE: Assembled all two-byte instructions')
-dump(sc_2byte) 
+    if MPU == '65816':
 
+        # TODO Rewrite this horrible code once we are sure this is what we want
+        # to do. Note it appears twice 
+        # TODO make sure switch to 16 only works in native mode
+        if w[0] == '.a->8':
+            a_len_offset = 0 
+            continue 
 
-# -------------------------------------------------------------------
-# ASSERT: At this point we should only have .byte instructions
-verbose('ASSERT: All data should now be converted in .byte lines')
+        elif w[0] == '.a->16':
+            a_len_offset = 1 
+            continue 
 
+        elif w[0] == '.xy->8':
+            xy_len_offset = 0 
+            continue 
 
-# -------------------------------------------------------------------
-# PASS VALIDATE: At this point we should only have CODE_DONE, DATA_DONE, and
-# CONTROL instructions 
+        elif w[0] == '.xy->16':
+            xy_len_offset = 1 
+            continue 
 
-# Note this pass does not store or save any data
+    try:
+        oc = mnemonics[w[0]]
+    except KeyError:
+        sc_allopr.append((n, s, p)) 
+    else:
 
-legal_status = [CODE_DONE, DATA_DONE, CONTROL]
+        # Get number of bytes in instruction
+        n_bytes = opcode_table[oc][2]
 
-for n, s, p in sc_2byte:
+        # Factor in register size if this is a 65816
+        if MPU == '65816':
 
-    if s not in legal_status: 
-        fatal(n, 'Illegal status "{0}" in validiation pass'.\
-                    format(s))
+            if w[0] in a_imm:
+                n_bytes += a_len_offset
+            elif w[0] in xy_imm:
+                n_bytes += xy_len_offset
 
-verbose('STEP VALIDATE: Confirmed all lines assembled')
-dump(sc_2byte) 
+        is_number, opr = convert_number(w[1]) 
+
+        # Paranoid, we should have converted all symbols
+        if not is_number:
+            fatal(n, 'Symbol "{0}" mysteriously not converted'.format(opr))
+
+        # We hand tuples to the next step 
+        if n_bytes == 2: 
+            bl = (lsb(opr), ) 
+        elif n_bytes == 3:
+            bl = little_endian_16(opr)
+        elif n_bytes == 4:
+            bl = little_endian_24(opr)
+        else:
+            fatal(n, 'Found {0} byte instruction in opcode list'.\
+                    format(n_bytes))
+
+        # p = INDENT+'.byte '+hexstr(oc)+' '+' '.join([hexstr(i) for i in bl])
+        #
+        p = '{0}.byte {1:02x} {2}'.\
+                format(INDENT, oc, ' '.join([hexstr(i) for i in bl]))
+        sc_allopr.append((n, CODE_DONE, p)) 
+
+verbose('PASS ALLOPR: Assembled all remaining operands')
+dump(sc_allopr)
 
 
 # -------------------------------------------------------------------
 # PASS BINONLY: strip out everything that isn't a .byte directive
 
 # This is the last human-readable source listing. We need to keep the line
-# numbers for the next step 
+# numbers for the next step; we keep the status line so we can distinguish
+# between data and code bytes 
 
-sc_binonly = [(n, s, p) for n, s, p in sc_2byte if '.byte' in p] 
+sc_binonly = [(n, s, p) for n, s, p in sc_allopr if '.byte' in p] 
 
 verbose('PASS BINONLY: Source completely converted to byte list') 
 dump(sc_binonly) 
@@ -1498,7 +1554,7 @@ if args.dump:
 
 
 # -------------------------------------------------------------------
-# PASS TOBIN: Convert assembly lines to bin 
+# PASS TOBIN: Convert lists of bytes into one single byte list
 
 sc_tobin = []
 
@@ -1508,8 +1564,8 @@ for i in sc_purebytes:
 objectcode = bytes(sc_tobin) 
 code_size = len(objectcode) 
 
-verbose('PASS TOBIN: Converted byte list to {0} bytes'.\
-        format(code_size))
+verbose('PASS TOBIN: Converted {0} lines of bytes to {1} bytes'.\
+        format(len(sc_purebytes), code_size))
 
 
 # -------------------------------------------------------------------
@@ -1532,15 +1588,15 @@ with open(args.listing, 'w') as f:
     f.write(title_string)
     f.write('Code listing for file {0}\n'.format(args.source))
     f.write('Generated on {0}\n'.format(time.asctime(time.localtime())))
-    f.write('Target MPU was {0}\n'.format(MPU))
+    f.write('Target MPU: {0}\n'.format(MPU))
     time_end = timeit.default_timer() 
-    f.write('Assembly time was {0:.5f} seconds\n'.format(time_end - time_start))
+    f.write('Assembly time: {0:.5f} seconds\n'.format(time_end - time_start))
     if n_warnings != 0:
-        f.write('Generated {0} warnings.\n'.format(n_warnings))
+        f.write('Warnings generated: {0}\n'.format(n_warnings))
     if n_external_files != 0:
-        f.write('Loaded {0} external files.\n'.format(n_external_files))
-    f.write('Code origin is {0:06x}\n'.format(LC0))
-    f.write('Generated {0} bytes of machine code\n'.format(code_size))
+        f.write('External files loaded: {0}\n'.format(n_external_files))
+    f.write('Code origin: {0:06x}\n'.format(LC0))
+    f.write('Bytes of machine code generated: {0}\n'.format(code_size))
 
     # Add listing 
     f.write('\nLISTING:\n')
@@ -1566,7 +1622,7 @@ with open(args.listing, 'w') as f:
 
 
     # Add symbol list 
-    f.write('\nSYMBOLS:\n')
+    f.write('\nSYMBOL TABLE:\n')
 
     if len(symbol_table) > 0: 
 
@@ -1579,8 +1635,7 @@ with open(args.listing, 'w') as f:
 
 # TODO add local labels list
 
-verbose('STEP LIST: Created listing as {0}\n'.\
-        format(args.listing))
+verbose('STEP LIST: Saved listing as {0}'.format(args.listing))
 
 
 # -------------------------------------------------------------------
@@ -1606,14 +1661,15 @@ if args.hexdump:
                 f.write('{0:06x}: '.format(a65))
         f.write('\n') 
 
-    verbose('STEP HEXDUMP: Create hexdump file {0}'.format(HEX_FILE))
+    verbose('STEP HEXDUMP: Saved hexdump file as {0}'.format(HEX_FILE))
 
 
 # -------------------------------------------------------------------
 # STEP END: Sign off
 
 time_end = timeit.default_timer() 
-verbose('All steps completed in {0:.5f} seconds.'.format(time_end - time_start))
+verbose('\nSuccess! All steps completed in {0:.5f} seconds.'.\
+        format(time_end - time_start))
 verbose('Enjoy the cake.')
 sys.exit(0) 
 

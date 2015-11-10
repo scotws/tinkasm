@@ -2,25 +2,29 @@
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 ; branch testing
 
-            .mpu 65816
-            .origin 0e000
+    .mpu 65816
 
-            .include tests/includeme.tasm
-
-            jack = 01
-            jill = 02
-
-@           nop 
-            nop 
-            bra - 
-
-            .native
-
+    .macro frog
             nop
-            nop 
+            nop
+    .endmacro
 
-            stp 
+    .origin 0e000   ; let's test math!
 
-data        .byte jack jill jack jill
+    jack = 10 
+    jill = 1 
 
-            .end
+loop        sta.l 112233
+            lda.# 1122  ; should only load 22
+            bra loop 
+
+    .native
+    .a16
+
+            lda.# 1122
+
+    .invoke frog 
+
+data    .byte 01 02 03 04 05 
+
+    .end
