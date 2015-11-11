@@ -147,8 +147,8 @@ INDENT = ' '*12     # Indent in whitespace for inserted instructions
 LC0 = 0             # Start address of code ("location counter") 
 LCi = 0             # Index to where we are in code
 
-LIST_FILE = 'tink.lst'   # Name of listing file 
 HEX_FILE  = 'tink.hex'   # Name of hexdump file
+LIST_FILE = 'tink.lst'   # Name of listing file 
 
 symbol_table = {}
 local_labels = [] 
@@ -164,12 +164,12 @@ OPCT_N_BYTES = 2
 # SOURCE and end up with everything either as CODE_DONE or DATA_DONE. Make
 # the strings the same length to make formatting easier
 ADDED     = 'ADDED     '  # Line that was added by the assembler automatically 
-CODE_DONE = 'ok (code) '  # Finished entry from code, now machine code bytes
+CODE_DONE = 'ok! (code)'  # Finished entry from code, now machine code bytes
 CONTROL   = 'CONTROL   '  # Entry for flow control that procudes no code or data
-DATA_DONE = 'ok (data) '  # Finished entry from data, now pure bytes
+DATA_DONE = 'ok! (data)'  # Finished entry from data, now pure bytes
 MACRO     = 'MACRO     '  # Line created by macro expansion 
 SOURCE    = 'src       '  # Entry that hasn't been touched except for whitespace
-TOUCHED   = 'TOUCHED   '  # Entry that has been partially processed
+MODIFIED  = 'MODIFIED  '  # Entry that has been partially processed
 
 # TODO add name etc
 title_string = "A Tinkerer's Assembler for the 65816 in Python\n"
@@ -558,11 +558,11 @@ for n, s, p in sc_status:
 
     # If we're alone in the line we're done 
     if len(w) == 1:
-        sc_breakup.append((n, TOUCHED, p.strip()))
+        sc_breakup.append((n, MODIFIED, p.strip()))
         continue 
 
     # Nope, there is something after the label
-    sc_breakup.append((n, TOUCHED, w[0].strip()))
+    sc_breakup.append((n, MODIFIED, w[0].strip()))
     rest = p.replace(w[0], '').strip()  # Delete word from string
     sc_breakup.append((n, s, INDENT+rest))
 
@@ -901,7 +901,7 @@ for n, s, p in sc_axy:
         # life easier later
         if w[0] in branches: 
             p = p + ' ' + hexstr(LC0+LCi)
-            s = TOUCHED 
+            s = MODIFIED 
             verbose('Added address of branch to its payload in line {0}'.\
                     format(n)) 
 
@@ -1103,7 +1103,7 @@ for n, s, p in sc_labels:
         except KeyError:
             pass
         else:
-            s_temp = TOUCHED
+            s_temp = MODIFIED
         finally:
             wc.append(w)
                 
@@ -1131,14 +1131,14 @@ for n, s, p in sc_replace:
         for ln, ll in local_labels: 
             if ln > n: 
                 p = p.replace('+', hexstr(ll))
-                s = TOUCHED
+                s = MODIFIED
                 break
 
     if len(w) > 1 and w[1] == '-': 
         for ln, ll in reversed(local_labels): 
             if ln < n: 
                 p = p.replace('-', hexstr(ll))
-                s = TOUCHED
+                s = MODIFIED
                 break
 
     sc_locals.append((n, s, p))
@@ -1422,7 +1422,7 @@ for n, s, p  in sc_branches:
 
         # Reassemble p as a string
         p = INDENT+w[0]+' '+hexstr(res)
-        s = TOUCHED
+        s = MODIFIED
 
     sc_math.append((n, s, p)) 
 

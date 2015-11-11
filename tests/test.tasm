@@ -11,8 +11,8 @@
 
     .origin 0e000   ; let's test math!
 
-    jack = 10 
-    jill = 1 
+    jack = 10 + 20 
+    jill = 1 .lshift 2 
 
 loop        sta.l 112233
             lda.# 1122  ; should only load 22
