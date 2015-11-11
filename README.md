@@ -5,8 +5,9 @@ Scot W. Stevenson <scot.stevenson@gmail.com>
 
 ### TL;DR
 
-This is a PRE-ALPHA version of a multi-pass assembler for the 6502/65c02/65816 
-8/16-bit MPUs in Python 3. 
+This is a PRE-ALPHA version of a easily modified multi-pass assembler for the
+6502/65c02/65816 8/16-bit MPUs in Python 3. PRE-ALPHA means "it doesn't work
+yet". Once BETA is reached, it will be announced on 6502.org.
 
 ### WHAT'S ALL THIS HERE NOW ANYWAY?
 
