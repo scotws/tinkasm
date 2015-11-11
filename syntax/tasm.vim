@@ -24,7 +24,7 @@ setlocal ts=4 shiftwidth=4 expandtab tw=80 nowrap number fo=cronq1
 syn keyword tasmMnemonics 
     \ adc adc.# adc.d adc.dil adc.di adc.diy adc.dily adc.dx adc.dxi adc.l 
     \ adc.lx adc.s adc.siy adc.x adc.y 
-    \ and. and.# and.d and.di and.dil and.dily and.diy and.dx and.dxi 
+    \ and and.# and.d and.di and.dil and.dily and.diy and.dx and.dxi 
     \ and.l and.lx and.s and.siy and.x and.y asl asl.a asl.d 
     \ asl.dx asl.x
     \ bit bit.# bit.d bit.dxi bit.x 

@@ -3,28 +3,26 @@
 ; branch testing
 
     .mpu 65816
+    .origin 0e000
 
-    .macro frog
-            nop
-            nop
+    .macro oops
+            wdm 01      ; should trigger warning 
     .endmacro
 
-    .origin 0e000   ; let's test math!
+    clearspace = &1024
+    jack = %00001111
 
-    jack = 10 + 20 
-    jill = 1 .lshift 2 
 
-loop        sta.l 112233
-            lda.# 1122  ; should only load 22
-            bra loop 
+            ldx.# 00
+            txa
+loop    
+            sta.x clearspace
+            inx
+            bne loop 
 
-    .native
-    .a16
+    .invoke oops
 
-            lda.# 1122
-
-    .invoke frog 
-
-data    .byte 01 02 03 04 05 
-
-    .end
+            stp 
+    
+    
+    .end 

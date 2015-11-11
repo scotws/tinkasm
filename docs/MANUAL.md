@@ -113,6 +113,8 @@ its own line.
 To expand a macro, use the `.invoke` directive followed by the macro's name. In
 future versions, this will be followed optional parameters. 
 
+Currently, there are no system macros such as `.if`, `.then`, `.else` or loop
+constructs. These are to be added in a future version.
 
 
 ## Internals 
@@ -187,6 +189,12 @@ instead of including a complete construct with TRY/EXCEPT/ELSE/FINALLY.
 
 The use of ELSE after FOR loops is prohibitted, as it confuses Python newbies no
 end. 
+
+
+### Notes on various opcodes
+
+TinkAsm enforces the signature byte of `brk` for all processors.
+
 
 
 # (OLD STUFF BELOW HERE) 

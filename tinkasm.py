@@ -112,6 +112,13 @@ def hexdump(listing, addr65 = 0):
     print('\n') 
 
 
+### PRINT HEADER ###
+
+title_string = "A Tinkerer's Assembler for the 65816 in Python\n"
+
+verbose(title_string) 
+# TODO add name
+
 ### IMPORT OPCODE TABLE ### 
 
 MPU = args.mpu.lower() 
@@ -163,17 +170,13 @@ OPCT_N_BYTES = 2
 # Line Status. Leave these as strings so humans can read them. We start with
 # SOURCE and end up with everything either as CODE_DONE or DATA_DONE. Make
 # the strings the same length to make formatting easier
-ADDED     = 'ADDED     '  # Line that was added by the assembler automatically 
-CODE_DONE = 'ok! (code)'  # Finished entry from code, now machine code bytes
-CONTROL   = 'CONTROL   '  # Entry for flow control that procudes no code or data
-DATA_DONE = 'ok! (data)'  # Finished entry from data, now pure bytes
-MACRO     = 'MACRO     '  # Line created by macro expansion 
-SOURCE    = 'src       '  # Entry that hasn't been touched except for whitespace
-MODIFIED  = 'MODIFIED  '  # Entry that has been partially processed
-
-# TODO add name etc
-title_string = "A Tinkerer's Assembler for the 65816 in Python\n"
-verbose(title_string)
+ADDED     = 'ADDED      '  # Line that was added by the assembler 
+CODE_DONE = 'done (code)'  # Finished entry from code, now machine code bytes
+CONTROL   = 'CONTROL    '  # Entry for flow control w/ no code or data
+DATA_DONE = 'done (data)'  # Finished entry from data, now pure bytes
+MACRO     = 'MACRO      '  # Line created by macro expansion 
+SOURCE    = 'src        '  # Raw entry line (without whitespace) 
+MODIFIED  = 'MODIFIED   '  # Entry that has been partially processed
 
 
 ### GENERATE TABLES ###
@@ -1382,7 +1385,7 @@ if MPU == '65816':
         else:
             sc_move.append((n, s, p)) 
 
-    verbose('PASS MOVE: Handled mvn/mvp instructions on the 65816')
+    verbose('PASS MOVE: Handled mvn/mvp instructions on the 65816 (DUMMY)')
     dump(sc_move) 
 
 else:
@@ -1524,7 +1527,17 @@ dump(sc_binonly)
 # suggestions and warnings here. We need the line numbers here so we can offer
 # the user suggestions
 
-verbose('PASS ANALYZE: Code scanned (DUMMY, no analyses performed)') 
+verbose('PASS ANALYZE: Searched for obvious errors and improvements') 
+
+for n, _, p in sc_binonly:
+
+    w = p.split()[1:]  # get rid of '.byte' directive 
+    
+    # SUBSTEP WDM: Check to see if we have WDM instruction
+    if w[0] == '42':
+        warning('Reserved instruction WDM (0x42) found in line {0}'.\
+                format(n))
+        continue 
 
 
 # -------------------------------------------------------------------
