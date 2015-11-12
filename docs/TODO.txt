@@ -1,11 +1,12 @@
 TODO List for A Tinkerer's Assember for the 65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 11. Nov 2015
+This version: 12. Nov 2015
 
 
 BEFORE BETA:
 
+- Rewrite inline codes so that we have them ready for listing
 - Complete documentation 
 - Make sure that A8->16 switch only works in native mode of the 65816
 - Complete opcode lists
@@ -13,7 +14,6 @@ BEFORE BETA:
 - Addresses are included in inbetween sources (after labels are removed) 
 - Listing file only when user requests it
 - Format listing file
-- Analysis step: Suggest JSR, RTS --> JMP
 
 
 AFTER RELEASE:
@@ -21,4 +21,4 @@ AFTER RELEASE:
 - Add parameters to macros
 - Add system macros (if/then/else, loops)
 - Add modify & math to assignments
-
+- Analysis step: Suggest JSR, RTS --> JMP

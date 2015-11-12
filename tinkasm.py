@@ -53,8 +53,6 @@ parser.add_argument('-o', '--output', dest='output',
         help='Binary output file (default TINK.BIN)', default='tink.bin')
 parser.add_argument('-l', '--listing', dest='listing', 
         help='Name of listing file (default TINK.LST)', default='tink.lst')
-parser.add_argument('-m', '--mpu', dest='mpu', help='Type of MPU', 
-        choices=['6502', '65c02', '65816'], default='65816')
 parser.add_argument('-v', '--verbose', 
         help='Display additional information', action='store_true')
 parser.add_argument('-d', '--dump', 
@@ -119,23 +117,6 @@ title_string = "A Tinkerer's Assembler for the 65816 in Python\n"
 verbose(title_string) 
 # TODO add name
 
-### IMPORT OPCODE TABLE ### 
-
-MPU = args.mpu.lower() 
-
-if MPU == '6502':
-    from opcodes6502 import opcode_table
-elif MPU == '65c02':
-    from opcodes65c02 import opcode_table
-elif MPU == '65816':
-    from opcodes65816 import opcode_table
-else:
-    # Paranoid, this should be caught by argparse routines automatically
-    print('FATAL: Unknown MPU type {0} given'.format(args.mpu))
-    sys.exit(1)
-
-verbose('Loading opcodes for {0}'.format(MPU))
-
 
 ### CONSTANTS ###
 
@@ -156,6 +137,8 @@ LCi = 0             # Index to where we are in code
 
 HEX_FILE  = 'tink.hex'   # Name of hexdump file
 LIST_FILE = 'tink.lst'   # Name of listing file 
+
+legal_mpus = ['6502', '65c02', '65816'] 
 
 symbol_table = {}
 local_labels = [] 
@@ -179,18 +162,6 @@ SOURCE    = 'src        '  # Raw entry line (without whitespace)
 MODIFIED  = 'MODIFIED   '  # Entry that has been partially processed
 
 
-### GENERATE TABLES ###
-
-# Generate mnemonic list 
-# TODO remove special NOP handling once opcode table is complete: Remove if
-# portion of next line and assigment to nop
-
-mnemonics =\
-    { opcode_table[n][1]:n for n, e in enumerate(opcode_table) if opcode_table[n][1] != 'nop'}
-
-mnemonics['nop'] = 0xea
-
-verbose('Generated mnemonics list')
 
 
 # List of all directives
@@ -381,7 +352,7 @@ def math_operand(lw, n):
 
 
 # -------------------------------------------------------------------
-# STEP ZERO: Set up timing, print banner 
+# STEP BANNER: Set up timing, print banner 
 
 # TODO print banner
 
@@ -443,29 +414,32 @@ dump(sc_include)
 # -------------------------------------------------------------------
 # PASS EMPTY: Remove empty lines
 
-# TODO keep empty lines in separate list to reconstruct listing file
-
 sc_empty = []
+empty_lines = []
 
-for n, p in sc_include:
-    if p.strip():
-        sc_empty.append((n, p)) 
+for num, pay in sc_include:
+    if pay.strip():
+        sc_empty.append((num, pay)) 
+    else:
+        empty_lines.append(num)
 
 verbose('STEP EMPTY: Removed {0} empty lines'\
         .format(len(sc_include)-len(sc_empty)))
+verbose('Empty lines are {0}'.format(empty_lines))
 dump(sc_empty) 
 
 
 # -------------------------------------------------------------------
-# STEP COMMENTS: Remove comments that span whole lines
-
-# TODO keep comment lines in separate list to reconstruct listing file
+# PASS COMMENTS: Remove comments that span whole lines
 
 sc_comments = []
+full_line_comments = [] 
 
-for n, p in sc_empty:
-    if p.strip()[0] != COMMENT :
-        sc_comments.append((n, p)) 
+for num, pay in sc_empty:
+    if pay.strip()[0] != COMMENT :
+        sc_comments.append((num, pay)) 
+    else:
+        full_line_comments.append((num, pay))
 
 verbose('STEP COMMENTS: Removed {0} full-line comments'.\
         format(len(sc_empty)-len(sc_comments)))
@@ -473,7 +447,7 @@ dump(sc_comments)
 
 
 # -------------------------------------------------------------------
-# STEP INLINES: Remove comments that are inline
+# PASS INLINES: Remove comments that are inline
 
 # TODO keep inline comments in a separate list to reconstruct file listing
 
@@ -484,43 +458,71 @@ def remove_inlines(p):
 
 sc_inlines = []
 
-for n, p in sc_comments:
-    sc_inlines.append((n, remove_inlines(p)))
+for num, pay in sc_comments:
+    sc_inlines.append((num, remove_inlines(pay)))
 
 verbose('STEP INLINES: Removed all inline comments and terminating linefeeds') 
 dump(sc_inlines) 
 
 
 # -------------------------------------------------------------------
-# STEP LOWER: Convert everything to lower case
+# PASS LOWER: Convert everything to lower case
 
-sc_lower = [(n, p.lower()) for n, p in sc_inlines] 
+sc_lower = [(num, pay.lower()) for num, pay in sc_inlines] 
 
 verbose('STEP LOWER: Converted all lines to lower case')
 dump(sc_lower) 
 
 
 # -------------------------------------------------------------------
-# STEP MPU: Make sure we have the correct MPU listed
+# PASS MPU: Find MPU type 
 
 sc_mpu = []
+MPU = ''
 
-# MPU line should be in first line now 
-ml = sc_lower[0][1].strip().split() 
-n = sc_lower[0][0]
+for num, pay in sc_lower:
 
-if ml[0] != '.mpu': 
-    fatal('No ".mpu" directive found at beginning of source file')
+    if '.mpu' in pay:
+        MPU = pay.split()[1].strip() 
+    else: 
+        sc_mpu.append((num, pay)) 
 
-if ml[1] != MPU:
-    fatal(n, 'MPU mismatch: {0} given, {1} in source file'.\
-            format(MPU, ml[1]))
+if not MPU:
+    fatal('No ".mpu" directive found')
 
-sc_mpu = sc_lower[1:]
+if MPU not in legal_mpus:
+    fatal('MPU "{0}" not supported'.format(MPU))
 
-verbose('STEP MPU: Found .mpu directive, "{0}", agrees with MPU given'.\
-        format(MPU))
+verbose('PASS MPU: Found MPU "{0}", is supported'.format(MPU))
 dump(sc_mpu)
+
+
+# -------------------------------------------------------------------
+# STEP OPCODES: Load opcodes depending on MPU type
+
+# We use 65816 as the default. This step does not change the source code
+
+# If we ever have have more than these three types, rewrite
+if MPU == '6502':
+    from opcodes6502 import opcode_table
+elif MPU == '65c02':
+    from opcodes65c02 import opcode_table
+else: 
+    from opcodes65816 import opcode_table
+
+verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
+
+
+# -------------------------------------------------------------------
+# STEP MNEMONICS: Generate mnemonic list from opcode table
+
+# This step does not change the source code
+#
+mnemonics = {opcode_table[n][1]:n for n, e in enumerate(opcode_table)}
+
+verbose('STEP MNEMONICS: Generated mnemonics list')
+if args.dump:
+    print('Mnemonics found: {0}'.format(mnemonics.keys()))
 
 
 # -------------------------------------------------------------------
@@ -535,7 +537,7 @@ dump(sc_status)
 
 
 # -------------------------------------------------------------------
-# STEP BREAKUP: Split labels into their own lines, reformat others
+# PASS BREAKUP: Split labels into their own lines, reformat others
 
 # It's legal to have a label and either an opcode or a directive in the same
 # line. To make life easier for the following routines, here we make sure each
