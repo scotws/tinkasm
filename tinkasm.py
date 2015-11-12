@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 11. Nov 2015
+# This version: 12. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -86,7 +86,7 @@ def verbose(s):
     if args.verbose:
         print(s)
 
-# TODO code this for PASS ANALYZE 
+# TODO code this 
 def suggestion(n, s):
     """Print a suggestion of how the code could be better"""
     print('SUGGESTION: DUMMY, ROUTINE NOT CODED YET')
@@ -369,11 +369,12 @@ def math_operand(lw, n):
 # Manual for details). Each step is given a title such as STATUS, and all
 # requirements for that step are kept close to the actual processing. 
 #
-# Each step passes on a list with a tuple that contains
+# Each step passes on a list with a tuple that can contain at various times:
 #
-#   n - The original line number in the source for reference
-#   s - A status string that shows the status of the line
-#   p - The payload of the line, either a string or later a list of bytes
+#   num - The original line number in the source for reference
+#   sta - A status string that shows the status of the line
+#   add - Address of the instruction 
+#   pay - The payload of the line, either a string or later a list of bytes
 #
 # After each step we pass on the processed list and, if requested by the user,
 # print a verbose information string and a dump of the processes lists. 
@@ -406,7 +407,7 @@ dump(sc_load)
 
 
 # -------------------------------------------------------------------
-# PASS INLCUDE: Add content from extermal files specified by the INCLUDE
+# PASS INCLUDE: Add content from extermal files specified by the INCLUDE
 # directive
 
 # The .include directive must be alone in the line and the second string must be
@@ -414,16 +415,16 @@ dump(sc_load)
 
 sc_include = []
 
-for n, p in sc_load:
+for num, pay in sc_load:
 
-    w = p.split() 
+    w = pay.split() 
 
     try: 
         if w[0].lower() == '.include':
 
             # We keep the line number for later reference
             with open(w[1], "r") as f:
-                sc_include.extend([(n, l) for l in f.readlines()])
+                sc_include.extend([(num, l) for l in f.readlines()])
 
             n_external_files += 1
             verbose('Included code from file "{0}"'.format(w[1]))
@@ -431,9 +432,9 @@ for n, p in sc_load:
 
     # TODO This looks stupid, rewrite
     except IndexError:
-        sc_include.append((n, p)) 
+        sc_include.append((num, pay)) 
     else:
-        sc_include.append((n, p)) 
+        sc_include.append((num, pay)) 
 
 verbose('STEP INCLUDE: Added {0} external files'.format(n_external_files))  
 dump(sc_include) 
