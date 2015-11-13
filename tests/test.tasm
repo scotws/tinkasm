@@ -12,7 +12,6 @@
     clearspace = &1024
     jack = %00001111
 
-
             ldx.# 00 + 2
             txa
 loop    
@@ -26,6 +25,7 @@ loop
     .invoke oops
 
             stp 
+
     .byte 01 02 03
     .word 1122 3344 5566
     .long 667788 

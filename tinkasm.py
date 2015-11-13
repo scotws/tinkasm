@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 12. Nov 2015
+# This version: 13. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -282,7 +282,7 @@ def dump_symbol_table(d=symbol_table, s=""):
 
 ### MODIFIER AND MATH FUNCTIONS ###
 
-# The math functions for TinkAsm are very primative. For the assignments and
+# The math functions for TinkAsm are very primitive. For the assignments and
 # instructions with as single operand such as an address, there are two cases:
 #
 # 1) If the operand is split into two words, it's a "modifier" case with an
@@ -476,9 +476,22 @@ dump(sc_inlines)
 # -------------------------------------------------------------------
 # PASS LOWER: Convert everything to lower case
 
-# TODO Skip this for strings
+# We can't just lowercase everything in one list comprehension because the
+# strings might contain upper cases we want to keep.
 
-sc_lower = [(num, pay.lower()) for num, pay in sc_inlines] 
+sc_lower = []
+
+for num, pay in sc_inlines: 
+
+    if '"' not in pay:
+        sc_lower.append((num, pay.lower()))
+
+    else:
+        w = pay.split() 
+        new_inst = w[0].lower()
+        print('new_inst', new_inst)
+        new_pay = INDENT+new_inst+' '+' '.join(w[1:])
+        sc_lower.append((num, new_pay))
 
 verbose('STEP LOWER: Converted all lines to lower case')
 dump(sc_lower) 
