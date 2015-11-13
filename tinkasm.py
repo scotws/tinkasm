@@ -240,18 +240,29 @@ def dump(l):
     """At each assembly stage, print the complete stage as a list. Produces
     an enormous amount of output, probably only interesting for debugging."""
     if args.dump:
+
+        # Fail gracefully: If we are given anything else than these number of
+        # entries, don't print anything at all
         for line in l:
 
+            n_entries = len(line)
+
             # For lines without status codes at the beginning of the code
-            if len(line) == 2: 
+            if n_entries == 2: 
                 print('{0:5d}: {1}'.format(line[0], repr(line[1])))
                 continue 
 
             # For lines with status codes
-            # TODO make the final line dump numbers in hex
-            if len(line) == 3: 
+            elif n_entries == 3: 
                 print('{0:5d}: {1} {2!s}'.\
                         format(line[0], line[1], line[2]))
+                continue
+
+            # For lines with status and address codes
+            elif n_entries  == 4:
+                print('{0:5d}: {1}  {2}  {3!s}'.\
+                        format(line[0], line[1], line[2], line[3].strip()))
+
         print()
 
 
@@ -1537,9 +1548,9 @@ def format_adr24(i):
     return '{0:02x}:{1:04x}'.format(bank(i), i & 0xffff)
 
 format_adr_mpu = {
-        '6502': format_addr16,
-        '65c02': format_addr16,
-        '65816': format_addr24}
+        '6502': format_adr16,
+        '65c02': format_adr16,
+        '65816': format_adr24}
 
 sc_adr = []
 LCi = 0 
@@ -1547,11 +1558,9 @@ LCi = 0
 for num, sta, pay in sc_allin:
 
     b = len(pay.split())-1 
-    LCi += b
-
     adr = format_adr_mpu[MPU](LC0+LCi)
-
     sc_adr.append((num, sta, adr, pay))
+    LCi += b
 
 verbose('PASS ADR: Added addresses to each line.')
 dump(sc_adr)
