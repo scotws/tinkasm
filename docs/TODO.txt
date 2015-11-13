@@ -1,19 +1,19 @@
 TODO List for A Tinkerer's Assember for the 65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 12. Nov 2015
+This version: 13. Nov 2015
 
 
 BEFORE BETA:
 
+- Don't convert string directives to lower case (duh)
 - Rewrite inline codes so that we have them ready for listing
-- Complete documentation 
 - Make sure that A8->16 switch only works in native mode of the 65816
 - Complete opcode lists
 - Handle MVP and MVN 
-- Addresses are included in inbetween sources (after labels are removed) 
 - Listing file only when user requests it
 - Format listing file
+- Complete documentation 
 
 
 AFTER RELEASE:

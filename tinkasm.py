@@ -476,6 +476,8 @@ dump(sc_inlines)
 # -------------------------------------------------------------------
 # PASS LOWER: Convert everything to lower case
 
+# TODO Skip this for strings
+
 sc_lower = [(num, pay.lower()) for num, pay in sc_inlines] 
 
 verbose('STEP LOWER: Converted all lines to lower case')
@@ -1659,14 +1661,22 @@ with open(args.listing, 'w') as f:
 
     # Add listing 
     f.write('\nLISTING:\n')
+    f.write('       Line Address  Bytes         Instruction  Comment\n')
+
+
+    # We start with line 1 because that is the way editors count lines
+    c = 1   
 
     for num, _, adr, pay in sc_adr:
-        pay = pay.replace('.byte', '')
-        l = print('{0:5d}: {2}  {3!s}\n'.\
-                        format(num, adr, pay))
+        bl = pay.replace('.byte', '')
+
+        # TODO Take payload line from sc_axy
+        
+        l = '{0:5d} {1:5d} {2}  {3!s} {4}\n'.\
+                format(c, num, adr, bl.strip(), '(INSTRUCTION DUMMY)')
 
         f.write(l) 
-        f.write('\n')
+        c += 1
 
 
     # Add macros
@@ -1675,7 +1685,7 @@ with open(args.listing, 'w') as f:
     if len(macros) > 0: 
 
         for m in macros.keys(): 
-            f.write('Macro {0}\n'.format(m))
+            f.write('Macro "{0}"\n'.format(m))
 
             for ml in macros[m]:
                 f.write('    {0}\n'.format(ml)) 
