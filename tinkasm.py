@@ -149,7 +149,6 @@ OPCT_OPCODE = 0
 OPCT_MNEMONIC = 1 
 OPCT_N_BYTES = 2
 
-
 # Line Status. Leave these as strings so humans can read them. We start with
 # SOURCE and end up with everything either as CODE_DONE or DATA_DONE. Make
 # the strings the same length to make formatting easier
@@ -161,10 +160,8 @@ MACRO     = 'MACRO      '  # Line created by macro expansion
 SOURCE    = 'src        '  # Raw entry line (without whitespace) 
 MODIFIED  = 'MODIFIED   '  # Entry that has been partially processed
 
-
-
-
 # List of all directives
+# TODO see if we need this 
 directives = ['.a->8', '.a->16', '.a8', '.a16', '.append', '.origin',\
         '.org', '.end', '.b', '.byte', '.w', '.word', '.l', '.long',\
         '.native', '.emulated', '.s', '.string', '.s0', '.string0', '.slf',\
@@ -526,13 +523,13 @@ if args.dump:
 
 
 # -------------------------------------------------------------------
-# STEP STATUS: Add status strings to end of line 
+# PASS STATUS: Add status strings to end of line 
 
 # Starting here, each line has a three-element tuple 
 
-sc_status = [(n, SOURCE, p) for n, p in sc_mpu]
+sc_status = [(num, SOURCE, pay) for num, pay in sc_mpu]
 
-verbose('STEP STATUS: Added status strings')
+verbose('PASS STATUS: Added status strings')
 dump(sc_status) 
 
 
@@ -545,34 +542,36 @@ dump(sc_status)
 # anything that is in the first column and is not whitespace is then considered
 # a label. We don't distinguish between global and local labels at this point
 
+# This also cleans up the formating in the source codes for the user
+
 # It is tempting to start filling the symbol table here because we're touching
 # all the labels and that would be far more efficient. However, we keep these
 # steps separate for ideological reasons. 
 
 sc_breakup = []
 
-for n, s, p in sc_status:
+for num, sta, pay in sc_status:
 
     # Most of the stuff will be whitespace
-    if p[0] in string.whitespace:
-        sc_breakup.append((n, s, INDENT+p.strip()))
+    if pay[0] in string.whitespace:
+        sc_breakup.append((num, sta, INDENT+pay.strip()))
         continue 
 
     # We now know we have a label, we just don't know if it is alone in its
     # line. 
-    w = p.split() 
+    w = pay.split() 
 
     # If we're alone in the line we're done 
     if len(w) == 1:
-        sc_breakup.append((n, MODIFIED, p.strip()))
+        sc_breakup.append((num, MODIFIED, pay.strip()))
         continue 
 
     # Nope, there is something after the label
-    sc_breakup.append((n, MODIFIED, w[0].strip()))
-    rest = p.replace(w[0], '').strip()  # Delete word from string
-    sc_breakup.append((n, s, INDENT+rest))
+    sc_breakup.append((num, MODIFIED, w[0].strip()))
+    rest = pay.replace(w[0], '').strip()  # Delete word from string
+    sc_breakup.append((num, sta, INDENT+rest))
 
-verbose('STEP BREAKUP: All labels now have a line to themselves')
+verbose('PASS BREAKUP: All labels now have a line to themselves')
 dump(sc_breakup)
 
 
@@ -587,26 +586,26 @@ macros = {}
 macro_name = ''
 are_defining = False 
 
-for n, s, p in sc_breakup: 
+for num, sta, pay in sc_breakup: 
 
-    w = p.split() 
+    w = pay.split() 
 
     if not are_defining:
         
         # MACRO directive must be first in the line, no labels allowed
         if w[0] != '.macro':    
-            sc_macros.append((n, s, p)) 
+            sc_macros.append((num, sta, pay)) 
             continue 
         else: 
             macro_name = w[1]
             macros[macro_name] = []
             are_defining = True 
-            verbose('Found macro "{0}" in line {1}'.format(w[1], n))
+            verbose('Found macro "{0}" in line {1}'.format(w[1], num))
 
     else:
 
         if w[0] != ".endmacro": 
-            macros[macro_name].append((n, MACRO, p))
+            macros[macro_name].append((num, MACRO, pay))
         else: 
             are_defining = False 
             continue 
@@ -629,9 +628,6 @@ if args.dump:
 # -------------------------------------------------------------------
 # STEP ORIGIN: Find .ORIGIN directive
 
-# TODO See if we want to give the user the option of passing the origin at the
-#      command line, possibly with -s --start option
-
 # We accept both ".origin" and ".org". 
 
 sc_origin = []
@@ -640,8 +636,8 @@ sc_origin = []
 originline = sc_macros[0][2].strip().split() 
 
 if originline[0] != '.origin' and originline[0] != '.org':
-    n = sc_macros[0][0]
-    fatal(n, 'No ORIGIN directive found, must be first line after macros') 
+    num = sc_macros[0][0]
+    fatal(num, 'No ORIGIN directive found, must be first line after macros') 
 
 is_number, LC0 = convert_number(originline[1])  
 
@@ -659,6 +655,8 @@ dump(sc_origin)
 
 # -------------------------------------------------------------------
 # STEP END: Find .END directive 
+
+# End directive must be in the last line
 
 endline = sc_origin[-1][2].strip().split() 
 
@@ -682,32 +680,32 @@ dump(sc_end)
 
 sc_assign = []
 
-for n, s, p in sc_end:
+for num, sta, pay in sc_end:
 
-    w = p.split() 
+    w = pay.split() 
 
     # An assigment line must have three words at least. The "at least" part
-    # is so we will be able to add math functions later
+    # is so we will be able to add modifier and math functions later
     if len(w) < 3:
-        sc_assign.append((n, s, p))
+        sc_assign.append((num, sta, pay))
         continue 
 
     # Sorry, Lisp and Forth coders, infix notation only
     if w[1] == '=' or w[1] == '.equ': 
-        sy, v = p.split(w[1])
+        sy, va = pay.split(w[1])
         symbol = sy.split()[-1] 
-        is_number, value = convert_number(v.split()[0])
+        is_number, value = convert_number(va.split()[0])
 
-        # We can't do symbol to symbol assignment because we have no way to make
-        # sure that there was a real number there back up the line 
+        # We can't do symbol to symbol assignment because we have no way 
+        # to make sure that there was a real number somewhere before
         if not is_number:
             fatal(n, 'Illegal attempt to assign a symbol to another symbol')
 
         symbol_table[symbol] = value  
     else: 
-        sc_assign.append((n, s, p))
+        sc_assign.append((num, sta, pay))
 
-verbose('STEP ASSIGN: Assigned {0} symbols to symbol table'.\
+verbose('PASS ASSIGN: Assigned {0} symbols to symbol table'.\
         format(len(sc_end)-len(sc_assign))) 
 dump(sc_assign)
 
@@ -716,7 +714,7 @@ if args.verbose:
 
 
 # -------------------------------------------------------------------
-# STEP INVOKE: Insert macro definitions
+# PASS INVOKE: Insert macro definitions
 # TODO Add parameters
 
 # Macros must be expanded before we touch the .NATIVE and .AXY directives
@@ -725,19 +723,19 @@ if args.verbose:
 sc_invoke = []
 pre_len = len(sc_assign)
 
-for n, s, p in sc_assign: 
+for num, sta, pay in sc_assign: 
     
-    if '.invoke' not in p:
-        sc_invoke.append((n, s, p)) 
+    if '.invoke' not in pay:
+        sc_invoke.append((num, sta, pay)) 
         continue 
         
-    # Name of macro to invoke must be second word in line
-    w = p.split()
+    w = pay.split()
     
+    # Name of macro to invoke must be second word in line
     try:
         m = macros[w[1]]
     except KeyError:
-        fatal(n, 'Attempt to invoke non-existing macro "{0}"'.\
+        fatal(num, 'Attempt to invoke non-existing macro "{0}"'.\
                 format(w[1]))
 
     for ml in m:
@@ -745,13 +743,13 @@ for n, s, p in sc_assign:
 
     n_invocations += 1
     verbose('Expanding macro "{0}" into line {1}'.\
-                format(w[1], n))
+                format(w[1], num))
 
 post_len = len(sc_invoke)
 
 # We give the "net" number of lines added because we also remove the invocation
 # line itself
-verbose('STEP INVOKE: {0} macro expansions, net {1} lines added'.\
+verbose('PASS INVOKE: {0} macro expansions, net {1} lines added'.\
         format(n_invocations, post_len - pre_len))
 dump(sc_invoke)
 
@@ -761,37 +759,33 @@ dump(sc_invoke)
 
 # TODO count and print number of mode switches
 
-# Since we have moved labels to their own lines, we assume that both .NATVIE
-# and .EMULATED alone in their respective lines
+# Since we have moved labels to their own lines, we assume that both .native
+# and .emulated alone in their respective lines. 
 
 sc_modes = []
 
 if MPU == '65816':
 
-    for n, s, p in sc_invoke:
+    for num, sta, pay in sc_invoke:
 
-        if '.native' in p:
-            # Spaces are for cosmetic reasons, as we have already handled 
-            # labels
-            sc_modes.append((n, ADDED, INDENT+'clc'))
-            sc_modes.append((n, ADDED, INDENT+'xce'))
+        if '.native' in pay:
+            sc_modes.append((num, ADDED, INDENT+'clc'))
+            sc_modes.append((num, ADDED, INDENT+'xce'))
             continue 
 
-        if '.emulated' in p: 
-            # Spaces are for cosmetic reasons, as we have already handled 
-            # labels
-            sc_modes.append((n, ADDED, INDENT+'sec'))
-            sc_modes.append((n, ADDED, INDENT+'xce'))
+        if '.emulated' in pay: 
+            sc_modes.append((num, ADDED, INDENT+'sec'))
+            sc_modes.append((num, ADDED, INDENT+'xce'))
 
             # Emulation drops us into 8-bit modes for A, X, and Y 
             # automatically, no REP or SEP commands needed
-            sc_modes.append((n, CONTROL, INDENT+'.a->8'))
-            sc_modes.append((n, CONTROL, INDENT+'.xy->8'))
+            sc_modes.append((num, CONTROL, INDENT+'.a->8'))
+            sc_modes.append((num, CONTROL, INDENT+'.xy->8'))
             continue
         
-        sc_modes.append((n, s, p))
+        sc_modes.append((num, sta, pay))
 
-    verbose('STEP MODES: Handled mode switches')
+    verbose('PASS MODES: Handled mode switches')
     dump(sc_modes) 
 
 else:
@@ -810,7 +804,6 @@ sc_axy = []
 
 if MPU == '65816':
 
-    # Indentation is cosmetic, as we have already handled labels
     axy_ins = {
     '.a8':    ((ADDED, 'sep 20'), (CONTROL, '.a->8')),
     '.a16':   ((ADDED, 'rep 20'), (CONTROL, '.a->16')), 
@@ -819,23 +812,23 @@ if MPU == '65816':
     '.axy8':  ((ADDED, 'sep 30'), (CONTROL, '.a->8'), (CONTROL, '.xy->8')),
     '.axy16': ((ADDED, 'rep 30'), (CONTROL, '.a->16'), (CONTROL, '.xy->16')) } 
 
-    for n, s, p in sc_modes:
+    for num, sta, pay in sc_modes:
         have_found = False
 
-        for a in axy_ins: 
+        for ins in axy_ins: 
 
             # Because we moved labels to their own lines, we can assume that
             # register switches are alone in the line
-            if a in p:
+            if ins in pay:
 
-                for e in axy_ins[a]:
-                    sc_axy.append((n, e[0], INDENT+e[1]))
+                for e in axy_ins[ins]:
+                    sc_axy.append((num, e[0], INDENT+e[1]))
                     have_found = True
 
         if not have_found:
-            sc_axy.append((n, s, p)) 
+            sc_axy.append((num, sta, pay)) 
 
-    verbose('STEP AXY: Registered register 8/16 bit switches')
+    verbose('PASS AXY: Registered register 8/16 bit switches')
     dump(sc_axy) 
 
 else:
@@ -843,7 +836,7 @@ else:
 
 
 # -------------------------------------------------------------------
-# STEP LABELS - Construct symbol table by finding all labels 
+# PASS LABELS - Construct symbol table by finding all labels 
 
 # This is the equivalent of the traditional "Pass 1" in normal two-pass
 # assemblers. We assume that the most common line by far will be mnemonics, and
@@ -861,15 +854,14 @@ branches = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
 
 # These are only used for 65816. The offsets are used to calculate if an extra
 # byte is needed for immediate forms such as lda.# with the 65816
-
 a_len_offset = 0 
 xy_len_offset = 0 
 a_imm = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#'] 
 xy_imm = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
 
-for n, s, p in sc_axy:
+for num, sta, pay in sc_axy:
 
-    w = p.split() 
+    w = pay.split() 
 
 
     # --- SUBSTEP CURRENT: Replace the CURRENT symbol by current address
@@ -880,15 +872,13 @@ for n, s, p in sc_axy:
     # TODO This version is too primitive because CURRENT is probably the star
     # which will also be used for multiplication at some point. Right now, we
     # just brute force it.
-
-    # TODO consider giving this its own full pass
     
-    if CURRENT in p:
-        hc = hexstr(LC0+LCi)     # TODO make this a separate function
-        p = p.replace(CURRENT, hc)
-        w = p.split() 
+    if CURRENT in pay:
+        hc = hexstr(LC0+LCi)
+        pay = pay.replace(CURRENT, hc)
+        w = pay.split() 
         verbose('Current marker "{0}" in line {1}, replaced with {2}'.\
-                format(CURRENT, n, hc))
+                format(CURRENT, num, hc))
 
 
 
@@ -906,10 +896,10 @@ for n, s, p in sc_axy:
         # For branches, we want to remember were the instruction is to make our
         # life easier later
         if w[0] in branches: 
-            p = p + ' ' + hexstr(LC0+LCi)
-            s = MODIFIED 
+            pay = pay + ' ' + hexstr(LC0+LCi)
+            sta = MODIFIED 
             verbose('Added address of branch to its payload in line {0}'.\
-                    format(n)) 
+                    format(num)) 
 
         LCi += opcode_table[oc][OPCT_N_BYTES]
 
@@ -921,7 +911,7 @@ for n, s, p in sc_axy:
             elif w[0] in xy_imm:
                 LCi += xy_len_offset 
 
-        sc_labels.append((n, s, p))
+        sc_labels.append((num, sta, pay))
         continue 
 
 
@@ -930,49 +920,51 @@ for n, s, p in sc_axy:
     # Labels and local labels are the only thing that should be in the first
     # column at this point
     
-    if p[0] not in string.whitespace:
+    if pay[0] not in string.whitespace:
 
         # Local labels are easiest, start with them first
         if w[0] == LOCAL_LABEL:
-            local_labels.append((n, LC0+LCi))
+            local_labels.append((num, LC0+LCi))
             verbose('New local label found in line {0}, address {1:06x}'.\
-                    format(n, LC0+LCi))
+                    format(num, LC0+LCi))
             continue 
 
         # This must be a real label. If we don't have it in the symbol table,
         # all is well and we add a new entry
         if w[0] not in symbol_table.keys():
             verbose('New label "{0}" found in line {1}, address {2:06x}'.\
-                    format(w[0], n, LC0+LCi))
+                    format(w[0], num, LC0+LCi))
             symbol_table[w[0]] = LC0+LCi
             continue
 
         # If it is already known, something went wrong, because we can't
         # redefine a label. 
         else: 
-            fatal(n, 'Attempt to redefine symbol "{0}" in line {1}'.\
-                    format(w[0], p))
+            fatal(num, 'Attempt to redefine symbol "{0}" in line {1}'.\
+                    format(w[0], pay))
 
 
     # --- SUBSTEP DATA: See if we were given data to store ---
+    
+    # TODO rewrite this
     
     # .BYTE stores one byte per whitespace separated word
     # This is a freebee because that is where we want to end up
     if w[0] == '.byte' or w[0] == '.b':
         LCi += len(w)-1 
-        sc_labels.append((n, s, p)) 
+        sc_labels.append((num, sta, pay)) 
         continue 
 
     # .WORD stores two bytes per whitespace separated word
     if w[0] == '.word' or w[0] == '.w':
         LCi += 2*(len(w)-1) 
-        sc_labels.append((n, s, p)) 
+        sc_labels.append((num, sta, pay)) 
         continue 
     
     # .LONG stores three bytes per whitespace separated word
     if w[0] == '.long' or w[0] == '.l':
         LCi += 3*(len(w)-1) 
-        sc_labels.append((n, s, p)) 
+        sc_labels.append((num, sta, pay)) 
         continue 
 
 
@@ -990,22 +982,22 @@ for n, s, p in sc_axy:
         # TODO make sure the switch to 16 bits only works in native mode
         if w[0] == '.a->8':
             a_len_offset = 0 
-            sc_labels.append((n, s, p)) 
+            sc_labels.append((num, sta, pay)) 
             continue 
 
         elif w[0] == '.a->16':
             a_len_offset = 1 
-            sc_labels.append((n, s, p)) 
+            sc_labels.append((num, sta, pay)) 
             continue 
 
         elif w[0] == '.xy->8':
             xy_len_offset = 0 
-            sc_labels.append((n, s, p)) 
+            sc_labels.append((num, sta, pay)) 
             continue 
 
         elif w[0] == '.xy->16':
             xy_len_offset = 1 
-            sc_labels.append((n, s, p)) 
+            sc_labels.append((num, sta, pay)) 
             continue 
 
 
@@ -1019,23 +1011,23 @@ for n, s, p in sc_axy:
             try: 
                 r = symbol_table[r]
             except KeyError:
-                fatal(n, '.advance directive has undefined symbol "{0}"'.\
+                fatal(num, '.advance directive has undefined symbol "{0}"'.\
                         format(r))
 
 
         # Make sure the user is not attempting to advance backwards
         if r < (LCi+LC0):
-            fatal(n, '.advance directive attempting to march backwards')
+            fatal(num, '.advance directive attempting to march backwards')
 
         # While we're here, we might as well already convert this to .byte 
         # (This is called "Do as I say, don't do as I do") 
         offset = r - (LCi+LC0)  
         zl = ' '.join(['00']*offset)
-        new_p = INDENT+'.byte '+zl
-        sc_labels.append((n, DATA_DONE, new_p))
+        new_pay = INDENT+'.byte '+zl
+        sc_labels.append((num, DATA_DONE, new_pay))
         LCi = r-(LCi+LC0)
         verbose('Replaced .advance directive in line {0} by .byte directive'.\
-                format(n)) 
+                format(num)) 
         continue 
 
 
@@ -1049,21 +1041,21 @@ for n, s, p in sc_axy:
             try: 
                 r = symbol_table[r]
             except KeyError:
-                fatal(n, '.skip directive has undefined symbol "{0}"'.\
+                fatal(num, '.skip directive has undefined symbol "{0}"'.\
                         format(r))
 
         # While we're here, we might as well already convert this to .byte 
         # (This is called "Do as I say, don't do as I do") 
         zl = ' '.join(['00']*r)
-        new_p = INDENT+'.byte '+zl
-        sc_labels.append((n, DATA_DONE, new_p))
+        new_pay = INDENT+'.byte '+zl
+        sc_labels.append((num, DATA_DONE, new_pay))
         LCi += r
         verbose('Replaced .skip directive in line {0} by .byte directive'.\
-                format(n)) 
+                format(num)) 
         continue 
 
     # If none of that was right, keep the old line 
-    sc_labels.append((n, s, p)) 
+    sc_labels.append((num, sta, pay)) 
 
 
 verbose('STEP LABELS: Assigned value to all labels.') 
@@ -1084,23 +1076,24 @@ dump(sc_labels)
 
 
 # -------------------------------------------------------------------
-# ASSERT: At this point we should have all symbols present and known in the
+# CLAIM: At this point we should have all symbols present and known in the
 # symbol table, and local labels in the local label list
-verbose('ASSERTING that all symbols should now be known')
+
+verbose('CLAMING that all symbols should now be known')
 
 
 # -------------------------------------------------------------------
-# PASS STEP REPLACE: Replace all symbols in code by correct numbers
+# PASS REPLACE: Replace all symbols in code by correct numbers
 
 sc_replace = []
 
-for n, s, p in sc_labels:
+for num, sta, pay in sc_labels:
 
     # We need to go word-by-word because somebody might have the bright idea of
     # defining lots of .byte data as symbols 
     wc = []
-    ws = p.split() 
-    s_temp = s
+    ws = pay.split() 
+    s_temp = sta
 
     for w in ws: 
         
@@ -1113,22 +1106,22 @@ for n, s, p in sc_labels:
         finally:
             wc.append(w)
                 
-    sc_replace.append((n, s_temp, INDENT+' '.join(wc))) 
+    sc_replace.append((num, s_temp, INDENT+' '.join(wc))) 
         
-verbose('STEP REPLACED: Replaced all symbols with their number values') 
+verbose('PASS REPLACED: Replaced all symbols with their number values') 
 dump(sc_replace) 
 
 
 # -------------------------------------------------------------------
 # PASS LOCALS: Replace all local label references by correct numbers
 
-# Note we can't do math or modify local labels 
+# We don't do math or modify local labels 
 
 sc_locals = [] 
 
-for n, s, p in sc_replace:
+for num, sta, pay in sc_replace:
 
-    w = p.split() 
+    w = pay.split() 
 
     # We only allow the local references to be in the second word of the line,
     # that is, as an operand to an opcode. To be sure, we might want to check to
@@ -1136,27 +1129,28 @@ for n, s, p in sc_replace:
     if len(w) > 1 and w[1] == '+': 
         for ln, ll in local_labels: 
             if ln > n: 
-                p = p.replace('+', hexstr(ll))
-                s = MODIFIED
+                pay = pay.replace('+', hexstr(ll))
+                sta = MODIFIED
                 break
 
     if len(w) > 1 and w[1] == '-': 
         for ln, ll in reversed(local_labels): 
             if ln < n: 
-                p = p.replace('-', hexstr(ll))
-                s = MODIFIED
+                pay = pay.replace('-', hexstr(ll))
+                sta = MODIFIED
                 break
 
-    sc_locals.append((n, s, p))
+    sc_locals.append((num, sta, pay))
 
-verbose('STEP LOCALS: Replaced all local labels with address values')
+verbose('PASS LOCALS: Replaced all local labels with address values')
 dump(sc_locals)
 
 
 # -------------------------------------------------------------------
-# ASSERT: At this point we should have comletely replaced all labels and symbols
-# with numerical values.
-verbose('ASSERTING there should be no labels or symbols left in the source')
+# CLAIM: At this point we should have completely replaced all labels and
+# symbols with numerical values.
+
+verbose('CLAMING there should be no labels or symbols left in the source')
 
 
 # -------------------------------------------------------------------
@@ -1166,13 +1160,13 @@ verbose('ASSERTING there should be no labels or symbols left in the source')
 
 sc_bytedata = []
 
-for n, s, p in sc_locals:
+for num, sta, pay in sc_locals:
 
-    w = p.split()
+    w = pay.split()
 
     # SUBSTEP BYTE: Change status of .byte instructions
     if w[0] == '.byte':
-        sc_bytedata.append((n, DATA_DONE, p)) 
+        sc_bytedata.append((num, DATA_DONE, pay)) 
         continue 
 
 
@@ -1187,15 +1181,15 @@ for n, s, p in sc_locals:
 
             # Paranoid, all symbols should be gone
             if not is_number:
-                fatal(n, 'Found symbol left over in .word directive')
+                fatal(num, 'Found symbol left over in .word directive')
 
             for b in little_endian_16(r):
                 bl.append(hexstr(b)) 
 
-        p = INDENT+'.byte '+' '.join(bl) 
-        sc_bytedata.append((n, DATA_DONE, p))
+        pay = INDENT+'.byte '+' '.join(bl) 
+        sc_bytedata.append((num, DATA_DONE, pay))
         verbose('Converted .word directive in line {0} to .byte directive'.\
-                format(n)) 
+                format(num)) 
         continue
 
     # SUBSTEP LONG: Produce three bytes per word
@@ -1209,61 +1203,62 @@ for n, s, p in sc_locals:
 
             # Paranoid, all symbols should be gone
             if not is_number:
-                fatal(n, 'Found symbol left over in .long directive')
+                fatal(num, 'Found symbol left over in .long directive')
 
             for b in little_endian_24(r):
                 bl.append(hexstr(b)) 
 
-        p = INDENT+'.byte '+' '.join(bl) 
-        sc_bytedata.append((n, DATA_DONE, p))
+        pay = INDENT+'.byte '+' '.join(bl) 
+        sc_bytedata.append((num, DATA_DONE, pay))
         verbose('Converted .long directive in line {0} to .byte directive'.\
-                format(n)) 
+                format(num)) 
         continue
 
     # SUBSTEP STRING: Convert .string directive to bytes
     if w[0] == '.string' or w[0] == '.str':
-        s = p.split('"')[1] 
-        _, bl = string2bytes(s)  
-        p = INDENT+'.byte '+' '.join(bl) 
-        sc_bytedata.append((n, DATA_DONE, p))
+        st = pay.split('"')[1] 
+        _, bl = string2bytes(st)  
+        pay = INDENT+'.byte '+' '.join(bl) 
+        sc_bytedata.append((num, DATA_DONE, pay))
         verbose('Converted .string directive in line {0} to .byte directive'.\
-                format(n)) 
+                format(num)) 
         continue 
     
     # SUBSTEP STRING0: Convert .string0 directive to bytes
     if w[0] == '.string0' or w[0] == '.str0':
-        s = p.split('"')[1] 
-        _, bl = string2bytes(s)  
+        st = pay.split('"')[1] 
+        _, bl = string2bytes(st)  
         bl.append(hexstr(00)) 
-        p = INDENT+'.byte '+' '.join(bl)
-        sc_bytedata.append((n, DATA_DONE, p))
+        pay = INDENT+'.byte '+' '.join(bl)
+        sc_bytedata.append((num, DATA_DONE, pay))
         verbose('Converted .string0 directive in line {0} to .byte directive'.\
                 format(n)) 
         continue 
     
     # SUBSTEP STRINGLF: Convert .stringlf directive to bytes
     if w[0] == '.stringlf' or w[0] == '.strlf':
-        s = p.split('"')[1] 
-        _, bl = string2bytes(s)  
+        st = pay.split('"')[1] 
+        _, bl = string2bytes(st)  
         bl.append(hexstr(ord('\n'))) 
-        p = INDENT+'.byte '+' '.join(bl)
-        sc_bytedata.append((n, DATA_DONE, p))
+        pay = INDENT+'.byte '+' '.join(bl)
+        sc_bytedata.append((num, DATA_DONE, pay))
         verbose('Converted .stringlf directive in line {0} to .byte directive'.\
-                format(n)) 
+                format(num)) 
         continue 
 
     # If this is something else, keep it
-    sc_bytedata.append((n, s, p))
+    sc_bytedata.append((num, sta, pay))
 
 
-verbose('STEP BYTEDATA: Converted all other data formats to .byte')
+verbose('PASS BYTEDATA: Converted all other data formats to .byte')
 dump(sc_bytedata)
 
 
 # -------------------------------------------------------------------
-# ASSERT: At this point there should only be .byte data directives in the code
+# CLAIM: At this point there should only be .byte data directives in the code
 # with numerical values.
-verbose('ASSERTING that all data is now contained in .byte directives')
+
+verbose('CLAMING that all data is now contained in .byte directives')
 
 
 # -------------------------------------------------------------------
@@ -1273,96 +1268,95 @@ verbose('ASSERTING that all data is now contained in .byte directives')
 
 sc_1byte = []
 
-for n, s, p in sc_bytedata: 
+for num, sta, pay in sc_bytedata: 
 
-    w = p.split() 
+    w = pay.split() 
 
     try:
         oc = mnemonics[w[0]]
     except KeyError:
-        sc_1byte.append((n, s, p)) 
+        sc_1byte.append((num, sta, pay)) 
     else: 
 
         if opcode_table[oc][OPCT_N_BYTES] == 1: 
             bl = INDENT+'.byte '+hexstr(oc)
-            sc_1byte.append((n, CODE_DONE, bl))
+            sc_1byte.append((num, CODE_DONE, bl))
         else:
-            sc_1byte.append((n, s, p)) 
+            sc_1byte.append((num, sta, pay)) 
 
-
-verbose('STEP 1BYTE: Assembled single byte instructions')
+verbose('PASS 1BYTE: Assembled single byte instructions')
 dump(sc_1byte)
 
+
 # -------------------------------------------------------------------
-# STEP BRANCHES: Assemble branch instructions
+# PASS BRANCHES: Assemble branch instructions
 
 # All our branch instructions, including bra.l and phe.r on the 65816, should
 # include the line they are on as the last entry in the payload 
 
-# TODO These can be fused 
+# TODO change this to adding adr to source line
 
 sc_branches = []
 
 branches_8 = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs']
 branches_16 = ['bra.l', 'phe.r']  
 
-for n, s, p in sc_1byte: 
+for num, sta, pay in sc_1byte: 
 
     # Skip the finished stuff
-    if s == CODE_DONE or s == DATA_DONE:
-            sc_branches.append((n, s, p))
+    if sta == CODE_DONE or sta == DATA_DONE:
+            sc_branches.append((num, sta, pay))
             continue
 
-    w = p.split() 
+    w = pay.split() 
 
     if w[0] in branches_8:
-        new_p = '.byte '+hexstr(mnemonics[w[0]])+' '  
+        new_pay = '.byte '+hexstr(mnemonics[w[0]])+' '  
         is_number,  branch_addr = convert_number(w[-1])
 
         # Paranoid, we should have converted all symbols
         if not is_number:
-            fatal(n, 'Found unconverted symbol "{0}" during branch handling'.\
+            fatal(num, 'Found leftover symbol "{0}" during branch handling'.\
                     format(w[-1]))
         
         is_number,  target_addr = convert_number(w[-2])
         
         # Paranoid, we should have converted all symbols
         if not is_number:
-            fatal(n, 'Found unconverted symbol "{0}" during branch handling'.\
+            fatal(num, 'Found leftover symbol "{0}" during branch handling'.\
                     format(w[-2]))
 
         opr = hexstr(lsb(target_addr - branch_addr - 2))
-        sc_branches.append((n, CODE_DONE, INDENT+new_p+opr)) 
+        sc_branches.append((num, CODE_DONE, INDENT+new_pay+opr)) 
         continue 
 
     # 16-bit branches (65816 only) 
     if MPU == '65816' and w[0] in branches_16:
 
-        oc_p = '.byte '+hexstr(mnemonics[w[0]])+' '  
-        is_number,  branch_addr = convert_number(w[-1])
+        oc_pay = '.byte '+hexstr(mnemonics[w[0]])+' '  
+        is_number, branch_addr = convert_number(w[-1])
 
         # Paranoid, we should have converted all symbols
         if not is_number:
-            fatal(n, 'Found unconverted symbol "{0}" during branch handling'.\
+            fatal(num, 'Found leftover symbol "{0}" during branch handling'.\
                     format(w[-1]))
         
-        is_number,  target_addr = convert_number(w[-2])
+        is_number, target_addr = convert_number(w[-2])
         
         # Paranoid, we should have converted all symbols
         if not is_number:
-            fatal(n, 'Found unconverted symbol "{0}" during branch handling'.\
+            fatal(num, 'Found leftover symbol "{0}" during branch handling'.\
                     format(w[-2]))
 
         bl, bm = little_endian_16(target_addr - branch_addr - 3)
-        opr = INDENT+oc_p+' '+hexstr(bl)+' '+hexstr(bm)
-        sc_branches.append((n, CODE_DONE, opr)) 
+        opr = INDENT+oc_pay+' '+hexstr(bl)+' '+hexstr(bm)
+        sc_branches.append((num, CODE_DONE, opr)) 
         continue 
  
     # Everything else 
-    sc_branches.append((n, s, p)) 
+    sc_branches.append((num, sta, pay)) 
 
-
-verbose('STEP BRANCHES: Encoded all branch instructions')
+verbose('PASS BRANCHES: Encoded all branch instructions')
 dump(sc_branches) 
 
 
@@ -1378,15 +1372,15 @@ sc_move = []
 
 if MPU == '65816':
 
-    for n, s, p in sc_branches:
+    for num, sta, pay in sc_branches:
 
-        w = p.split()
+        w = pay.split()
 
         if w[0] == 'mvp' or w[0] == 'mvn':
             print('DUMMY Found move instruction, skipping') 
             continue 
         else:
-            sc_move.append((n, s, p)) 
+            sc_move.append((num, sta, pay)) 
 
     verbose('PASS MOVE: Handled mvn/mvp instructions on the 65816 (DUMMY)')
     dump(sc_move) 
@@ -1396,7 +1390,7 @@ else:
 
 
 # -------------------------------------------------------------------
-# STEP MATH: Handle modifiers and math functions
+# PASS MATH: Handle modifiers and math functions
 
 # As discussed above, we distingish between "modifiers" and "math" by the number
 # of whitespace delimited words the operand is made up of. Assumes that all
@@ -1405,9 +1399,9 @@ else:
 
 sc_math = [] 
 
-for n, s, p  in sc_branches: 
+for num, sta, pay  in sc_branches: 
 
-    w = p.split() 
+    w = pay.split() 
 
     try:
         oc = mnemonics[w[0]]
@@ -1420,30 +1414,32 @@ for n, s, p  in sc_branches:
         if n_words == 1:
             _, res = convert_number(w[1])
         elif n_words == 2:
-            res = modify_operand(w[1:], n)
+            res = modify_operand(w[1:], num)
         elif n_words == 3:
-            res = math_operand(w[1:], n)
+            res = math_operand(w[1:], num)
         else:
-            fatal(n, 'Too many termn for modifier or math routines')
+            fatal(n, 'Too many terms for modifier or math routines')
 
-        # Reassemble p as a string
-        p = INDENT+w[0]+' '+hexstr(res)
-        s = MODIFIED
+        # Reassemble pay as a string
+        pay = INDENT+w[0]+' '+hexstr(res)
+        sta = MODIFIED
 
-    sc_math.append((n, s, p)) 
+    sc_math.append((num, sta, pay)) 
 
-verbose('STEP MATH: Calculated all modifiers and math terms.')
+verbose('PASS MATH: Calculated all modifiers and math terms.')
 dump(sc_math)
 
 
 # -------------------------------------------------------------------
-# PASS ALLOPR: Assemble all remaining operands
+# PASS ALLIN: Assemble all remaining operands
 
-sc_allopr = []
+# This should remove all CONTROL entries as well
 
-for n, s, p in sc_math:
+sc_allin = []
 
-    w = p.split() 
+for num, sta, pay in sc_math:
+
+    w = pay.split() 
 
     if MPU == '65816':
 
@@ -1469,7 +1465,7 @@ for n, s, p in sc_math:
     try:
         oc = mnemonics[w[0]]
     except KeyError:
-        sc_allopr.append((n, s, p)) 
+        sc_allin.append((num, sta, pay)) 
     else:
 
         # Get number of bytes in instruction
@@ -1487,7 +1483,7 @@ for n, s, p in sc_math:
 
         # Paranoid, we should have converted all symbols
         if not is_number:
-            fatal(n, 'Symbol "{0}" mysteriously not converted'.format(opr))
+            fatal(num, 'Symbol "{0}" mysteriously not converted'.format(opr))
 
         # We hand tuples to the next step 
         if n_bytes == 2: 
@@ -1497,30 +1493,31 @@ for n, s, p in sc_math:
         elif n_bytes == 4:
             bl = little_endian_24(opr)
         else:
-            fatal(n, 'Found {0} byte instruction in opcode list'.\
+            fatal(num, 'Found {0} byte instruction in opcode list'.\
                     format(n_bytes))
 
-        # p = INDENT+'.byte '+hexstr(oc)+' '+' '.join([hexstr(i) for i in bl])
-        #
-        p = '{0}.byte {1:02x} {2}'.\
+        pay = '{0}.byte {1:02x} {2}'.\
                 format(INDENT, oc, ' '.join([hexstr(i) for i in bl]))
-        sc_allopr.append((n, CODE_DONE, p)) 
+        sc_allin.append((num, CODE_DONE, pay)) 
 
-verbose('PASS ALLOPR: Assembled all remaining operands')
-dump(sc_allopr)
+verbose('PASS ALLIN: Assembled all remaining operands')
+dump(sc_allin)
 
 
 # -------------------------------------------------------------------
-# PASS BINONLY: strip out everything that isn't a .byte directive
+# PASS VALIDATE: Make sure we only have .byte instructions
 
-# This is the last human-readable source listing. We need to keep the line
-# numbers for the next step; we keep the status line so we can distinguish
-# between data and code bytes 
+# We shouldn't have anything left now that isn't a byte directive
+# This does not change the source file 
 
-sc_binonly = [(n, s, p) for n, s, p in sc_allopr if '.byte' in p] 
+for num, _, pay in sc_allin:
 
-verbose('PASS BINONLY: Source completely converted to byte list') 
-dump(sc_binonly) 
+    w = pay.split() 
+
+    if w[0] != '.byte':
+        fatal(num, 'Found payload that is not ".byte"')
+
+verbose('PASS VALIDATE: Confirmed that all lines are now byte data') 
 
 
 # -------------------------------------------------------------------
@@ -1530,21 +1527,21 @@ dump(sc_binonly)
 # suggestions and warnings here. We need the line numbers here so we can offer
 # the user suggestions
 
-verbose('PASS ANALYZE: Searched for obvious errors and improvements') 
+for num, _, pay in sc_allin:
 
-for n, _, p in sc_binonly:
-
-    w = p.split()[1:]  # get rid of '.byte' directive 
+    w = pay.split()[1:]  # get rid of '.byte' directive 
     
     # SUBSTEP WDM: Check to see if we have WDM instruction
     if w[0] == '42':
         warning('Reserved instruction WDM (0x42) found in line {0}'.\
-                format(n))
+                format(num))
         continue 
+
+verbose('PASS ANALYZE: Searched for obvious errors and improvements') 
 
 
 # -------------------------------------------------------------------
-# PASS PUREBYTES: Remove everything except the byte strings
+# PASS PUREBYTES: Remove everything except bytes (remove .byte) 
 
 def strip_byte(s):
     """Strip out the '.byte' directive from a string"""
@@ -1552,12 +1549,12 @@ def strip_byte(s):
 
 sc_purebytes = []
 
-for _, _, p in sc_binonly: 
-    p_bytes = strip_byte(p) 
-    bl = [int(b, 16) for b in p_bytes.split()] 
+for _, _, pay in sc_allin: 
+    pay_bytes = strip_byte(pay) 
+    bl = [int(b, 16) for b in pay_bytes.split()] 
     sc_purebytes.append(bl)
 
-verbose('PASS PUREBYTES: Converted line to pure byte lists')
+verbose('PASS PUREBYTES: Converted all line to pure byte lists')
 
 if args.dump: 
 

@@ -13,16 +13,23 @@
     jack = %00001111
 
 
-            ldx.# 00
+            ldx.# 00 + 2
             txa
 loop    
             sta.x clearspace
             inx
             bne loop 
 
+            .native
+            .a16
+
     .invoke oops
 
             stp 
+    .byte 01 02 03
+    .word 1122 3344 5566
+    .long 667788 
     
+    .string "Scot W. Stevenson" 
     
     .end 
