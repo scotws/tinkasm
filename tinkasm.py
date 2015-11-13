@@ -94,21 +94,6 @@ def warning(s):
     if args.warnings:
         print('WARNING: {0}'.format(s)) 
         
-def hexdump(listing, addr65 = 0):
-    """Print hexdump of listing to screen"""
-
-    print('{0:06x}'.format(addr65), end=': ')
-    c = 0 
-
-    for e in listing:
-        print('{0:02x}'.format(e), end=' ')
-        c += 1
-        if c % 16 == 0:
-            print()
-            addr65 += 16
-            print('{0:06x}'.format(addr65), end=': ')
-    print('\n') 
-
 
 ### PRINT HEADER ###
 
