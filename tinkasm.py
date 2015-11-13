@@ -1562,7 +1562,7 @@ for num, sta, pay in sc_allin:
     sc_adr.append((num, sta, adr, pay))
     LCi += b
 
-verbose('PASS ADR: Added addresses to each line.')
+verbose('PASS ADR: Added MPU address locations to each byte line')
 dump(sc_adr)
 
 
@@ -1660,7 +1660,13 @@ with open(args.listing, 'w') as f:
     # Add listing 
     f.write('\nLISTING:\n')
 
-    # TODO write this 
+    for num, _, adr, pay in sc_adr:
+        pay = pay.replace('.byte', '')
+        l = print('{0:5d}: {2}  {3!s}\n'.\
+                        format(num, adr, pay))
+
+        f.write(l) 
+        f.write('\n')
 
 
     # Add macros
