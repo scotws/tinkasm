@@ -489,7 +489,6 @@ for num, pay in sc_inlines:
     else:
         w = pay.split() 
         new_inst = w[0].lower()
-        print('new_inst', new_inst)
         new_pay = INDENT+new_inst+' '+' '.join(w[1:])
         sc_lower.append((num, new_pay))
 
