@@ -1,7 +1,7 @@
 TODO List for A Tinkerer's Assember for the 65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 13. Nov 2015
+This version: 14. Nov 2015
 
 
 BEFORE BETA:
@@ -17,6 +17,7 @@ BEFORE BETA:
 
 AFTER RELEASE:
 
+- Allow modifier and math terms in branch instructions
 - Add parameters to macros
 - Add system macros (if/then/else, loops)
 - Add modify & math to assignments

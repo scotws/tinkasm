@@ -44,7 +44,7 @@ is converted to lower case).
 
 -i --input      - Input assembler file (required) 
 -o --output     - Output file for the binary code, default is tasm.bin 
--l --listing    - Output file for the listing, default is tasm.txt  
+-l --listing    - Create a line-by-line listing file
 -v --verbose    - Print more info about each assembly step
 -d --dump       - Dump state of inbetween steps, produces lots of output
 -x --hexdump    - Create a human-readable hexdump file tasm.hex
@@ -95,8 +95,14 @@ The `-` or `+` always refers to the next or previous `@`.
 It is assumed that branches will always be given a label, not the relative
 offset. There is in fact currently no way to pass on such offset.
 
-Currently, no arithmetic with label references is possible, such as `jmp cats +
-2`. This feature will be added in a future version.
+
+## Modifiers and Math
+
+Normal labels (but not local labels) and symbols can be modified by "modifiers"
+such as `.invert` and simple mathematical terms such as `label + 2` . Whitespace
+is significant, so `label+2` is not legal (and will be identified as a symbol).
+The system in its current form is primitive: Assignments and labels of branches
+cannot be modified -- yet. These functions will be added in later versions.
 
 
 ### Macros

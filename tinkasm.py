@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# A Tinkerer's Assembler for the 65816 in Forth 
+# A Tinkerer's Assembler for the 65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
 # This version: 13. Nov 2015
@@ -187,7 +187,8 @@ def string2bytes(s):
 def convert_number(s): 
     """Convert a number string provided by the user in one of various 
     formats to an integer we can use internally. See Manual for details 
-    on supported formats."""
+    on supported formats. Returns a tuple of a bool and an int, or a 
+    bool and a string"""
     
     # Remove separator markings
     s1 = re.sub(SEPARATORS, '', s)
@@ -218,6 +219,89 @@ def convert_number(s):
         r = s
 
     return f, r
+
+
+# The math functions for TinkAsm are very primitive. For the assignments and
+# instructions with as single operand such as an address, there are two cases:
+#
+# 1) If the operand is split into two words, it's a "modifier" case with an
+#    action and a number or symbol (eg "lda.# .lsb muggle'). 
+# 2) If the operand is split into three words, it's a "math" case with an action
+#    between two numbers of symbols (eg "lda.# muggle + 1")
+#
+# Note that in both cases, white space is significant. Also, the mvp and mvn
+# instructions of the 65816 are treated separately because their structure does
+# not fit the single-operand mode. 
+
+modifier_funcs = { '.lsb': lsb, '.msb': msb, '.bank': bank,\
+        '.invert': operator.invert}
+
+def modify_operand(lw, n): 
+    """Given a list lw of two strings, apply the modifier function that is 
+    the first word to the actual operand that is the second word. Returns
+    an int"""
+    is_number, opr = convert_number(lw[1])
+
+    # Paranoid, we shouldn't have symbols anymore
+    if not is_number:
+        fatal(n, 'Symbol found during modify function {0}'.format(lw[0]))
+
+    try:
+        r = modifier_funcs[lw[0]](opr)
+    except KeyError:
+        fatal(n, 'Illegal modifier {0} given'.format(lw[0]))
+
+    return r 
+
+
+math_funcs = { '+': operator.add, '-': operator.sub, '*': operator.mul,\
+        '/': operator.floordiv, '.and': operator.and_, '.or': operator.or_,\
+        '.xor': operator.xor, '.lshift': operator.lshift,\
+        '.rshift': operator.rshift} 
+
+def math_operand(lw, n):
+    """Given a list lw of three strings, apply the math function in
+    the second word to the two other operands. Returns an int"""
+    is_number, a1 = convert_number(lw[0])
+
+    # Paranoid, we shouldn't have symbols anymore
+    if not is_number:
+        fatal(n, 'Symbol found during modify function {0}'.format(lw[1]))
+
+    is_number, a2 = convert_number(lw[2])
+
+    # Paranoid, we shouldn't have symbols anymore
+    if not is_number:
+        fatal(n, 'Symbol found during modify function {0}'.format(lw[1]))
+
+    try:
+        r = math_funcs[lw[1]](a1, a2)
+    except KeyError:
+        fatal(n, 'Illegal modifier {0} given'.format(lw[1]))
+
+    return r 
+
+
+def convert_term(s, n): 
+    """Given a string that is either a number, a modifier and a number, or
+    a math term, return the resulting number as an int. Also given line
+    number for errors. This is the highest level math function. Returns
+    an int."""
+
+    w = s.split()
+
+    n_words = len(w)
+
+    if n_words == 1:
+        _, res = convert_number(w[0])
+    elif n_words == 2:
+        res = modify_operand(w, n)
+    elif n_words == 3:
+        res = math_operand(w, n)
+    else:
+        fatal(n, 'Too many terms for modifier or math routines')
+
+    return res 
 
 
 def dump(l):
@@ -264,67 +348,6 @@ def dump_symbol_table(d=symbol_table, s=""):
     else:
         print('    (empty)\n')
 
-
-### MODIFIER AND MATH FUNCTIONS ###
-
-# The math functions for TinkAsm are very primitive. For the assignments and
-# instructions with as single operand such as an address, there are two cases:
-#
-# 1) If the operand is split into two words, it's a "modifier" case with an
-#    action and a number or symbol (eg "lda.# .lsb muggle'). 
-# 2) If the operand is split into three words, it's a "math" case with an action
-#    between two numbers of symbols (eg "lda.# muggle + 1")
-#
-# Note that in both cases, white space is significant. Also, the mvp and mvn
-# instructions of the 65816 are treated separately because their structure does
-# not fit the single-operand mode. 
-
-modifier_funcs = { '.lsb': lsb, '.msb': msb, '.bank': bank,\
-        '.invert': operator.invert}
-
-def modify_operand(lw, n): 
-    """Given a list lw of two strings, apply the modifier function that is 
-    the first word to the actual operand that is the second word."""
-    is_number, opr = convert_number(lw[1])
-
-    # Paranoid, we shouldn't have symbols anymore
-    if not is_number:
-        fatal(n, 'Symbol found during modify function {0}'.format(lw[0]))
-
-    try:
-        r = modifier_funcs[lw[0]](opr)
-    except KeyError:
-        fatal(n, 'Illegal modifier {0} given'.format(lw[0]))
-
-    return r 
-
-
-math_funcs = { '+': operator.add, '-': operator.sub, '*': operator.mul,\
-        '/': operator.floordiv, '.and': operator.and_, '.or': operator.or_,\
-        '.xor': operator.xor, '.lshift': operator.lshift,\
-        '.rshift': operator.rshift} 
-
-def math_operand(lw, n):
-    """Given a list lw of three strings, apply the math function in
-    the second word to the two other operands"""
-    is_number, a1 = convert_number(lw[0])
-
-    # Paranoid, we shouldn't have symbols anymore
-    if not is_number:
-        fatal(n, 'Symbol found during modify function {0}'.format(lw[1]))
-
-    is_number, a2 = convert_number(lw[2])
-
-    # Paranoid, we shouldn't have symbols anymore
-    if not is_number:
-        fatal(n, 'Symbol found during modify function {0}'.format(lw[1]))
-
-    try:
-        r = math_funcs[lw[1]](a1, a2)
-    except KeyError:
-        fatal(n, 'Illegal modifier {0} given'.format(lw[1]))
-
-    return r 
 
 
 ### PASSES AND STEPS ###
@@ -681,8 +704,6 @@ dump(sc_end)
 
 # -------------------------------------------------------------------
 # PASS ASSIGN: Handle assignments
-
-# TODO add math and modifiers
 
 # We accept two kinds of assignment directives , "=" and ".equ". Since we've
 # moved all labels to their own lines, any such directive must be the second
@@ -1304,7 +1325,7 @@ dump(sc_1byte)
 # All our branch instructions, including bra.l and phe.r on the 65816, should
 # include the line they are on as the last entry in the payload 
 
-# TODO change this to adding adr to source line
+# TODO Add modifiers and math to branch addresses
 
 sc_branches = []
 
@@ -1313,7 +1334,7 @@ branches_16 = ['bra.l', 'phe.r']
 
 for num, sta, pay in sc_1byte: 
 
-    # Skip the finished stuff
+    # Skip stuff that is already done 
     if sta == CODE_DONE or sta == DATA_DONE:
             sc_branches.append((num, sta, pay))
             continue
@@ -1321,46 +1342,20 @@ for num, sta, pay in sc_1byte:
     w = pay.split() 
 
     if w[0] in branches_8:
-        new_pay = '.byte '+hexstr(mnemonics[w[0]])+' '  
-        is_number,  branch_addr = convert_number(w[-1])
-
-        # Paranoid, we should have converted all symbols
-        if not is_number:
-            fatal(num, 'Found leftover symbol "{0}" during branch handling'.\
-                    format(w[-1]))
-        
-        is_number,  target_addr = convert_number(w[-2])
-        
-        # Paranoid, we should have converted all symbols
-        if not is_number:
-            fatal(num, 'Found leftover symbol "{0}" during branch handling'.\
-                    format(w[-2]))
-
+        new_pay = '.byte '+hexstr(mnemonics[w[0]])+' '
+        _, branch_addr = convert_number(w[-1])
+        _, target_addr = convert_number(w[-2])
         opr = hexstr(lsb(target_addr - branch_addr - 2))
-        sc_branches.append((num, CODE_DONE, INDENT+new_pay+opr)) 
+        sc_branches.append((num, CODE_DONE, INDENT+new_pay+opr))
         continue 
 
-    # 16-bit branches (65816 only) 
     if MPU == '65816' and w[0] in branches_16:
-
-        oc_pay = '.byte '+hexstr(mnemonics[w[0]])+' '  
-        is_number, branch_addr = convert_number(w[-1])
-
-        # Paranoid, we should have converted all symbols
-        if not is_number:
-            fatal(num, 'Found leftover symbol "{0}" during branch handling'.\
-                    format(w[-1]))
-        
-        is_number, target_addr = convert_number(w[-2])
-        
-        # Paranoid, we should have converted all symbols
-        if not is_number:
-            fatal(num, 'Found leftover symbol "{0}" during branch handling'.\
-                    format(w[-2]))
-
+        new_pay = '.byte '+hexstr(mnemonics[w[0]])+' '
+        _, branch_addr = convert_number(w[-1])
+        _, target_addr = convert_number(w[-2])
         bl, bm = little_endian_16(target_addr - branch_addr - 3)
-        opr = INDENT+oc_pay+' '+hexstr(bl)+' '+hexstr(bm)
-        sc_branches.append((num, CODE_DONE, opr)) 
+        opr = INDENT+new_pay+' '+hexstr(bl)+' '+hexstr(bm)
+        sc_branches.append((num, CODE_DONE, opr))
         continue 
  
     # Everything else 
@@ -1418,19 +1413,8 @@ for num, sta, pay  in sc_branches:
     except KeyError:
         pass 
     else: 
-
-        n_words = len(w)-1
-
-        if n_words == 1:
-            _, res = convert_number(w[1])
-        elif n_words == 2:
-            res = modify_operand(w[1:], num)
-        elif n_words == 3:
-            res = math_operand(w[1:], num)
-        else:
-            fatal(n, 'Too many terms for modifier or math routines')
-
-        # Reassemble pay as a string
+        opr = pay.replace(w[0], '').strip() 
+        res = convert_term(opr, num)
         pay = INDENT+w[0]+' '+hexstr(res)
         sta = MODIFIED
 

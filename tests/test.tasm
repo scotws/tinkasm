@@ -5,31 +5,14 @@
     .mpu 65816
     .origin 0e000
 
-    .macro oops
-            wdm 01      ; should trigger warning 
-    .endmacro
-
+    jill = 1000 
+    jack = 10 
     clearspace = &1024
-    jack = %00001111
 
+loop
             ldx.# 00 + 2
-            txa
-loop    
-            sta.x clearspace
-            inx
-            bne loop 
-
-            .native
-            .a16
-
-    .invoke oops
-
-            stp 
-
-    .byte 01 02 03
-    .word 1122 3344 5566
-    .long 667788 
-    
-    .string "Scot W. Stevenson" 
+            lda.# .lsb 3344
+            bra jill + 2 
+            jmp jack + jill
     
     .end 
