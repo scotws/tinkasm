@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 13. Nov 2015
+# This version: 14. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -51,15 +51,14 @@ parser.add_argument('-i', '--input', dest='source', required=True,
         help='Assembler source code file (required)')
 parser.add_argument('-o', '--output', dest='output', 
         help='Binary output file (default TINK.BIN)', default='tink.bin')
-parser.add_argument('-l', '--listing', dest='listing', 
-        help='Name of listing file (default TINK.LST)', default='tink.lst')
 parser.add_argument('-v', '--verbose', 
         help='Display additional information', action='store_true')
 parser.add_argument('-d', '--dump', 
         help='Print intermediate steps as (long) lists', action='store_true')
-parser.add_argument('-x', '--hexdump', 
-        help='Create ASCII file TINK.HEX with hexdump of program',
-        action='store_true')
+parser.add_argument('-l', '--listing', action='store_true',
+        help='Create listing file TINK.LST')
+parser.add_argument('-x', '--hexdump', action='store_true',
+        help='Create ASCII hexdump listing file TINK.HEX') 
 parser.add_argument('-w', '--warnings', default=True,
         help='Disable warnings (default: print them)', action='store_false')
 args = parser.parse_args()
@@ -1626,98 +1625,100 @@ if n_warnings != 0 and args.warnings:
 # -------------------------------------------------------------------
 # STEP LIST: Create listing file
 
-with open(args.listing, 'w') as f:
-    f.write(title_string)
-    f.write('Code listing for file {0}\n'.format(args.source))
-    f.write('Generated on {0}\n'.format(time.asctime(time.localtime())))
-    f.write('Target MPU: {0}\n'.format(MPU))
-    time_end = timeit.default_timer() 
-    f.write('Assembly time: {0:.5f} seconds\n'.format(time_end - time_start))
-    if n_warnings != 0:
-        f.write('Warnings generated: {0}\n'.format(n_warnings))
-    if n_external_files != 0:
-        f.write('External files loaded: {0}\n'.format(n_external_files))
-    f.write('Code origin: {0:06x}\n'.format(LC0))
-    f.write('Bytes of machine code generated: {0}\n'.format(code_size))
+if args.listing: 
 
-    # Add listing 
-    f.write('\nLISTING:\n')
-    f.write('       Line Address  Bytes         Instruction  Comment\n')
-
-
-    # We start with line 1 because that is the way editors count lines
-    c = 1   
-
-    for num, _, adr, pay in sc_adr:
-        bl = pay.replace('.byte', '')
-
-        # TODO Take payload line from sc_axy
-        
-        l = '{0:5d} {1:5d} {2}  {3!s} {4}\n'.\
-                format(c, num, adr, bl.strip(), '(INSTRUCTION DUMMY)')
-
-        f.write(l) 
-        c += 1
-
-
-    # Add macros
-    f.write('\nMACROS:\n')
-
-    if len(macros) > 0: 
-
-        for m in macros.keys(): 
-            f.write('Macro "{0}"\n'.format(m))
-
-            for ml in macros[m]:
-                f.write('    {0}\n'.format(ml)) 
-
-        f.write('\n') 
-
-    else:
-        f.write('    (none)\n')
-
-
-    # Add symbol list 
-    f.write('\nSYMBOL TABLE:\n')
-
-    if len(symbol_table) > 0: 
-
-        for v in sorted(symbol_table):
-            f.write('{0} : {1:x}\n'.format(v.rjust(ST_WIDTH), symbol_table[v]))
-        f.write('\n')
-
-    else:
-        f.write('    (empty)\n')
-
-# TODO add local labels list
-
-verbose('STEP LIST: Saved listing as {0}'.format(args.listing))
-
-
-# -------------------------------------------------------------------
-# STEP HEXDUMP: Create hexdump file if requested
-
-if args.hexdump:
-
-    with open(HEX_FILE, 'w') as f:
+    with open(LIST_FILE, 'w') as f:
         f.write(title_string)
-        f.write('Hexdump file of {0}\n'.format(args.source)) 
-        f.write('Generated on {0}\n\n'.format(time.asctime(time.localtime())))
-        a65 = LC0
-        f.write('{0:06x}: '.format(a65))
-    
-        c = 0 
+        f.write('Code listing for file {0}\n'.format(args.source))
+        f.write('Generated on {0}\n'.format(time.asctime(time.localtime())))
+        f.write('Target MPU: {0}\n'.format(MPU))
+        time_end = timeit.default_timer() 
+        f.write('Assembly time: {0:.5f} seconds\n'.format(time_end - time_start))
+        if n_warnings != 0:
+            f.write('Warnings generated: {0}\n'.format(n_warnings))
+        if n_external_files != 0:
+            f.write('External files loaded: {0}\n'.format(n_external_files))
+        f.write('Code origin: {0:06x}\n'.format(LC0))
+        f.write('Bytes of machine code generated: {0}\n'.format(code_size))
 
-        for e in objectcode: 
-            f.write('{0:02x} '.format(e))
+        # Add listing 
+        f.write('\nLISTING:\n')
+        f.write('       Line Address  Bytes         Instruction  Comment\n')
+
+
+        # We start with line 1 because that is the way editors count lines
+        c = 1   
+
+        for num, _, adr, pay in sc_adr:
+            bl = pay.replace('.byte', '')
+
+            # TODO Take payload line from sc_axy
+            
+            l = '{0:5d} {1:5d} {2}  {3!s} {4}\n'.\
+                    format(c, num, adr, bl.strip(), '(INSTRUCTION DUMMY)')
+
+            f.write(l) 
             c += 1
-            if c % 16 == 0:
-                f.write('\n')
-                a65 += 16
-                f.write('{0:06x}: '.format(a65))
-        f.write('\n') 
 
-    verbose('STEP HEXDUMP: Saved hexdump file as {0}'.format(HEX_FILE))
+
+        # Add macros
+        f.write('\nMACROS:\n')
+
+        if len(macros) > 0: 
+
+            for m in macros.keys(): 
+                f.write('Macro "{0}"\n'.format(m))
+
+                for ml in macros[m]:
+                    f.write('    {0}\n'.format(ml)) 
+
+            f.write('\n') 
+
+        else:
+            f.write('    (none)\n')
+
+
+        # Add symbol list 
+        f.write('\nSYMBOL TABLE:\n')
+
+        if len(symbol_table) > 0: 
+
+            for v in sorted(symbol_table):
+                f.write('{0} : {1:x}\n'.format(v.rjust(ST_WIDTH), symbol_table[v]))
+            f.write('\n')
+
+        else:
+            f.write('    (empty)\n')
+
+    # TODO add local labels list
+
+    verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
+
+
+    # -------------------------------------------------------------------
+    # STEP HEXDUMP: Create hexdump file if requested
+
+    if args.hexdump:
+
+        with open(HEX_FILE, 'w') as f:
+            f.write(title_string)
+            f.write('Hexdump file of {0}\n'.format(args.source)) 
+            f.write('Generated on {0}\n\n'.format(time.asctime(time.localtime())))
+            a65 = LC0
+            f.write('{0:06x}: '.format(a65))
+        
+            c = 0 
+
+            for e in objectcode: 
+                f.write('{0:02x} '.format(e))
+                c += 1
+                if c % 16 == 0:
+                    f.write('\n')
+                    a65 += 16
+                    f.write('{0:06x}: '.format(a65))
+            f.write('\n') 
+
+        verbose('STEP HEXDUMP: Saved hexdump file as {0}'.format(HEX_FILE))
 
 
 # -------------------------------------------------------------------
