@@ -1521,13 +1521,50 @@ verbose('PASS VALIDATE: Confirmed that all lines are now byte data')
 
 
 # -------------------------------------------------------------------
+# PASS ADR: Add addresses for human readers and listing generation
+
+# This produces the final human readable version and is the basis for the
+# listing file 
+
+def format_adr16(i):
+    """Convert an integer to a 16 bit hex address string for the listing
+    file"""
+    return '{0:04x}'.format(i & 0xffff)
+
+def format_adr24(i):
+    """Convert an integer to a 24 bit hex address string for the listing
+    file. We use a separator for the bank byte"""
+    return '{0:02x}:{1:04x}'.format(bank(i), i & 0xffff)
+
+format_adr_mpu = {
+        '6502': format_addr16,
+        '65c02': format_addr16,
+        '65816': format_addr24}
+
+sc_adr = []
+LCi = 0 
+
+for num, sta, pay in sc_allin:
+
+    b = len(pay.split())-1 
+    LCi += b
+
+    adr = format_adr_mpu[MPU](LC0+LCi)
+
+    sc_adr.append((num, sta, adr, pay))
+
+verbose('PASS ADR: Added addresses to each line.')
+dump(sc_adr)
+
+
+# -------------------------------------------------------------------
 # PASS OPTIMIZE: Analyze and optimize code
 
 # We don't perform automatic optimizations at the moment, but only give
 # suggestions and warnings here. We need the line numbers here so we can offer
 # the user suggestions
 
-for num, _, pay in sc_allin:
+for num, _, _, pay in sc_adr:
 
     w = pay.split()[1:]  # get rid of '.byte' directive 
     
@@ -1549,7 +1586,7 @@ def strip_byte(s):
 
 sc_purebytes = []
 
-for _, _, pay in sc_allin: 
+for _, _, _, pay in sc_adr: 
     pay_bytes = strip_byte(pay) 
     bl = [int(b, 16) for b in pay_bytes.split()] 
     sc_purebytes.append(bl)
