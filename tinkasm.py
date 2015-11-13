@@ -40,7 +40,9 @@ if sys.version_info.major != 3:
 n_external_files = 0    # How many external files were loaded
 n_invocations = 0       # How many macros were expanded
 n_mode_switches = 0     # TODO Count switches native/emulated (65816)
+n_passes = 0            # Number of passes during processing
 n_size_switches = 0     # TODO Count 8/16 bit register switches (65816)
+n_steps = 0             # Number of steps during processing
 n_warnings = 0          # How many warnings were generated
 
 
@@ -369,6 +371,7 @@ def dump_symbol_table(d=symbol_table, s=""):
 # -------------------------------------------------------------------
 # STEP BANNER: Set up timing, print banner 
 
+# This step is not counted
 # TODO print banner
 
 time_start = timeit.default_timer() 
@@ -387,6 +390,7 @@ sc_load = []
 with open(args.source, "r") as f:
     sc_load = list(enumerate(f.readlines(), 1))
 
+n_steps += 1
 verbose('STEP IMPORT: Read {0} lines from {1}'.\
         format(len(sc_load), args.source))
 dump(sc_load) 
@@ -422,6 +426,7 @@ for num, pay in sc_load:
     else:
         sc_include.append((num, pay)) 
 
+n_passes += 1
 verbose('STEP INCLUDE: Added {0} external files'.format(n_external_files))  
 dump(sc_include) 
 
@@ -438,6 +443,7 @@ for num, pay in sc_include:
     else:
         empty_lines.append(num)
 
+n_passes += 1
 verbose('STEP EMPTY: Removed {0} empty lines'\
         .format(len(sc_include)-len(sc_empty)))
 verbose('Empty lines are {0}'.format(empty_lines))
@@ -456,6 +462,7 @@ for num, pay in sc_empty:
     else:
         full_line_comments.append((num, pay))
 
+n_passes += 1
 verbose('STEP COMMENTS: Removed {0} full-line comments'.\
         format(len(sc_empty)-len(sc_comments)))
 dump(sc_comments) 
@@ -476,6 +483,7 @@ sc_inlines = []
 for num, pay in sc_comments:
     sc_inlines.append((num, remove_inlines(pay)))
 
+n_passes += 1
 verbose('STEP INLINES: Removed all inline comments and terminating linefeeds') 
 dump(sc_inlines) 
 
@@ -499,6 +507,7 @@ for num, pay in sc_inlines:
         new_pay = INDENT+new_inst+' '+' '.join(w[1:])
         sc_lower.append((num, new_pay))
 
+n_passes += 1
 verbose('STEP LOWER: Converted all lines to lower case')
 dump(sc_lower) 
 
@@ -522,6 +531,7 @@ if not MPU:
 if MPU not in legal_mpus:
     fatal('MPU "{0}" not supported'.format(MPU))
 
+n_passes += 1
 verbose('PASS MPU: Found MPU "{0}", is supported'.format(MPU))
 dump(sc_mpu)
 
@@ -539,6 +549,7 @@ elif MPU == '65c02':
 else: 
     from opcodes65816 import opcode_table
 
+n_steps += 1
 verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
 
 
@@ -549,6 +560,7 @@ verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
 #
 mnemonics = {opcode_table[n][1]:n for n, e in enumerate(opcode_table)}
 
+n_steps += 1
 verbose('STEP MNEMONICS: Generated mnemonics list')
 if args.dump:
     print('Mnemonics found: {0}'.format(mnemonics.keys()))
@@ -561,6 +573,7 @@ if args.dump:
 
 sc_status = [(num, SOURCE, pay) for num, pay in sc_mpu]
 
+n_passes += 1
 verbose('PASS STATUS: Added status strings')
 dump(sc_status) 
 
@@ -603,12 +616,13 @@ for num, sta, pay in sc_status:
     rest = pay.replace(w[0], '').strip()  # Delete word from string
     sc_breakup.append((num, sta, INDENT+rest))
 
+n_passes += 1
 verbose('PASS BREAKUP: All labels now have a line to themselves')
 dump(sc_breakup)
 
 
 # -------------------------------------------------------------------
-# STEP MACROS: Define macros 
+# PASS MACROS: Define macros 
 
 # TODO add parameters 
 
@@ -642,6 +656,7 @@ for num, sta, pay in sc_breakup:
             are_defining = False 
             continue 
 
+n_passes += 1
 verbose('STEP MACROS: Defined {0} macros'.format(len(macros)))
 dump(sc_macros)
 
@@ -680,6 +695,7 @@ if not is_number:
 
 sc_origin = sc_macros[1:]
 
+n_steps += 1
 verbose('STEP ORIGIN: Found ORIGIN directive, starting at {0:06x}'.\
         format(LC0))
 dump(sc_origin) 
@@ -697,6 +713,7 @@ if endline[0] != ".end":
 
 sc_end = sc_origin[:-1]
 
+n_steps += 1
 verbose('STEP END: Found END directive in last line') 
 dump(sc_end) 
 
@@ -735,6 +752,7 @@ for num, sta, pay in sc_end:
     else: 
         sc_assign.append((num, sta, pay))
 
+n_passes += 1
 verbose('PASS ASSIGN: Assigned {0} symbols to symbol table'.\
         format(len(sc_end)-len(sc_assign))) 
 dump(sc_assign)
@@ -777,6 +795,7 @@ for num, sta, pay in sc_assign:
 
 post_len = len(sc_invoke)
 
+n_passes += 1
 # We give the "net" number of lines added because we also remove the invocation
 # line itself
 verbose('PASS INVOKE: {0} macro expansions, net {1} lines added'.\
@@ -815,6 +834,7 @@ if MPU == '65816':
         
         sc_modes.append((num, sta, pay))
 
+    n_passes += 1
     verbose('PASS MODES: Handled mode switches')
     dump(sc_modes) 
 
@@ -857,7 +877,8 @@ if MPU == '65816':
 
         if not have_found:
             sc_axy.append((num, sta, pay)) 
-
+    
+    n_passes += 1 
     verbose('PASS AXY: Registered register 8/16 bit switches')
     dump(sc_axy) 
 
@@ -1088,7 +1109,8 @@ for num, sta, pay in sc_axy:
     sc_labels.append((num, sta, pay)) 
 
 
-verbose('STEP LABELS: Assigned value to all labels.') 
+n_passes += 1
+verbose('PASS LABELS: Assigned value to all labels.') 
 
 if args.verbose:
     dump_symbol_table(symbol_table, "after LABELS (numbers in hex)")
@@ -1137,7 +1159,8 @@ for num, sta, pay in sc_labels:
             wc.append(w)
                 
     sc_replace.append((num, s_temp, INDENT+' '.join(wc))) 
-        
+
+n_passes += 1
 verbose('PASS REPLACED: Replaced all symbols with their number values') 
 dump(sc_replace) 
 
@@ -1172,6 +1195,7 @@ for num, sta, pay in sc_replace:
 
     sc_locals.append((num, sta, pay))
 
+n_passes += 1
 verbose('PASS LOCALS: Replaced all local labels with address values')
 dump(sc_locals)
 
@@ -1280,6 +1304,7 @@ for num, sta, pay in sc_locals:
     sc_bytedata.append((num, sta, pay))
 
 
+n_passes += 1
 verbose('PASS BYTEDATA: Converted all other data formats to .byte')
 dump(sc_bytedata)
 
@@ -1314,6 +1339,7 @@ for num, sta, pay in sc_bytedata:
         else:
             sc_1byte.append((num, sta, pay)) 
 
+n_passes += 1
 verbose('PASS 1BYTE: Assembled single byte instructions')
 dump(sc_1byte)
 
@@ -1360,6 +1386,7 @@ for num, sta, pay in sc_1byte:
     # Everything else 
     sc_branches.append((num, sta, pay)) 
 
+n_passes += 1
 verbose('PASS BRANCHES: Encoded all branch instructions')
 dump(sc_branches) 
 
@@ -1386,6 +1413,7 @@ if MPU == '65816':
         else:
             sc_move.append((num, sta, pay)) 
 
+    n_passes += 1
     verbose('PASS MOVE: Handled mvn/mvp instructions on the 65816 (DUMMY)')
     dump(sc_move) 
 
@@ -1419,6 +1447,7 @@ for num, sta, pay  in sc_branches:
 
     sc_math.append((num, sta, pay)) 
 
+n_passes += 1
 verbose('PASS MATH: Calculated all modifiers and math terms.')
 dump(sc_math)
 
@@ -1493,6 +1522,7 @@ for num, sta, pay in sc_math:
                 format(INDENT, oc, ' '.join([hexstr(i) for i in bl]))
         sc_allin.append((num, CODE_DONE, pay)) 
 
+n_passes += 1
 verbose('PASS ALLIN: Assembled all remaining operands')
 dump(sc_allin)
 
@@ -1510,6 +1540,7 @@ for num, _, pay in sc_allin:
     if w[0] != '.byte':
         fatal(num, 'Found payload that is not ".byte"')
 
+n_passes += 1
 verbose('PASS VALIDATE: Confirmed that all lines are now byte data') 
 
 
@@ -1544,6 +1575,7 @@ for num, sta, pay in sc_allin:
     sc_adr.append((num, sta, adr, pay))
     LCi += b
 
+n_passes += 1
 verbose('PASS ADR: Added MPU address locations to each byte line')
 dump(sc_adr)
 
@@ -1565,6 +1597,7 @@ for num, _, _, pay in sc_adr:
                 format(num))
         continue 
 
+n_passes += 1
 verbose('PASS ANALYZE: Searched for obvious errors and improvements') 
 
 
@@ -1582,6 +1615,7 @@ for _, _, _, pay in sc_adr:
     bl = [int(b, 16) for b in pay_bytes.split()] 
     sc_purebytes.append(bl)
 
+n_passes += 1
 verbose('PASS PUREBYTES: Converted all line to pure byte lists')
 
 if args.dump: 
@@ -1605,6 +1639,7 @@ for i in sc_purebytes:
 objectcode = bytes(sc_tobin) 
 code_size = len(objectcode) 
 
+n_passes += 1
 verbose('PASS TOBIN: Converted {0} lines of bytes to {1} bytes'.\
         format(len(sc_purebytes), code_size))
 
@@ -1615,11 +1650,18 @@ verbose('PASS TOBIN: Converted {0} lines of bytes to {1} bytes'.\
 with open(args.output, 'wb') as f:
     f.write(objectcode)
 
+n_steps += 1 
 verbose('STEP SAVEBIN: Saved {0} bytes of object code as {1}'.\
         format(code_size, args.output))
 
+
+# -------------------------------------------------------------------
+# STEP WARNINGS: Print warnings unless users said not to
+#
 if n_warnings != 0 and args.warnings:
     print('Generated {0} warning(s).'.format(n_warnings))
+
+n_steps += 1
 
 
 # -------------------------------------------------------------------
@@ -1628,18 +1670,22 @@ if n_warnings != 0 and args.warnings:
 if args.listing: 
 
     with open(LIST_FILE, 'w') as f:
+
+        # Header 
         f.write(title_string)
         f.write('Code listing for file {0}\n'.format(args.source))
         f.write('Generated on {0}\n'.format(time.asctime(time.localtime())))
         f.write('Target MPU: {0}\n'.format(MPU))
         time_end = timeit.default_timer() 
         f.write('Assembly time: {0:.5f} seconds\n'.format(time_end - time_start))
+        f.write('Number of passes executed: {0}\n'.format(n_passes))
+        f.write('Number of steps executed: {0}\n'.format(n_steps))
         if n_warnings != 0:
             f.write('Warnings generated: {0}\n'.format(n_warnings))
         if n_external_files != 0:
             f.write('External files loaded: {0}\n'.format(n_external_files))
         f.write('Code origin: {0:06x}\n'.format(LC0))
-        f.write('Bytes of machine code generated: {0}\n'.format(code_size))
+        f.write('Bytes of machine code: {0}\n'.format(code_size))
 
         # Add listing 
         f.write('\nLISTING:\n')
@@ -1692,6 +1738,7 @@ if args.listing:
 
     # TODO add local labels list
 
+    n_steps += 1
     verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
 
 
@@ -1718,6 +1765,7 @@ if args.listing:
                     f.write('{0:06x}: '.format(a65))
             f.write('\n') 
 
+        n_steps += 1
         verbose('STEP HEXDUMP: Saved hexdump file as {0}'.format(HEX_FILE))
 
 
