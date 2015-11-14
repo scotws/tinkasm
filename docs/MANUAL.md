@@ -61,6 +61,7 @@ TinkAsm assumes that there is one and one menemonic for each opcode. This is why
 the assembler uses Typist's Assembler Notation (TAN) instead of traditional
 notation for these MPUs. 
 
+
 ## Use 
 
 ### Labels
@@ -68,35 +69,31 @@ notation for these MPUs.
 TinkAsm sees any string as a label that is in the first column of a line and is
 not the comment directive. In other words, anything that is *not* a label or a
 comment must have whitespace in front of it. Note there are no rules for the
-string itself. `*!$?' is a perfectly legal string. (TODO check Unicode
-characters). 
+string itself, so `*!$?` is a perfectly legal string. Also, labels do not have
+to end with a `:`. 
 
 During use, there are two kinds of label references, global and local. A
 **global** reference points to the label by name as is expected. 
 
-```
-ice&fire        nop
+```ice&fire        nop
                 nop
-                jmp ice&fire    ; gobal reference
-                
-```
+                jmp ice&fire    ; gobal reference```
 
 A **local reference** is an easy to use form of a label for trivial uses such as
 loops. It consists of `@` as the generic label and either a `+` or a `-` after
 the jump or branch instruction. 
 
-```
-@               nop
+```@               nop
                 nop
-                jmp -           ; local reference
-```
+                jmp -           ; local reference ```
+
 The `-` or `+` always refers to the next or previous `@`. 
 
 It is assumed that branches will always be given a label, not the relative
 offset. There is in fact currently no way to pass on such offset.
 
 
-## Modifiers and Math
+### Modifiers and Math
 
 Normal labels (but not local labels) and symbols can be modified by "modifiers"
 such as `.invert` and simple mathematical terms such as `label + 2` . Whitespace

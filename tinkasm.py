@@ -39,9 +39,7 @@ if sys.version_info.major != 3:
 # Initialize various counts. Some of these are just for general data collection
 n_external_files = 0    # How many external files were loaded
 n_invocations = 0       # How many macros were expanded
-n_mode_switches = 0     # TODO Count switches native/emulated (65816)
 n_passes = 0            # Number of passes during processing
-n_size_switches = 0     # TODO Count 8/16 bit register switches (65816)
 n_steps = 0             # Number of steps during processing
 n_warnings = 0          # How many warnings were generated
 
@@ -129,11 +127,6 @@ legal_mpus = ['6502', '65c02', '65816']
 symbol_table = {}
 local_labels = [] 
 
-# Positions in the opcode tables
-# TODO see if we need these
-OPCT_OPCODE = 0 
-OPCT_MNEMONIC = 1 
-OPCT_N_BYTES = 2
 
 # Line Status. Leave these as strings so humans can read them. We start with
 # SOURCE and end up with everything either as CODE_DONE or DATA_DONE. Make
@@ -209,8 +202,8 @@ def convert_number(s):
         s2 = s1
     
     # If we can convert this to a number, it's a number, otherweise we claim its
-    # a symbol. Note that this means that a symbol such as "faced" will be
-    # converted to a number, so such numbers should always be prefixed with a 0 
+    # a symbol. The default is to convert to a number, so "dead" will be
+    # considered a hex number, not a label. 
     
     try: 
         r = int(s2, BASE)
@@ -952,7 +945,7 @@ for num, sta, pay in sc_axy:
             verbose('Added address of branch to its payload in line {0}'.\
                     format(num)) 
 
-        LCi += opcode_table[oc][OPCT_N_BYTES]
+        LCi += opcode_table[oc][2]
 
         # Factor in register size if this is a 65816
         if MPU == '65816':
@@ -1333,7 +1326,7 @@ for num, sta, pay in sc_bytedata:
         sc_1byte.append((num, sta, pay)) 
     else: 
 
-        if opcode_table[oc][OPCT_N_BYTES] == 1: 
+        if opcode_table[oc][2] == 1: 
             bl = INDENT+'.byte '+hexstr(oc)
             sc_1byte.append((num, CODE_DONE, bl))
         else:

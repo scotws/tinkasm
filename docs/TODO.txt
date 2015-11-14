@@ -10,7 +10,6 @@ BEFORE BETA:
 - Make sure that A8->16 switch only works in native mode of the 65816
 - Complete opcode lists
 - Handle MVP and MVN 
-- Listing file only when user requests it
 - Format listing file
 - Complete documentation 
 
@@ -22,3 +21,4 @@ AFTER RELEASE:
 - Add system macros (if/then/else, loops)
 - Add modify & math to assignments
 - Analysis step: Suggest JSR, RTS --> JMP
+- Add counts for 65816 mode and register size switches
