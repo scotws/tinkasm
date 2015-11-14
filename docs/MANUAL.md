@@ -12,7 +12,7 @@ understand, but also easy to modify and adapt to their own needs. It uses the
 Typist's Assembler Notation (TAN) and is released under the GPL. 
 
 
-## Basic Idea
+## Philosophy 
 
 People who want to play around with assemblers but are not computer scientists
 have a rough time. Like compilers, professional grade assemblers involve things
@@ -29,29 +29,7 @@ one thing. Easy to understand, easy to modify.
 This, then, is an assembler for those of us who associate the "Wizard Book" with
 *Lord of the Rings* and the "Dragon Book" with *A Song of Ice and Fire.* Enjoy.
 
-
-## Use
-
-TinkAsm requires Python 3.4 or later. It will not run with Python 2.7. 
-
-The assembler does not distinguish between upper and lower case (internally, all
-is converted to lower case). 
-
-(call options) 
-
-
-### PARAMETERS
-
--i --input      - Input assembler file (required) 
--o --output     - Output file for the binary code, default is tasm.bin 
--l --listing    - Create a line-by-line listing file
--v --verbose    - Print more info about each assembly step
--d --dump       - Dump state of inbetween steps, produces lots of output
--x --hexdump    - Create a human-readable hexdump file tasm.hex
-
-
-
-## Drawbacks
+### Drawbacks
 
 Because of the way it is structured, as an assembler, TinkAsm is horribly
 inefficient as an actual assembler. If you're in it for raw speed, this is not
@@ -62,7 +40,40 @@ the assembler uses Typist's Assembler Notation (TAN) instead of traditional
 notation for these MPUs. 
 
 
-## Use 
+### State of Development
+
+TinkAsm is in an very early stage of development. See the `docs/TODO.txt` file for
+features that are to be added soon and those that will come later. 
+
+
+## Requirements 
+
+TinkAsm requires Python 3.4 or later. It will not run with Python 2.7. 
+
+
+
+### PARAMETERS
+
+-i --input      - Input assembler file (required) 
+
+-o --output     - Output file for the binary code, default is tasm.bin 
+
+-l --listing    - Create a line-by-line listing file
+
+-v --verbose    - Print more info about each assembly step
+
+-d --dump       - Dump state of inbetween steps, produces lots of output
+
+-x --hexdump    - Create a human-readable hexdump file tasm.hex
+
+
+
+## The Source File 
+
+TinkAsm requires a text format source file that is passed with the `-i` or
+`--input` options. The assembler does not distinguish between upper and lower
+case (internally, all is converted to lower case). 
+
 
 ### Asignments 
 
@@ -152,6 +163,12 @@ future versions, this will be followed optional parameters.
 
 Currently, there are no system macros such as `.if`, `.then`, `.else` or loop
 constructs. These are to be added in a future version.
+
+
+## Mnemonics 
+
+TinkAsm uses a different format for the actual MPU instructions, the Typist's
+Assembler Notation (TAN).
 
 
 ## Internals 

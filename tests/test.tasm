@@ -9,10 +9,14 @@
     jack = 10 
     clearspace = &1024
 
+@
+            nop
+            bra - 
+
 loop
-            ldx.# 00 + 2
-            lda.# .lsb 3344
-            bra jill + 2 
-            jmp jack + jill
+            ldx.# .lsb *    ; first version
+            sta * + 2       ; second version 
+
+            jmp 200 * 2     ; reverse test
     
     .end 

@@ -131,6 +131,7 @@ local_labels = []
 # Line Status. Leave these as strings so humans can read them. We start with
 # SOURCE and end up with everything either as CODE_DONE or DATA_DONE. Make
 # the strings the same length to make formatting easier
+
 ADDED     = 'ADDED      '  # Line that was added by the assembler 
 CODE_DONE = 'done (code)'  # Finished entry from code, now machine code bytes
 CONTROL   = 'CONTROL    '  # Entry for flow control w/ no code or data
@@ -139,14 +140,15 @@ MACRO     = 'MACRO      '  # Line created by macro expansion
 SOURCE    = 'src        '  # Raw entry line (without whitespace) 
 MODIFIED  = 'MODIFIED   '  # Entry that has been partially processed
 
-# List of all directives
-# TODO see if we need this 
+# List of all directives. Note the local label character is not included because
+# this is used to keep the user from using these words as labels
+
 directives = ['.a->8', '.a->16', '.a8', '.a16', '.append', '.origin',\
         '.org', '.end', '.b', '.byte', '.w', '.word', '.l', '.long',\
         '.native', '.emulated', '.s', '.string', '.s0', '.string0', '.slf',\
         '.stringlf', '.xy->8', '.xy->16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
-        '.and', '.or', '.xor', CURRENT, LOCAL_LABEL]
+        '.and', '.or', '.xor', CURRENT]
 
 
 ### HELPER FUNCTIONS ###
@@ -739,7 +741,12 @@ for num, sta, pay in sc_end:
         # We can't do symbol to symbol assignment because we have no way 
         # to make sure that there was a real number somewhere before
         if not is_number:
-            fatal(n, 'Illegal attempt to assign a symbol to another symbol')
+            fatal(num, 'Illegal attempt to assign a symbol to another symbol')
+
+        # We don't allow using directives as symbols
+        if symbol in directives:
+            fatal(num, 'Directive {0} cannot be redefined as a symbol'.\
+                    format(symbol))
 
         symbol_table[symbol] = value  
     else: 
@@ -903,26 +910,42 @@ xy_len_offset = 0
 a_imm = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#'] 
 xy_imm = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
 
+
+def has_current(s): 
+    """Given a string of the payload, see if we have been given the CURRENT
+    symbol (usually '*') as part of the payload. This can be the case for one
+    word; for two words if the second one is the CURRENT symbol (for example
+    ".lsb *"); for three words if the first one is the symbol (for exampe "*
+    + 1"). We test the reverse, making sure that '*' is not in the second
+    position in an operand term with three words, which would be a 
+    multiplication."""
+
+    w = s.split()[1:] 
+    res = False 
+
+    if CURRENT in s: 
+        
+        if not (w[1] == CURRENT and len(w) == 3):  # This is a multiply 
+            res = True 
+
+    return res 
+
+
 for num, sta, pay in sc_axy:
 
-    w = pay.split() 
-
+    w = pay.split()
 
     # --- SUBSTEP CURRENT: Replace the CURRENT symbol by current address
     
     # This must come before we handle mnemonics. Don't add a continue because
-    # that will screw up the line count; we replace in-place, so to speak
+    # that will screw up the line count; we replace in-place
 
-    # TODO This version is too primitive because CURRENT is probably the star
-    # which will also be used for multiplication at some point. Right now, we
-    # just brute force it.
-    
-    if CURRENT in pay:
-        hc = hexstr(LC0+LCi)
-        pay = pay.replace(CURRENT, hc)
+    if has_current(pay): 
+        pay = pay.replace(CURRENT, hexstr(LC0+LCi))
+        print("pay", pay)
         w = pay.split() 
         verbose('Current marker "{0}" in line {1}, replaced with {2}'.\
-                format(CURRENT, num, hc))
+                format(CURRENT, num, hexstr(LC0+LCi)))
 
 
 
@@ -1174,14 +1197,14 @@ for num, sta, pay in sc_replace:
     # see if the first word is a mnemonic, but so far this is unnecessary
     if len(w) > 1 and w[1] == '+': 
         for ln, ll in local_labels: 
-            if ln > n: 
+            if ln > num: 
                 pay = pay.replace('+', hexstr(ll))
                 sta = MODIFIED
                 break
 
     if len(w) > 1 and w[1] == '-': 
         for ln, ll in reversed(local_labels): 
-            if ln < n: 
+            if ln < num: 
                 pay = pay.replace('-', hexstr(ll))
                 sta = MODIFIED
                 break
