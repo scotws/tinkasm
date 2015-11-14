@@ -64,33 +64,61 @@ notation for these MPUs.
 
 ## Use 
 
+### Asignments 
+
+To assign a value to a variable, use either `=` or `.equ` with significant
+whitespace. That means, both
+
+```
+        less = 20 
+        more .equ 21
+```
+are both allowed, but not `nope=19`. The current version does not allow modifiers or math (see
+below). 
+
+
 ### Labels
 
-TinkAsm sees any string as a label that is in the first column of a line and is
-not the comment directive. In other words, anything that is *not* a label or a
-comment must have whitespace in front of it. Note there are no rules for the
-string itself, so `*!$?` is a perfectly legal string. Also, labels do not have
-to end with a `:`. 
+TinkAsm sees any string as a label that starts in the first column of a line and
+is not the comment directive (usually `;`) or the local label (default `@`). In
+other words, anything that is *not* a label or a comment must have whitespace in
+front of it. There are no rules for the string itself, so `*!$?` is a perfectly
+legal string. 
 
-During use, there are two kinds of label references, global and local. A
-**global** reference points to the label by name as is expected. 
-
-```ice&fire        nop
+```
+ice&fire        nop
                 nop
-                jmp ice&fire    ; gobal reference```
+                jmp ice&fire    ; gobal reference
+```
+Note that in contrast to other assemblers, labels do not have to end with a `:`. 
 
-A **local reference** is an easy to use form of a label for trivial uses such as
-loops. It consists of `@` as the generic label and either a `+` or a `-` after
-the jump or branch instruction. 
 
-```@               nop
+### Local Labels 
+
+Local labels are used for trivial uses such as loops that don't warrant a full
+label. It consists of `@` as the generic label, used as a normal label, and
+either a `+` or a `-` after the jump or branch instruction. 
+
+```
+@               nop
                 nop
-                jmp -           ; local reference ```
+                jmp -           ; local reference 
+```
 
-The `-` or `+` always refers to the next or previous `@`. 
+The `-` or `+` always refers to the next or previous `@`. These directives
+cannot be modified. 
 
-It is assumed that branches will always be given a label, not the relative
-offset. There is in fact currently no way to pass on such offset.
+
+### Current Line Symbol
+
+To reference the current address, by default the symbol `*` is used instead of
+an operand. It can be modified and subjected to mathematical operations.
+```
+                jmp * + 2
+```
+In contrast to other assemblers, the current line symbol cannot be used for
+advancing the line counter. Use the directives `.advance` and `.skip` for thise,
+see below.
 
 
 ### Modifiers and Math
@@ -102,7 +130,13 @@ The system in its current form is primitive: Assignments and labels of branches
 cannot be modified -- yet. These functions will be added in later versions.
 
 
-### Macros
+### Other 
+
+It is assumed that branches will always be given a label, not the relative
+offset. There is in fact currently no way to pass on such offset. 
+
+
+## Macros
 
 The macro system of TinkAsm is currently very primitive. Macros do not accept
 parameters and cannot reference other macros.
