@@ -83,10 +83,9 @@ def verbose(s):
     if args.verbose:
         print(s)
 
-# TODO code this 
 def suggestion(n, s):
     """Print a suggestion of how the code could be better"""
-    print('SUGGESTION: DUMMY, ROUTINE NOT CODED YET')
+    print('SUGGESTION: {0} in line {1}'.format(s, n))
     
 def warning(s):
     """If program called with -w or --warnings, print a warning string"""
@@ -211,8 +210,8 @@ def convert_number(s):
         r = int(s2, BASE)
         f = True
     except ValueError:
-        f = False
         r = s
+        f = False
 
     return f, r
 
@@ -255,20 +254,12 @@ math_funcs = { '+': operator.add, '-': operator.sub, '*': operator.mul,\
         '.xor': operator.xor, '.lshift': operator.lshift,\
         '.rshift': operator.rshift} 
 
+
 def math_operand(lw, n):
     """Given a list lw of three strings, apply the math function in
     the second word to the two other operands. Returns an int"""
-    is_number, a1 = convert_number(lw[0])
-
-    # Paranoid, we shouldn't have symbols anymore
-    if not is_number:
-        fatal(n, 'Symbol found during modify function {0}'.format(lw[1]))
-
-    is_number, a2 = convert_number(lw[2])
-
-    # Paranoid, we shouldn't have symbols anymore
-    if not is_number:
-        fatal(n, 'Symbol found during modify function {0}'.format(lw[1]))
+    _, a1 = convert_number(lw[0])
+    _, a2 = convert_number(lw[2])
 
     try:
         r = math_funcs[lw[1]](a1, a2)
@@ -845,8 +836,6 @@ else:
 # -------------------------------------------------------------------
 # PASS AXY: Handle register size switches on the 65816
 
-# TODO count and print number of mode switches
-
 # We add the actual REP/SEP instructions as well as internal directives for the
 # following steps 
 
@@ -1302,7 +1291,7 @@ for num, sta, pay in sc_locals:
         pay = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((num, DATA_DONE, pay))
         verbose('Converted .string0 directive in line {0} to .byte directive'.\
-                format(n)) 
+                format(num)) 
         continue 
     
     # SUBSTEP STRINGLF: Convert .stringlf directive to bytes
@@ -1410,10 +1399,9 @@ dump(sc_branches)
 # -------------------------------------------------------------------
 # PASS MOVE: Handle the 65816 move instructions MVP and MVN
 
-# TODO code this 
-
 # These two instructions are really, really annoying because they have two
-# operands where every other instruction has one. 
+# operands where every other instruction has one. We assume that the operand is
+# split by a comma. 
 
 sc_move = []
 
@@ -1424,13 +1412,23 @@ if MPU == '65816':
         w = pay.split()
 
         if w[0] == 'mvp' or w[0] == 'mvn':
-            print('DUMMY Found move instruction, skipping') 
-            continue 
-        else:
-            sc_move.append((num, sta, pay)) 
+
+            tmp_pay = pay.replace(w[0], '').strip()
+            a1, a2 = tmp_pay.split(',')
+
+            src = convert_term(a1, num)
+            des = convert_term(a2, num)
+
+            oc = mnemonics[w[0]]
+
+            # Remember destination comes before source with move instruction
+            pay = INDENT+'.byte '+hexstr(oc)+' '+hexstr(lsb(des))+' '+hexstr(lsb(src))
+            sta = CODE_DONE 
+ 
+        sc_move.append((num, sta, pay)) 
 
     n_passes += 1
-    verbose('PASS MOVE: Handled mvn/mvp instructions on the 65816 (DUMMY)')
+    verbose('PASS MOVE: Handled mvn/mvp instructions on the 65816')
     dump(sc_move) 
 
 else:
@@ -1447,7 +1445,7 @@ else:
 
 sc_math = [] 
 
-for num, sta, pay  in sc_branches: 
+for num, sta, pay  in sc_move: 
 
     w = pay.split() 
 
