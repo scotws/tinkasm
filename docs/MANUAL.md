@@ -54,25 +54,39 @@ TinkAsm requires Python 3.4 or later. It will not run with Python 2.7.
 
 ### PARAMETERS
 
--i --input      - Input assembler file (required) 
+**-i --input**      - Input assembler file (required) 
 
--o --output     - Output file for the binary code, default is tasm.bin 
+**-o --output**     - Output file for the binary code, default is `tink.bin`
 
--l --listing    - Create a line-by-line listing file
+**-l --listing**    - Create a line-by-line listing file `tink.lst` 
 
--v --verbose    - Print more info about each assembly step
+**-v --verbose**    - Print more info about each assembly step
 
--d --dump       - Dump state of inbetween steps, produces lots of output
+**-d --dump**       - Dump state of inbetween steps, produces lots of output
 
--x --hexdump    - Create a human-readable hexdump file tasm.hex
+**-x --hexdump**    - Create a human-readable hexdump file `tasm.hex`
 
 
 
-## The Source File 
+## The source file 
 
 TinkAsm requires a text format source file that is passed with the `-i` or
 `--input` options. The assembler does not distinguish between upper and lower
 case (internally, all is converted to lower case). 
+
+
+### Mnemonics 
+
+TinkAsm uses a different format for the actual MPU instructions, the Typist's
+Assembler Notation (TAN).
+
+
+### Definitions
+
+TinkAsm requires two definitions at the beginning of the source file: Where
+assembly is to start (`.origin` or `.org`) and which processor the code is to be
+generated for (`.mpu`). Failure to provide either one will abort the assembly
+process with a FATAL error.
 
 
 ### Asignments 
@@ -165,11 +179,6 @@ Currently, there are no system macros such as `.if`, `.then`, `.else` or loop
 constructs. These are to be added in a future version.
 
 
-## Mnemonics 
-
-TinkAsm uses a different format for the actual MPU instructions, the Typist's
-Assembler Notation (TAN).
-
 
 ## Internals 
 
@@ -211,43 +220,39 @@ At the end, we offer the options of printing an
 information string if we are in verbose mode, or dumping the complete list.
 
 TinkAsm was developed primarily to code 65816 assembler, because there are lots
-of great assemblers for the 6502 and 65c02 already out there; see FEHLT for an
-overview.
-
-
-
-### Coding Style
-
-
-We try to avoid complicated IF/ELIF/ELSE constructs, using IF/CONTINUE instead.
-For example, 
-
-```
-if cond:
-    stuff1
-else:
-    stuff2
-```
-
-should be coded as
-
-```
-if cond:
-    stuff1
-    continue 
-
-stuff 2
-```
-In the same manner, we usually use TRY/EXCEPT to get rid of the error condition
-instead of including a complete construct with TRY/EXCEPT/ELSE/FINALLY.
-
-The use of ELSE after FOR loops is prohibitted, as it confuses Python newbies no
-end. 
+of great assemblers for the 6502 and 65c02 already out there. 
 
 
 ### Notes on various opcodes
 
 TinkAsm enforces the signature byte of `brk` for all processors.
+
+The `mvp` and `mvn` move instructions are annoying even in the Typist's
+Assembler Notation because they break the rule that every instruction has only
+one operand. Also, the source and destination parameters are reversed in machine
+code from their positions in assembler. The format used here is 
+
+```
+                mvp <src> , <dest>
+```
+
+Currently, the whitespace around the comma is required, though that might be
+changed in future versions. The source and destination parameters can be
+modified (such as `.lsb 1000`) or math termns (`home + 2`). Note if either
+`<src>` or `<dest>` are too large, only the LSB of the term is used -- *not* the
+bank byte -- and the rest is discarded silently. For longer terms, you can use
+the `.bank` directive.
+
+```
+        source = 01:0000
+        target = 02:0000
+
+                mvp .bank source , .bank target
+```
+                
+
+
+### Further development plans
 
 
 
