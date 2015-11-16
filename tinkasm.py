@@ -219,9 +219,12 @@ def convert_number(s):
     elif c == BIN_PREFIX:
         BASE = 2
         s2 = s1[1:]
+    elif c == HEX_PREFIX:
+        BASE = 16
+        s2 = s1[1:]
     else: 
         BASE = 16 
-        s2 = s1[1:]
+        s2 = s1
     
     # If we can convert this to a number, it's a number, otherweise we claim its
     # a symbol. The default is to convert to a number, so "dead" will be
