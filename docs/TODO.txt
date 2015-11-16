@@ -5,18 +5,17 @@ This version: 16. Nov 2015
 
 BEFORE BETA:
 
-- Format listing file
 - Make sure that A8->16 switch only works in native mode of the 65816
-- Rewrite inline codes so that we have them ready for listing
 - Complete opcode lists
 - Complete documentation 
 
 
 AFTER RELEASE:
 
-- Allow modifier and math terms in branch instructions
-- Add parameters to macros
-- Add system macros (if/then/else, loops)
+- Allow modify & math to branch instructions
 - Add modify & math to assignments
+- Add parameters to macros
+- Add comments to listing file
+- Add system macros (if/then/else, loops)
 - Analysis step: Suggest JSR, RTS --> JMP
 - Add counts for 65816 mode and register size switches

@@ -221,7 +221,7 @@ def convert_number(s):
         s2 = s1[1:]
     else: 
         BASE = 16 
-        s2 = s1
+        s2 = s1[1:]
     
     # If we can convert this to a number, it's a number, otherweise we claim its
     # a symbol. The default is to convert to a number, so "dead" will be
@@ -1252,6 +1252,7 @@ for num, sta, pay in sc_locals:
 
         for ab in bw:
             _, r = convert_number(ab) 
+            print("r", r) 
             bl.append(hexstr2(r))
             
         pay = INDENT+'.byte '+' '.join(bl)
@@ -1397,7 +1398,7 @@ for num, sta, pay in sc_1byte:
         new_pay = '.byte '+hexstr2(mnemonics[w[0]])+' '
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
-        opr = hexstr4(lsb(target_addr - branch_addr - 2))
+        opr = hexstr2(lsb(target_addr - branch_addr - 2))
         sc_branches.append((num, CODE_DONE, INDENT+new_pay+opr))
         continue 
 
@@ -1406,7 +1407,7 @@ for num, sta, pay in sc_1byte:
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
         bl, bm = little_endian_16(target_addr - branch_addr - 3)
-        opr = INDENT+new_pay+' '+hexstr4(bl)+' '+hexstr4(bm)
+        opr = INDENT+new_pay+hexstr2(bl)+' '+hexstr2(bm)
         sc_branches.append((num, CODE_DONE, opr))
         continue 
  
@@ -1758,10 +1759,13 @@ if args.listing:
                 # some point because the list gets shorter. That's when we're
                 # done
                 try:
-                    num_i, _, pay_i = sc_tmp[i] 
+                    num_i, sta_i, pay_i = sc_tmp[i] 
                 except IndexError:
                     break
                 else: 
+                    # Skip leftover CONTROL instructions
+                    if sta_i == CONTROL:
+                        continue
                     if num_i == num:
                         instr = pay_i.strip() 
                         del sc_tmp[i]
@@ -1817,7 +1821,8 @@ if args.hexdump:
 
     with open(HEX_FILE, 'w') as f:
         f.write(title_string)
-        f.write('Hexdump file of {0}\n'.format(args.source)) 
+        f.write('Hexdump file of {0}'.format(args.source)) 
+        f.write(' (total of {0} bytes\n'.format(code_size)) 
         f.write('Generated on {0}\n\n'.format(time.asctime(time.localtime())))
         a65 = LC0
         f.write('{0:06x}: '.format(a65))

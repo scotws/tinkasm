@@ -4,29 +4,22 @@
     .mpu 65816
     .origin 0e000
 
-    .macro boring    ; this really does nothing
-                nop
-                nop
-    .endmacro
+    .native
+    .axy16
 
-    src = 0
-    dest = 0
-    offset = 1000
-
-                lda.# 00
-                tax
+            lda.# 0000
+            tax
 loop
-                sta.x 1000 + offset
-                dex
-                bne loop 
+            sta.x 1000
+            dex
+            bne loop 
 
-    .invoke boring
+            bra.l loop 
 
-                mvp src , dest + 1
-                stp 
-
-    .byte 1 2 3 4 5 6 7 8 9 a b c
-    .word 1122 3344 5566
-    .string "Liara T'Soni"
+            stp 
     
+    .byte $0 $1 $2 $3
+    .byte %0 %1 %10 %11
+    .byte &10 &11 &12 &13
+
     .end 
