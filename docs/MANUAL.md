@@ -6,10 +6,9 @@ Scot W. Stevenson <scot.stevenson@gmail.com>
 ## Overview
 
 The Tinkerer's Assembler (TinkAsm for short) is a multi-pass assembler for the
-6502, 65c02, and 65816 8/16-MPUs. It is written in simple Python 3 code with the
-intention to give computer hobbyists an assembler that is not only easy to
-understand, but also easy to modify and adapt to their own needs. It uses the
-Typist's Assembler Notation (TAN) and is released under the GPL. 
+6502, 65c02, and 65816 8/16-MPUs written in Python. Its aim is to provide
+hobbyists with an assembler that will run on almost any operating system while
+being easy to understand and easy to modify. 
 
 
 ## Philosophy 
@@ -354,5 +353,8 @@ https://www.google.de/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ve
 The authors discuss using compilers with multiple small passes for educational
 purposes. 
 
+David Salomon's [*Assemblers And
+Loaders*](http://www.davidsalomon.name/assem.advertis/AssemAd.html) was
+invaluable and is highly recommended for anybody who wants to write their own. 
 
 

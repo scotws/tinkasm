@@ -1,20 +1,32 @@
 ; Test file for 
 ; A Tinkerer's Assembler for the 6502/65c02/65816
-; Movement Testing 
 
     .mpu 65816
     .origin 0e000
 
-    src = 00
-    dest = 00
+    .macro boring    ; this really does nothing
+                nop
+                nop
+    .endmacro
 
-    .native
-    .a16
+    src = 0
+    dest = 0
+    offset = 1000
 
-                lda.#   1000
-                ldx.#   0000
-                ldy.#   0000
+                lda.# 00
+                tax
+loop
+                sta.x 1000 + offset
+                dex
+                bne loop 
+
+    .invoke boring
 
                 mvp src , dest + 1
+                stp 
+
+    .byte 1 2 3 4 5 6 7 8 9 a b c
+    .word 1122 3344 5566
+    .string "Liara T'Soni"
     
     .end 

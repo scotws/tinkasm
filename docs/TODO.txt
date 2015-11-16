@@ -1,7 +1,7 @@
 TODO List for A Tinkerer's Assember for the 65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 15. Nov 2015
+This version: 16. Nov 2015
 
 BEFORE BETA:
 
