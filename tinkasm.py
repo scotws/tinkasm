@@ -942,7 +942,7 @@ def has_current(s):
     """Given a string of the payload, see if we have been given the CURRENT
     symbol (usually '*') as part of the payload. This can be the case for one
     word; for two words if the second one is the CURRENT symbol (for example
-    ".lsb *"); for three words if the first one is the symbol (for exampe "*
+    ".lsb *"); for three words if the first one is the symbol (for example "*
     + 1"). We test the reverse, making sure that '*' is not in the second
     position in an operand term with three words, which would be a
     multiplication."""

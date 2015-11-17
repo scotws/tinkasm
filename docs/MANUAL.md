@@ -28,6 +28,7 @@ one thing. Easy to understand, easy to modify.
 This, then, is an assembler for those of us who associate the "Wizard Book" with
 *Lord of the Rings* and the "Dragon Book" with *A Song of Ice and Fire.* Enjoy.
 
+
 ### Drawbacks
 
 Because of the way it is structured, as an assembler, TinkAsm is horribly
@@ -49,7 +50,6 @@ are welcome
 ## Requirements 
 
 TinkAsm requires Python 3.4 or later. It will not run with Python 2.7. 
-
 
 
 ### PARAMETERS
@@ -188,8 +188,23 @@ constructs. These are to be added in a future version.
 
 ### Directives for all MPUs
 
+`+` - As an operand to a branch or jump instruction: Refer to the next local
+label. Between numbers or symbols in the operand: Math function addition.
+
+`-` - As an operand to a branch or jump instruction: Refer to previous local
+label. Between numbers or symbols in the operand: Math function subtraction.
+
+`*` - As an operand in the first position after the mnemonic: Marks current
+address (eg `jmp * + 2`). As an operand between numbers or symbols in the
+operand: Math function multiplication (eg `lda.# 2 * 2`). 
+
+`/` - Between numbers or symbols in the operand: Math function division. Note
+this returns an integer (Python "floor division" function). 
+
 `.advance` - Jump ahead to the address given as parameter, filling the space
 inbetween with zeros.
+
+`.and` - Logically AND two numbers or symbols in the operand. 
 
 `.bank` - Isolate bank byte - the highest byte - of following number. This is a
 modifier. Thought it pretty much only makes sense for the 65816 MPU, it is
@@ -206,14 +221,20 @@ original source file. Required.
 `.include` - Inserts code from an external file, the name of which is given as a
 parameter. 
 
-`.invoke` - Inserts the macro given as parameter. 
+`.invert` - Inverts the following symbol or number in the operand (eg `lda.#
+.invert 0ff`).
 
-`.lsb` - Isolate least significant byte of following number. This is a 
-modifier.
+`.invoke` - Inserts the macro given as parameter. 
 
 `.long` or `.l` - Store the following list of space-delimited 24-bit as bytes.
 The assembler handles the conversion to little-endian format. Parameters can be
 in any supported number base or symbols, but not modified or math terms. 
+
+`.lsb` - Isolate least significant byte of following number. This is a 
+modifier.
+
+`.lshift` - Shift the the first number or symbol in the operand left by the
+number of bytes given in the second operand (eg `lda.# 01 .lshift 1`).
 
 `.macro` - Start definition of the macros, the name of which follows
 immediately as the next string. Parameters are not supported in this version.
@@ -225,8 +246,13 @@ modifier.
 `.mpu` - Provides the target MPU as the parameter. Required. Legal values are
 `6502`, `65c02`, or `65816`. 
 
+`.or` - Logically OR two numbers or symbols in the operand. 
+
 `.origin` or `.org` - Start assembly at the address provided as a parameter.
 Required for the program to run.
+
+`.rshift` - Shift the the first number or symbol in the operand right by the
+number of bytes given in the second operand (eg `lda.# 01 .rshift 1`).
 
 `.skip` - Jump head by the number of bytes given as a parameter, filling the
 space inbetween with zeros.
@@ -248,6 +274,7 @@ can be in any supported number base or symbols, but not modified or math terms.
 Note that WDC uses "double byte" for 16-bit values, but the rest of the world
 uses "word". 
 
+`.xor` - Logically XOR (exclusive OR) two numbers or symbols in the operand. 
 
 
 ### Directives for 65816 only
