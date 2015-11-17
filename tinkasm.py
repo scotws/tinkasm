@@ -933,7 +933,7 @@ BRANCHES = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
 # byte is needed for immediate forms such as lda.# with the 65816
 a_len_offset = 0
 xy_len_offset = 0
-mpu_status = 'native'   # Start out in native status 
+mpu_status = 'emulated'   # Start 65816 out in emulated status 
 A_IMM = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
 XY_IMM = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
 
@@ -1076,7 +1076,7 @@ for num, sta, pay in sc_axy:
             mpu_status = 'native'
             continue 
 
-         if w[0] == '->emulated':
+        if w[0] == '->emulated':
             mpu_status = 'emulated'
             continue 
        
@@ -1409,8 +1409,6 @@ dump(sc_1byte)
 
 # All our branch instructions, including bra.l and phe.r on the 65816, should
 # include the line they are on as the last entry in the payload
-
-# TODO Add modifiers and math to branch addresses
 
 sc_branches = []
 
@@ -1853,7 +1851,7 @@ if args.hexdump:
     with open(HEX_FILE, 'w') as f:
         f.write(TITLE_STRING)
         f.write('Hexdump file of {0}'.format(args.source))
-        f.write(' (total of {0} bytes\n'.format(code_size))
+        f.write(' (total of {0} bytes)\n'.format(code_size))
         f.write('Generated on {0}\n\n'.format(time.asctime(time.localtime())))
         a65 = LC0
         f.write('{0:06x}: '.format(a65))
@@ -1879,7 +1877,7 @@ if args.hexdump:
 time_end = timeit.default_timer()
 verbose('\nSuccess! All steps completed in {0:.5f} seconds.'.\
         format(time_end - time_start))
-verbose('Enjoy the cake.')
+verbose('Enjoy your cake.')
 sys.exit(0)
 
 ### END ###
