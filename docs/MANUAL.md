@@ -184,6 +184,119 @@ Currently, there are no system macros such as `.if`, `.then`, `.else` or loop
 constructs. These are to be added in a future version.
 
 
+## List of Directives
+
+### Directives for all MPUs
+
+`.advance` - Jump ahead to the address given as parameter, filling the space
+inbetween with zeros.
+
+`.bank` - Isolate bank byte - the highest byte - of following number. This is a
+modifier. Thought it pretty much only makes sense for the 65816 MPU, it is
+supported for other formats as well. 
+
+`.byte` or `.b` - Store the following list of space-delimited bytes. Parameters
+can be in any supported number base or symbols, but not modified or math terms. 
+
+`.end` - Marks the end of the assembly source code. Must be last line in
+original source file. Required. 
+
+`.endmacro` - End definition of the macro that was last defined by `.macro`. 
+
+`.include` - Inserts code from an external file, the name of which is given as a
+parameter. 
+
+`.invoke` - Inserts the macro given as parameter. 
+
+`.lsb` - Isolate least significant byte of following number. This is a 
+modifier.
+
+`.long` or `.l` - Store the following list of space-delimited 24-bit as bytes.
+The assembler handles the conversion to little-endian format. Parameters can be
+in any supported number base or symbols, but not modified or math terms. 
+
+`.macro` - Start definition of the macros, the name of which follows
+immediately as the next string. Parameters are not supported in this version.
+The definition ends with the first `.endmacro`. Macros cannot be nested.
+
+`.msb` - Isolate most significant byte of following number. This is a 
+modifier.
+
+`.mpu` - Provides the target MPU as the parameter. Required. Legal values are
+`6502`, `65c02`, or `65816`. 
+
+`.origin` or `.org` - Start assembly at the address provided as a parameter.
+Required for the program to run.
+
+`.skip` - Jump head by the number of bytes given as a parameter, filling the
+space inbetween with zeros.
+
+`.string` or `.s` - Store the following ASCII string that is delimited by double
+quotation marks `"` (not single quote marks). 
+
+`.string0` or `.s0` - Store the following ASCII string that is delimited by double
+quotation marks `"` (not single quote marks) as well as a zero byte as last
+characters. 
+
+`.stringlf` or `.slf` - Store the following ASCII string that is delimited by
+double quotation marks `"` (not single quote marks) followed by a line feed
+ASCII character. 
+
+`.word` or `.w` - Store the following list of space-delimited 16-bit words as
+bytes. The assembler handles the conversion to little-endian format. Parameters
+can be in any supported number base or symbols, but not modified or math terms.
+Note that WDC uses "double byte" for 16-bit values, but the rest of the world
+uses "word". 
+
+
+
+### Directives for 65816 only
+
+`.a8` and `.a16` - Switch the size of the A register to 8 or 16 bit. The switch
+to 16 bit only works in native mode. These insert the required instructions
+as well as the internal control sequences (see below) and should be used instead
+of directly coding the `rep`/`sep` instructions.
+
+`.xy8` and `.xy16` - Switch the size of the X and Y registers to 8 or 16 bit.
+The switch to 16 bit only works in native mode. These insert the required instructions
+as well as the internal control sequences (see below) and should be used instead
+of directly coding the `rep`/`sep` instructions.
+
+`.axy8` and `.axy16` - Switch the size of the A, X, and Y registers to 8 or 16
+bit. The switch to 16 bit only works in native mode. These insert the required instructions
+as well as the internal control sequences (see below) and should be used instead
+of directly coding the `rep`/`sep` instructions.
+
+`.emulated` - Switch the MPU to emulated mode, inserting the required
+instructions and control sequences. Use this directive instead of directly
+coding `sec`/`xce`. 
+
+`.native` - Switch the MPU to native mode, inserting the required
+instructions and control sequences. Use this directive instead of directly
+coding `clc`/`xce`. 
+
+
+### Direct use of 65816 control directives
+
+Internally, the mode and register size switches are handled by inserting
+"control directives" into the source code. Though the above directives such as
+`.native` or `.a16` should be enough, you can insert the control sequences
+directly to ensure that the assembler handles the sizes correctly. These do not
+encode any instructions.
+
+`.a->8`, `.a->16` - Force assembler to interpret the A register as 8 or 16 bit.
+Note the switch to 16 bit only works in native mode.
+
+`.xy->8`, `.xy->16` - Force assembler to interpret the X and Y register as 8 or
+16 bit.  Note the switch to 16 bit only works in native mode.
+
+`->emulated` - Force switch of assembler to emulated mode. Note this does not
+insert the control sequences `.a->8` and `.xy->8` as the full directive
+`.emulated` does.
+
+`->native` - Force switch of assembler to native mode. 
+
+
 
 ## Internals 
 

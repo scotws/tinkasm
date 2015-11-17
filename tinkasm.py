@@ -163,12 +163,13 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 # List of all directives. Note the local label character is not included
 # because this is used to keep the user from using these words as labels
 
-DIRECTIVES = ['.a->8', '.a->16', '.a8', '.a16', '.append', '.origin',\
+DIRECTIVES = ['.a->8', '.a->16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
         '.org', '.end', '.b', '.byte', '.w', '.word', '.l', '.long',\
         '.native', '.emulated', '.s', '.string', '.s0', '.string0', '.slf',\
         '.stringlf', '.xy->8', '.xy->16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
-        '.and', '.or', '.xor', CURRENT]
+        '.and', '.or', '.xor', CURRENT, '.macro', '.endmacro', '.invoke',\
+        '.include', '->native', '->emulated']
 
 
 ### HELPER FUNCTIONS ###
@@ -521,15 +522,19 @@ n_passes += 1
 verbose('STEP LOWER: Converted all lines to lower case')
 dump(sc_lower)
 
+
 # -------------------------------------------------------------------
 # PASS MPU: NOPARENS
 
-# Enforce ban of parens which is reserved for future use. This pass doesn't
+# Enforce ban of parens which are reserved for future use. This pass doesn't
 # change the source code
 
 for num, pay in sc_lower:
     if '(' in pay or ')' in pay:
         fatal(num, '"(" and ")" are reserved for future use. Sorry.')
+
+n_passes += 1
+verbose('PASS NOPARENS: No parens found, proceeding normally.')
 
 
 # -------------------------------------------------------------------
@@ -788,7 +793,6 @@ if args.verbose:
 
 # -------------------------------------------------------------------
 # PASS INVOKE: Insert macro definitions
-# TODO Add parameters
 
 # Macros must be expanded before we touch the .NATIVE and .AXY directives
 # because those might be present in the macros
@@ -831,8 +835,6 @@ dump(sc_invoke)
 # -------------------------------------------------------------------
 # PASS MODES: Handle '.native' and '.emulated' directives on the 65816
 
-# TODO count and print number of mode switches
-
 # Since we have moved labels to their own lines, we assume that both .native
 # and .emulated alone in their respective lines.
 
@@ -845,11 +847,13 @@ if MPU == '65816':
         if '.native' in pay:
             sc_modes.append((num, ADDED, INDENT+'clc'))
             sc_modes.append((num, ADDED, INDENT+'xce'))
+            sc_modes.append((num, CONTROL, INDENT+'->native'))
             continue
 
         if '.emulated' in pay:
             sc_modes.append((num, ADDED, INDENT+'sec'))
             sc_modes.append((num, ADDED, INDENT+'xce'))
+            sc_modes.append((num, CONTROL, INDENT+'->emulated'))
 
             # Emulation drops us into 8-bit modes for A, X, and Y
             # automatically, no REP or SEP commands needed
@@ -877,7 +881,7 @@ sc_axy = []
 
 if MPU == '65816':
 
-    axy_ins = {'.a8':    ((ADDED, 'sep 20'), (CONTROL, '.a->8')),\
+    AXY_INS = {'.a8':    ((ADDED, 'sep 20'), (CONTROL, '.a->8')),\
     '.a16': ((ADDED, 'rep 20'), (CONTROL, '.a->16')),\
     '.xy8': ((ADDED, 'sep 10'), (CONTROL, '.xy->8')),\
     '.xy16': ((ADDED, 'rep 10'), (CONTROL, '.xy->16')),\
@@ -887,13 +891,13 @@ if MPU == '65816':
     for num, sta, pay in sc_modes:
         have_found = False
 
-        for ins in axy_ins:
+        for ins in AXY_INS:
 
             # Because we moved labels to their own lines, we can assume that
             # register switches are alone in the line
             if ins in pay:
 
-                for e in axy_ins[ins]:
+                for e in AXY_INS[ins]:
                     sc_axy.append((num, e[0], INDENT+e[1]))
                     have_found = True
 
@@ -901,7 +905,7 @@ if MPU == '65816':
             sc_axy.append((num, sta, pay))
 
     n_passes += 1
-    verbose('PASS AXY: Registered register 8/16 bit switches')
+    verbose('PASS AXY: Registered 8/16 bit switches for A, X, and Y')
     dump(sc_axy)
 
 else:
@@ -929,6 +933,7 @@ BRANCHES = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
 # byte is needed for immediate forms such as lda.# with the 65816
 a_len_offset = 0
 xy_len_offset = 0
+mpu_status = 'native'   # Start out in native status 
 A_IMM = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
 XY_IMM = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
 
@@ -1065,15 +1070,27 @@ for num, sta, pay in sc_axy:
 
     if MPU == '65816':
 
-        # TODO Rewrite this horrible code once we are sure this is what we want
-        # to do
-        # TODO make sure the switch to 16 bits only works in native mode
+        # TODO rewrite this once we're sure this works
+        
+        if w[0] == '->native':
+            mpu_status = 'native'
+            continue 
+
+         if w[0] == '->emulated':
+            mpu_status = 'emulated'
+            continue 
+       
         if w[0] == '.a->8':
             a_len_offset = 0
             sc_labels.append((num, sta, pay))
             continue
 
         elif w[0] == '.a->16':
+
+            # We can't switch to 16 bit A if we're not in native mode
+            if mpu_status == 'emulated':
+                fatal(num, 'Attempt to switch A to 16 bit in emulated mode')
+
             a_len_offset = 1
             sc_labels.append((num, sta, pay))
             continue
@@ -1084,6 +1101,11 @@ for num, sta, pay in sc_axy:
             continue
 
         elif w[0] == '.xy->16':
+
+            # We can't switch to 16 bit X/Y if we're not in native mode
+            if mpu_status == 'emulated':
+                fatal(num, 'Attempt to switch X/Y to 16 bit in emulated mode')
+
             xy_len_offset = 1
             sc_labels.append((num, sta, pay))
             continue
@@ -1101,7 +1123,6 @@ for num, sta, pay in sc_axy:
             except KeyError:
                 fatal(num, '.advance directive has undefined symbol "{0}"'.\
                         format(r))
-
 
         # Make sure the user is not attempting to advance backwards
         if r < (LCi+LC0):
@@ -1800,10 +1821,10 @@ if args.listing:
                 for ml in macros[m]:
                     f.write('    {0}\n'.format(ml))
 
-            f.write('\n')
+            f.write('\n\n')
 
         else:
-            f.write(INDENT+'(none)\n')
+            f.write(INDENT+'(none)\n\n')
 
 
         # Add symbol list
