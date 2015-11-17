@@ -104,7 +104,8 @@ def verbose(s):
         print(s)
 
 def suggestion(n, s):
-    """Print a suggestion of how the code could be better"""
+    """Print a suggestion of how the code could be better. This is to
+    be used in the analysis pass"""
     print('SUGGESTION: {0} in line {1}'.format(s, n))
 
 def warning(s):
@@ -115,9 +116,9 @@ def warning(s):
 
 ### PRINT HEADER ###
 
-title_string = "A Tinkerer's Assembler for the 65816 in Python\n"
+TITLE_STRING = "A Tinkerer's Assembler for the 65816 in Python\n"
 
-verbose(title_string)
+verbose(TITLE_STRING)
 # TODO add name
 
 
@@ -141,7 +142,7 @@ LCi = 0             # Index to where we are in code
 HEX_FILE = 'tink.hex'   # Name of hexdump file
 LIST_FILE = 'tink.lst'   # Name of listing file
 
-LEGAL_MPUS = ['6502', '65c02', '65816']
+SUPPORTED_MPUS = ['6502', '65c02', '65816']
 
 symbol_table = {}
 local_labels = []
@@ -162,7 +163,7 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 # List of all directives. Note the local label character is not included
 # because this is used to keep the user from using these words as labels
 
-directives = ['.a->8', '.a->16', '.a8', '.a16', '.append', '.origin',\
+DIRECTIVES = ['.a->8', '.a->16', '.a8', '.a16', '.append', '.origin',\
         '.org', '.end', '.b', '.byte', '.w', '.word', '.l', '.long',\
         '.native', '.emulated', '.s', '.string', '.s0', '.string0', '.slf',\
         '.stringlf', '.xy->8', '.xy->16', '.xy8', '.xy16', COMMENT,\
@@ -251,7 +252,7 @@ def convert_number(s):
 # instructions of the 65816 are treated separately because their structure does
 # not fit the single-operand mode.
 
-modifier_funcs = {'.lsb': lsb, '.msb': msb, '.bank': bank,\
+MODIFIER_FUNCS = {'.lsb': lsb, '.msb': msb, '.bank': bank,\
         '.invert': operator.invert}
 
 def modify_operand(lw, n):
@@ -265,14 +266,14 @@ def modify_operand(lw, n):
         fatal(n, 'Symbol found during modify function {0}'.format(lw[0]))
 
     try:
-        r = modifier_funcs[lw[0]](opr)
+        r = MODIFIER_FUNCS[lw[0]](opr)
     except KeyError:
         fatal(n, 'Illegal modifier {0} given'.format(lw[0]))
 
     return r
 
 
-math_funcs = {'+': operator.add, '-': operator.sub, '*': operator.mul,\
+MATH_FUNCS = {'+': operator.add, '-': operator.sub, '*': operator.mul,\
         '/': operator.floordiv, '.and': operator.and_, '.or': operator.or_,\
         '.xor': operator.xor, '.lshift': operator.lshift,\
         '.rshift': operator.rshift}
@@ -285,7 +286,7 @@ def math_operand(lw, n):
     _, a2 = convert_number(lw[2])
 
     try:
-        r = math_funcs[lw[1]](a1, a2)
+        r = MATH_FUNCS[lw[1]](a1, a2)
     except KeyError:
         fatal(n, 'Illegal modifier {0} given'.format(lw[1]))
 
@@ -520,6 +521,16 @@ n_passes += 1
 verbose('STEP LOWER: Converted all lines to lower case')
 dump(sc_lower)
 
+# -------------------------------------------------------------------
+# PASS MPU: NOPARENS
+
+# Enforce ban of parens which is reserved for future use. This pass doesn't
+# change the source code
+
+for num, pay in sc_lower:
+    if '(' in pay or ')' in pay:
+        fatal(num, '"(" and ")" are reserved for future use. Sorry.')
+
 
 # -------------------------------------------------------------------
 # PASS MPU: Find MPU type
@@ -537,7 +548,7 @@ for num, pay in sc_lower:
 if not MPU:
     fatal(num, 'No ".mpu" directive found')
 
-if MPU not in LEGAL_MPUS:
+if MPU not in SUPPORTED_MPUS:
     fatal(num, 'MPU "{0}" not supported'.format(MPU))
 
 n_passes += 1
@@ -758,7 +769,7 @@ for num, sta, pay in sc_end:
             fatal(num, 'Illegal attempt to assign a symbol to another symbol')
 
         # We don't allow using directives as symbols
-        if symbol in directives:
+        if symbol in DIRECTIVES:
             fatal(num, 'Directive {0} cannot be redefined as a symbol'.\
                     format(symbol))
 
@@ -911,15 +922,15 @@ else:
 
 sc_labels = []
 
-branches = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
+BRANCHES = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
         'bra.l', 'phe.r']
 
 # These are only used for 65816. The offsets are used to calculate if an extra
 # byte is needed for immediate forms such as lda.# with the 65816
 a_len_offset = 0
 xy_len_offset = 0
-a_imm = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
-xy_imm = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
+A_IMM = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
+XY_IMM = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
 
 
 def has_current(s):
@@ -973,7 +984,7 @@ for num, sta, pay in sc_axy:
     else:
         # For branches, we want to remember were the instruction is to make our
         # life easier later
-        if w[0] in branches:
+        if w[0] in BRANCHES:
             pay = pay + ' ' + hexstr(LC0+LCi)
             sta = MODIFIED
             verbose('Added address of branch to its payload in line {0}'.\
@@ -984,9 +995,9 @@ for num, sta, pay in sc_axy:
         # Factor in register size if this is a 65816
         if MPU == '65816':
 
-            if w[0] in a_imm:
+            if w[0] in A_IMM:
                 LCi += a_len_offset
-            elif w[0] in xy_imm:
+            elif w[0] in XY_IMM:
                 LCi += xy_len_offset
 
         sc_labels.append((num, sta, pay))
@@ -1382,8 +1393,8 @@ dump(sc_1byte)
 
 sc_branches = []
 
-branches_8 = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs']
-branches_16 = ['bra.l', 'phe.r']
+BRANCHES_8 = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs']
+BRANCHES_16 = ['bra.l', 'phe.r']
 
 for num, sta, pay in sc_1byte:
 
@@ -1394,7 +1405,7 @@ for num, sta, pay in sc_1byte:
 
     w = pay.split()
 
-    if w[0] in branches_8:
+    if w[0] in BRANCHES_8:
         new_pay = '.byte '+hexstr2(mnemonics[w[0]])+' '
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
@@ -1402,7 +1413,7 @@ for num, sta, pay in sc_1byte:
         sc_branches.append((num, CODE_DONE, INDENT+new_pay+opr))
         continue
 
-    if MPU == '65816' and w[0] in branches_16:
+    if MPU == '65816' and w[0] in BRANCHES_16:
         new_pay = '.byte '+hexstr2(mnemonics[w[0]])+' '
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
@@ -1535,9 +1546,9 @@ for num, sta, pay in sc_math:
         # Factor in register size if this is a 65816
         if MPU == '65816':
 
-            if w[0] in a_imm:
+            if w[0] in A_IMM:
                 n_bytes += a_len_offset
-            elif w[0] in xy_imm:
+            elif w[0] in XY_IMM:
                 n_bytes += xy_len_offset
 
         is_number, opr = convert_number(w[1])
@@ -1714,7 +1725,7 @@ if args.listing:
     with open(LIST_FILE, 'w') as f:
 
         # Header
-        f.write(title_string)
+        f.write(TITLE_STRING)
         f.write('Code listing for file {0}\n'.format(args.source))
         f.write('Generated on {0}\n'.format(time.asctime(time.localtime())))
         f.write('Target MPU: {0}\n'.format(MPU))
@@ -1819,7 +1830,7 @@ if args.listing:
 if args.hexdump:
 
     with open(HEX_FILE, 'w') as f:
-        f.write(title_string)
+        f.write(TITLE_STRING)
         f.write('Hexdump file of {0}'.format(args.source))
         f.write(' (total of {0} bytes\n'.format(code_size))
         f.write('Generated on {0}\n\n'.format(time.asctime(time.localtime())))

@@ -42,7 +42,8 @@ notation for these MPUs.
 ### State of Development
 
 TinkAsm is in an very early stage of development. See the `docs/TODO.txt` file for
-features that are to be added soon and those that will come later. 
+features that are to be added soon and those that will come later. Suggestions
+are welcome
 
 
 ## Requirements 
@@ -85,7 +86,8 @@ Assembler Notation (TAN).
 TinkAsm requires two definitions at the beginning of the source file: Where
 assembly is to start (`.origin` or `.org`) and which processor the code is to be
 generated for (`.mpu`). Failure to provide either one will abort the assembly
-process with a FATAL error.
+process with a FATAL error. Supported MPUs are `6502`, `65c02` (upper and
+lowercase "c" are accepted), and `65816`. 
 
 
 ### Asignments 
@@ -150,8 +152,9 @@ see below.
 Normal labels (but not local labels) and symbols can be modified by "modifiers"
 such as `.invert` and simple mathematical terms such as `label + 2` . Whitespace
 is significant, so `label+2` is not legal (and will be identified as a symbol).
-The system in its current form is primitive: Assignments and labels of branches
-cannot be modified -- yet. These functions will be added in later versions.
+The system in its current form is primitive: Assignments, data fields such as
+`.byte` and labels of branches can currently not be modified. See below for a
+complete list of modifiers. 
 
 
 ### Other 
@@ -159,10 +162,13 @@ cannot be modified -- yet. These functions will be added in later versions.
 It is assumed that branches will always be given a label, not the relative
 offset. There is in fact currently no way to pass on such offset. 
 
+The characters `(` and `)` are reserved for future use. The program will abort
+if it finds them outside of a comment.
+
 
 ## Macros
 
-The macro system of TinkAsm is currently very primitive. Macros do not accept
+The macro system of TinkAsm is in its first stage. Macros do not accept
 parameters and cannot reference other macros.
 
 To define a macro, use the directive `.macro` followed by the name string of the

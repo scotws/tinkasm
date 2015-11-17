@@ -10,7 +10,7 @@
             lda.# 0000
             tax
 loop
-            sta.x 1000
+            sta.x 1000 
             dex
             bne loop 
 
