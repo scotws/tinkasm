@@ -1,11 +1,12 @@
 TODO List for A Tinkerer's Assember for the 65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 16. Nov 2015
+This version: 17. Nov 2015
 
 BEFORE BETA:
 
 - Make sure that A8->16 switch only works in native mode of the 65816
+- Enforce reserving "(" for other uses
 - Complete opcode lists
 - Complete documentation 
 
