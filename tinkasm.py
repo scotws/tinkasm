@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 17. Nov 2015
+# This version: 18. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1412,8 +1412,12 @@ dump(sc_1byte)
 
 sc_branches = []
 
-BRANCHES_8 = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs']
-BRANCHES_16 = ['bra.l', 'phe.r']
+BRANCHES = {
+    '6502': ['beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs'],\
+    '65c02': ['beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
+        'bra'],\
+    '65816': ['beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
+        'bra', 'bra.l', 'phe.r']}
 
 for num, sta, pay in sc_1byte:
 
@@ -1424,7 +1428,7 @@ for num, sta, pay in sc_1byte:
 
     w = pay.split()
 
-    if w[0] in BRANCHES_8:
+    if w[0] in BRANCHES[MPU]:
         new_pay = '.byte '+hexstr2(mnemonics[w[0]])+' '
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
@@ -1432,7 +1436,8 @@ for num, sta, pay in sc_1byte:
         sc_branches.append((num, CODE_DONE, INDENT+new_pay+opr))
         continue
 
-    if MPU == '65816' and w[0] in BRANCHES_16:
+    # TODO see if we can simplify this 
+    if MPU == '65816' and w[0] in BRANCHES[MPU]: 
         new_pay = '.byte '+hexstr2(mnemonics[w[0]])+' '
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
@@ -1607,7 +1612,7 @@ for num, _, pay in sc_allin:
     w = pay.split()
 
     if w[0] != '.byte':
-        fatal(num, 'Found payload that is not ".byte"')
+        fatal(num, 'Found illegal opcode/directive "{0}"'.format(pay.strip()))
 
 n_passes += 1
 verbose('PASS VALIDATE: Confirmed that all lines are now byte data')

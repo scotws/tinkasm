@@ -1,7 +1,7 @@
 # Opcodes for the Tinkerer's Assembler for the 65816 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 23. Okt 2015
-# This version: 11. Nov 2015
+# This version: 18. Nov 2015
 
 # The Immediate Mode forms (<opc>.#) are listed as two-byte instructions and
 # then expanded by the assembler when the relevant instruction is called during
@@ -63,7 +63,7 @@ opcode_table = (
     (0x34, 'bit.dx', 2),
     (0x35, 'and.dx', 2),
     (0x36, 'rol.dx', 2),
-    (0x37, 'and.dy', 2),
+    (0x37, 'and.dily', 2),
     (0x38, 'sec', 1),
     (0x39, 'and.y', 3),
     (0x3a, 'dec.a', 1),
@@ -74,7 +74,7 @@ opcode_table = (
     (0x3f, 'and.lx', 4),
     (0x40, 'rti', 1),
     (0x41, 'eor.dxi', 2),
-    (0x42, 'wdm', 2),
+    (0x42, 'wdm', 2),       # Should produce warning
     (0x43, 'eor.s', 2),
     (0x44, 'mvp', 3),
     (0x45, 'eor.d', 2),
@@ -95,15 +95,7 @@ opcode_table = (
     (0x54, 'mvn', 3),
     (0x55, 'eor.dx', 2),
     (0x56, 'lsr.dx', 2),
-    (0x57, 'eor.dy', 2),
-    (0x58, 'cli', 1),
-    (0x59, 'eor.y', 3),
-    (0x5a, 'phy', 1),
-    (0x5b, 'tcd', 1),
-    (0x5c, 'jmp.l', 4),
-    (0x5d, 'eor.x', 3),
-    (0x5e, 'lsr.x', 3),
-    (0x5f, 'eor.lx', 4),
+    (0x57, 'eor.dily', 2),
     (0x60, 'rts', 1),
     (0x61, 'adc.dxi', 2),
     (0x62, 'phe.r', 3),
@@ -223,7 +215,7 @@ opcode_table = (
     (0xd4, 'phe.d', 2),
     (0xd5, 'cmp.dx', 2),
     (0xd6, 'dec.dx', 2),
-    (0xd7, 'cmp.dy', 2),
+    (0xd7, 'cmp.dily', 2),
     (0xd8, 'cld', 1),
     (0xd9, 'cmp.y', 3),
     (0xda, 'phx', 1),
