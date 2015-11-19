@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 18. Nov 2015
+# This version: 19. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1070,7 +1070,7 @@ for num, sta, pay in sc_axy:
 
     if MPU == '65816':
 
-        # TODO rewrite this once we're sure this works
+        # TODO rewrite this once we're sure it works
         
         if w[0] == '->native':
             mpu_status = 'native'
@@ -1575,11 +1575,7 @@ for num, sta, pay in sc_math:
             elif w[0] in XY_IMM:
                 n_bytes += xy_len_offset
 
-        is_number, opr = convert_number(w[1])
-
-        # Paranoid, we should have converted all symbols
-        if not is_number:
-            fatal(num, 'Symbol "{0}" mysteriously not converted'.format(opr))
+        _, opr = convert_number(w[1])
 
         # We hand tuples to the next step
         if n_bytes == 2:
