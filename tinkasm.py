@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 19. Nov 2015
+# This version: 23. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -116,11 +116,14 @@ def warning(s):
 
 ### PRINT HEADER ###
 
-TITLE_STRING = "A Tinkerer's Assembler for the 65816 in Python\n"
+TITLE_STRING = \
+"""A Tinkerer's Assembler for the 6502/65c02/65816
+Version PRE-ALPHA 23. November 2015
+Copyright 2015 Scot W. Stevenson <scot.stevenson@gmail.com>
+This program comes with ABSOLUTELY NO WARRANTY
+"""
 
 verbose(TITLE_STRING)
-# TODO add name
-
 
 ### CONSTANTS ###
 
