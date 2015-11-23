@@ -96,7 +96,7 @@ def warning(s):
         print('WARNING: {0}'.format(s))
 
 
-### PRINT HEADER ###
+### CONSTANTS ###
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
@@ -104,10 +104,6 @@ Version PRE-ALPHA 23. November 2015
 Copyright 2015 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
-
-verbose(TITLE_STRING)
-
-### CONSTANTS ###
 
 COMMENT = ';'       # Change this for a different comment marker
 CURRENT = '*'       # Marks current location counter
@@ -368,10 +364,9 @@ def dump_symbol_table(st, s=""):
 # STEP BANNER: Set up timing, print banner
 
 # This step is not counted
-# TODO print banner
 
+verbose(TITLE_STRING)
 time_start = timeit.default_timer()
-
 verbose('Beginning assembly, timer started.')
 
 
@@ -396,8 +391,8 @@ dump(sc_load)
 # PASS INCLUDE: Add content from extermal files specified by the INCLUDE
 # directive
 
-# The .include directive must be alone in the line and the second string must be
-# the name of the file without spaces.
+# The .include directive must be alone in the line and the second string must 
+# be the name of the file without spaces.
 
 sc_include = []
 
@@ -405,23 +400,18 @@ for num, pay in sc_load:
 
     w = pay.split()
 
-    try:
-        if w[0].lower() == '.include':
+    if len(w) > 1 and w[0].lower() == '.include':
 
-            # We keep the line number for later reference
-            with open(w[1], "r") as f:
-                sc_include.extend([(num, l) for l in f.readlines()])
+        # We keep the line number for later reference
+        with open(w[1], 'r') as f:
+            sc_include.extend([(num, l) for l in f.readlines()])
 
-            n_external_files += 1
-            verbose('Included code from file "{0}"'.format(w[1]))
-            continue
+        n_external_files += 1
+        verbose('Included code from file "{0}"'.format(w[1]))
 
-    # TODO This looks stupid, rewrite
-    except IndexError:
-        sc_include.append((num, pay))
     else:
         sc_include.append((num, pay))
-
+        
 n_passes += 1
 verbose('STEP INCLUDE: Added {0} external files'.format(n_external_files))
 dump(sc_include)
@@ -637,8 +627,6 @@ dump(sc_breakup)
 
 # -------------------------------------------------------------------
 # PASS MACROS: Define macros
-
-# TODO add parameters
 
 sc_macros = []
 
