@@ -66,31 +66,13 @@ args = parser.parse_args()
 
 ### BASIC OUTPUT FUNCTIONS ###
 
-# TODO merge hexstr functions
-
-def hexstr(i):
+def hexstr(n, i): 
     """Given an integer, return a hex number as a string that has the '0x'
     portion stripped out and is limited to 24 bit (to correctly handle the
-    negative numbers)"""
-    return hex(i & 0x0ffffff).replace('0x', '')
-
-def hexstr2(i):
-    """Given an integer, return a hex number as a string that has the '0x'
-    portion stripped out, is limited to 24 bit (to correctly handle the
-    negative numbers), and is two characters wide"""
-    return '{0:02x}'.format(i & 0x0ffffff)
-
-def hexstr4(i):
-    """Given an integer, return a hex number as a string that has the '0x'
-    portion stripped out, is limited to 24 bit (to correctly handle the
-    negative numbers), and is four hex digits wide"""
-    return '{0:04x}'.format(i & 0x0ffffff)
-
-def hexstr6(i):
-    """Given an integer, return a hex number as a string that has the '0x'
-    portion stripped out, is limited to 24 bit (to correctly handle the
-    negative numbers), and is six hex digits wide"""
-    return '{0:06x}'.format(i & 0x0ffffff)
+    negative numbers) and is n characters wide.
+    """
+    fmtstr = '{0:0'+str(n)+'x}'
+    return fmtstr.format(i & 0x0ffffff)
 
 def fatal(n, s):
     """Abort program because of fatal error during assembly"""
@@ -202,7 +184,7 @@ def string2bytes(s):
     and return the number of characters and a list of the hex ASCII values of
     the characters in that string. Assumes that there is one and only one
     string in the line that is delimited by quotation marks"""
-    return len(s), [hexstr2(ord(c)) for c in s]
+    return len(s), [hexstr(2, ord(c)) for c in s]
 
 def convert_number(s):
     """Convert a number string provided by the user in one of various
@@ -220,7 +202,7 @@ def convert_number(s):
     if c == DEC_PREFIX:
         BASE = 10
         s2 = s1[1:]
-    elif c == BIN_PREFIX:
+    elif c == BIN_PREFIX: 
         BASE = 2
         s2 = s1[1:]
     elif c == HEX_PREFIX:
@@ -585,8 +567,12 @@ verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
 # STEP MNEMONICS: Generate mnemonic list from opcode table
 
 # This step does not change the source code
-#
+
 mnemonics = {opcode_table[n][1]:n for n, e in enumerate(opcode_table)}
+
+# For the 6502 and 65c02, we have 'UNUSED' for the entries in the opcode table
+# that are, well, not used. We get rid of them here. 
+del mnemonics['UNUSED']
 
 n_steps += 1
 verbose('STEP MNEMONICS: Generated mnemonics list')
@@ -971,11 +957,11 @@ for num, sta, pay in sc_axy:
     # that will screw up the line count; we replace in-place
 
     if has_current(pay):
-        pay = pay.replace(CURRENT, hexstr6(LC0+LCi))
+        pay = pay.replace(CURRENT, hexstr(6, LC0+LCi))
         print("pay", pay)
         w = pay.split()
         verbose('Current marker "{0}" in line {1}, replaced with {2}'.\
-                format(CURRENT, num, hexstr6(LC0+LCi)))
+                format(CURRENT, num, hexstr(6, LC0+LCi)))
 
 
 
@@ -993,7 +979,7 @@ for num, sta, pay in sc_axy:
         # For branches, we want to remember were the instruction is to make our
         # life easier later
         if w[0] in BRANCHES:
-            pay = pay + ' ' + hexstr(LC0+LCi)
+            pay = pay + ' ' + hexstr(4, LC0+LCi)
             sta = MODIFIED
             verbose('Added address of branch to its payload in line {0}'.\
                     format(num))
@@ -1213,7 +1199,7 @@ for num, sta, pay in sc_labels:
         try:
             # We don't define the number of digits because we have no idea
             # what they're supposed to be
-            w = hexstr(symbol_table[w])
+            w = hexstr(6, symbol_table[w])
         except KeyError:
             pass
         else:
@@ -1245,14 +1231,14 @@ for num, sta, pay in sc_replace:
     if len(w) > 1 and w[1] == '+':
         for ln, ll in local_labels:
             if ln > num:
-                pay = pay.replace('+', hexstr6(ll))
+                pay = pay.replace('+', hexstr(6, ll))
                 sta = MODIFIED
                 break
 
     if len(w) > 1 and w[1] == '-':
         for ln, ll in reversed(local_labels):
             if ln < num:
-                pay = pay.replace('-', hexstr6(ll))
+                pay = pay.replace('-', hexstr(6, ll))
                 sta = MODIFIED
                 break
 
@@ -1288,7 +1274,7 @@ for num, sta, pay in sc_locals:
 
         for ab in bw:
             _, r = convert_number(ab)
-            bl.append(hexstr2(r))
+            bl.append(hexstr(2, r))
 
         pay = INDENT+'.byte '+' '.join(bl)
 
@@ -1305,7 +1291,7 @@ for num, sta, pay in sc_locals:
             _, r = convert_number(aw)
 
             for b in little_endian_16(r):
-                bl.append(hexstr2(b))
+                bl.append(hexstr(2, b))
 
         pay = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((num, DATA_DONE, pay))
@@ -1323,7 +1309,7 @@ for num, sta, pay in sc_locals:
             _, r = convert_number(al)
 
             for b in little_endian_24(r):
-                bl.append(hexstr2(b))
+                bl.append(hexstr(2, b))
 
         pay = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((num, DATA_DONE, pay))
@@ -1345,7 +1331,7 @@ for num, sta, pay in sc_locals:
     if w[0] == '.string0' or w[0] == '.str0':
         st = pay.split('"')[1]
         _, bl = string2bytes(st)
-        bl.append(hexstr2(00))
+        bl.append(hexstr(2, 00))
         pay = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((num, DATA_DONE, pay))
         verbose('Converted .string0 directive in line {0} to .byte directive'.\
@@ -1356,7 +1342,7 @@ for num, sta, pay in sc_locals:
     if w[0] == '.stringlf' or w[0] == '.strlf':
         st = pay.split('"')[1]
         _, bl = string2bytes(st)
-        bl.append(hexstr2(ord('\n')))
+        bl.append(hexstr(2, ord('\n')))
         pay = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((num, DATA_DONE, pay))
         verbose('Converted .stringlf directive in line {0} to .byte directive'.\
@@ -1397,7 +1383,7 @@ for num, sta, pay in sc_bytedata:
     else:
 
         if opcode_table[oc][2] == 1:
-            bl = INDENT+'.byte '+hexstr2(oc)
+            bl = INDENT+'.byte '+hexstr(2, oc)
             sc_1byte.append((num, CODE_DONE, bl))
         else:
             sc_1byte.append((num, sta, pay))
@@ -1432,20 +1418,20 @@ for num, sta, pay in sc_1byte:
     w = pay.split()
 
     if w[0] in BRANCHES[MPU]:
-        new_pay = '.byte '+hexstr2(mnemonics[w[0]])+' '
+        new_pay = '.byte '+hexstr(2, mnemonics[w[0]])+' '
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
-        opr = hexstr2(lsb(target_addr - branch_addr - 2))
+        opr = hexstr(2, lsb(target_addr - branch_addr - 2))
         sc_branches.append((num, CODE_DONE, INDENT+new_pay+opr))
         continue
 
     # TODO see if we can simplify this 
     if MPU == '65816' and w[0] in BRANCHES[MPU]: 
-        new_pay = '.byte '+hexstr2(mnemonics[w[0]])+' '
+        new_pay = '.byte '+hexstr(2, mnemonics[w[0]])+' '
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
         bl, bm = little_endian_16(target_addr - branch_addr - 3)
-        opr = INDENT+new_pay+hexstr2(bl)+' '+hexstr2(bm)
+        opr = INDENT+new_pay+hexstr(2, bl)+' '+hexstr(2, bm)
         sc_branches.append((num, CODE_DONE, opr))
         continue
 
@@ -1483,8 +1469,8 @@ if MPU == '65816':
             oc = mnemonics[w[0]]
 
             # Remember destination comes before source with move instruction
-            pay1 = INDENT+'.byte '+hexstr2(oc)+' '
-            pay2 = hexstr2(lsb(des))+' '+hexstr2(lsb(src))
+            pay1 = INDENT+'.byte '+hexstr(2, oc)+' '
+            pay2 = hexstr(2, lsb(des))+' '+hexstr(2, lsb(src))
             pay = pay1+pay2
             sta = CODE_DONE
 
@@ -1519,7 +1505,7 @@ for num, sta, pay  in sc_move:
     else:
         opr = pay.replace(w[0], '').strip()
         res = convert_term(opr, num)
-        pay = INDENT+w[0]+' '+hexstr4(res)
+        pay = INDENT+w[0]+' '+hexstr(4, res)
         sta = MODIFIED
 
     sc_math.append((num, sta, pay))
@@ -1592,7 +1578,7 @@ for num, sta, pay in sc_math:
                     format(n_bytes))
 
         pay = '{0}.byte {1:02x} {2}'.\
-                format(INDENT, oc, ' '.join([hexstr2(i) for i in bl]))
+                format(INDENT, oc, ' '.join([hexstr(2, i) for i in bl]))
         sc_allin.append((num, CODE_DONE, pay))
 
 n_passes += 1

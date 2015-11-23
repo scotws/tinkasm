@@ -4,7 +4,7 @@
     .mpu 65c02
     .origin 0e000
 
-            lda.# 0000
+            lda.# 00
             tax
 loop
             sta.x 1000 
