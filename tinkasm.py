@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 23. Nov 2015
+# This version: 24. Nov 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -186,7 +186,8 @@ def convert_number(s):
     """Convert a number string provided by the user in one of various
     formats to an integer we can use internally. See Manual for details
     on supported formats. Returns a tuple of a bool and an int, or a
-    bool and a string"""
+    bool and a string.
+    """
 
     # Remove separator markings
     s1 = re.sub(SEPARATORS, '', s)
@@ -222,6 +223,20 @@ def convert_number(s):
     return f, r
 
 
+def lookup_symbol(s, n):
+    """Given a string, look it up in the symbol table and return an int if 
+    found. Takes the line number for error message if symbol not in table. Use
+    this instead of a straight lookup for error handling.
+    """
+
+    try:
+        r = symbol_table[s]
+    except KeyError:
+        fatal(n, 'Symbol "{0}" unknown, lookup failed'.format(s)) 
+    else:
+        return r 
+
+
 # The math functions for TinkAsm are very primitive. For the assignments and
 # instructions with as single operand such as an address, there are two cases:
 #
@@ -237,20 +252,20 @@ def convert_number(s):
 MODIFIER_FUNCS = {'.lsb': lsb, '.msb': msb, '.bank': bank,\
         '.invert': operator.invert}
 
-def modify_operand(lw, n):
-    """Given a list lw of two strings, apply the modifier function that is
+def modify_operand(ls, n):
+    """Given a list ls of two strings, apply the modifier function that is
     the first word to the actual operand that is the second word. Returns
     an int"""
-    is_number, opr = convert_number(lw[1])
+    is_number, opr = convert_number(ls[1])
 
     # Paranoid, we shouldn't have symbols anymore
     if not is_number:
-        fatal(n, 'Symbol found during modify function {0}'.format(lw[0]))
+        fatal(n, 'Symbol found during modify function {0}'.format(ls[0]))
 
     try:
-        r = MODIFIER_FUNCS[lw[0]](opr)
+        r = MODIFIER_FUNCS[ls[0]](opr)
     except KeyError:
-        fatal(n, 'Illegal modifier {0} given'.format(lw[0]))
+        fatal(n, 'Illegal modifier {0} given'.format(ls[0]))
 
     return r
 
@@ -261,23 +276,34 @@ MATH_FUNCS = {'+': operator.add, '-': operator.sub, '*': operator.mul,\
         '.rshift': operator.rshift}
 
 
-def math_operand(lw, n):
-    """Given a list lw of three strings, apply the math function in
-    the second word to the two other operands. Returns an int"""
-    _, a1 = convert_number(lw[0])
-    _, a2 = convert_number(lw[2])
+def math_operand(ls, n):
+    """Given a list ls of three strings, apply the math function in
+    the second word to the two other operands. Returns an int. If we were 
+    given a symbol instead of a number (which can happend during PASS ASSIGN), 
+    try to look it up in the symbol table.
+    """
+
+    a1_is_number, a1 = convert_number(ls[0])
+
+    if not a1_is_number:
+        a1 = lookup_symbol(a1, n) 
+
+    a2_is_number, a2 = convert_number(ls[2])
+
+    if not a2_is_number:
+        a2 = lookup_symbol(a2, n) 
 
     try:
-        r = MATH_FUNCS[lw[1]](a1, a2)
+        r = MATH_FUNCS[ls[1]](a1, a2)
     except KeyError:
-        fatal(n, 'Illegal modifier {0} given'.format(lw[1]))
+        fatal(n, 'Illegal modifier {0} given'.format(ls[1]))
 
     return r
 
 
 def convert_term(s, n):
     """Given a string that is either a number, a modifier and a number, or
-    a math term, return the resulting number as an int. Also given line
+    a math term, return the resulting number as an int. Also takes line
     number for errors. This is the highest level math function. Returns
     an int."""
 
@@ -561,8 +587,10 @@ verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
 mnemonics = {opcode_table[n][1]:n for n, e in enumerate(opcode_table)}
 
 # For the 6502 and 65c02, we have 'UNUSED' for the entries in the opcode table
-# that are, well, not used. We get rid of them here. 
-del mnemonics['UNUSED']
+# that are, well, not used. We get rid of them here. The 65816 does not have any
+# unused opcodes.
+if MPU != '65816':
+    del mnemonics['UNUSED']
 
 n_steps += 1
 verbose('STEP MNEMONICS: Generated mnemonics list')
@@ -734,7 +762,7 @@ for num, sta, pay in sc_end:
     w = pay.split()
 
     # An assigment line must have three words at least. The "at least" part
-    # is so we will be able to add modifier and math functions later
+    # is so we can modifiy and do math with the assignment lines
     if len(w) < 3:
         sc_assign.append((num, sta, pay))
         continue
@@ -742,18 +770,21 @@ for num, sta, pay in sc_end:
     # Sorry, Lisp and Forth coders, infix notation only
     if w[1] == '=' or w[1] == '.equ':
         sy, va = pay.split(w[1])
-        symbol = sy.split()[-1]
-        is_number, value = convert_number(va.split()[0])
 
-        # We can't do symbol to symbol assignment because we have no way
-        # to make sure that there was a real number somewhere before
-        if not is_number:
-            fatal(num, 'Illegal attempt to assign a symbol to another symbol')
+        symbol = sy.split()[-1]
 
         # We don't allow using directives as symbols
         if symbol in DIRECTIVES:
-            fatal(num, 'Directive {0} cannot be redefined as a symbol'.\
+            fatal(num, 'Directive "{0}" cannot be redefined as a symbol'.\
                     format(symbol))
+
+        value = convert_term(va, num)
+
+        # If value is just a single string, then the conversion failed and we're
+        # struck with some "symbol = symbol" line
+        if isinstance(value, str):
+            fatal(num, 'Value "{0}" not defined'.\
+                    format(value))
 
         symbol_table[symbol] = value
     else:
@@ -1094,12 +1125,7 @@ for num, sta, pay in sc_axy:
 
         # If this is a symbol, it must be defined already or we're screwed
         if not is_number:
-
-            try:
-                r = symbol_table[r]
-            except KeyError:
-                fatal(num, '.advance directive has undefined symbol "{0}"'.\
-                        format(r))
+            r = lookup_symbol(r, num)
 
         # Make sure the user is not attempting to advance backwards
         if r < (LCi+LC0):
@@ -1123,12 +1149,7 @@ for num, sta, pay in sc_axy:
 
         # If this is a symbol, it must be defined already or we're screwed
         if not is_number:
-
-            try:
-                r = symbol_table[r]
-            except KeyError:
-                fatal(num, '.skip directive has undefined symbol "{0}"'.\
-                        format(r))
+            r = lookup_symbol(r, num) 
 
         # While we're here, we might as well already convert this to .byte
         # (This is called "Do as I say, don't do as I do")

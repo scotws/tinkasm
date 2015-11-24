@@ -4,23 +4,16 @@
     .mpu 65816
     .origin 0e000
 
-    .native
-    .axy16
+    vga_base = 8000
+    vga1 = vga_base + 1
+    vga2 = vga_base + 2
+    vga3 = vga_base + 3
+    vga4 = vga_base + 4
 
-            lda.# 0000
-            tax
 loop
-            sta.x 1000 
-            dex
+
+            lda vga4
+            cmp.# $01
             bne loop 
-
-            bra.l loop 
-
-            stp 
-    
-    .byte 0 1 2 3 4 5 6 7 8 9 0a 0b 0c
-    .byte $0 $1 $2 $3
-    .byte %0 %1 %10 %11
-    .byte &10 &11 &12 &13
 
     .end 
