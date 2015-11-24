@@ -66,7 +66,7 @@ args = parser.parse_args()
 
 ### BASIC OUTPUT FUNCTIONS ###
 
-def hexstr(n, i): 
+def hexstr(n, i):
     """Given an integer, return a hex number as a string that has the '0x'
     portion stripped out and is limited to 24 bit (to correctly handle the
     negative numbers) and is n characters wide.
@@ -199,7 +199,7 @@ def convert_number(s):
     if c == DEC_PREFIX:
         BASE = 10
         s2 = s1[1:]
-    elif c == BIN_PREFIX: 
+    elif c == BIN_PREFIX:
         BASE = 2
         s2 = s1[1:]
     elif c == HEX_PREFIX:
@@ -224,7 +224,7 @@ def convert_number(s):
 
 
 def lookup_symbol(s, n):
-    """Given a string, look it up in the symbol table and return an int if 
+    """Given a string, look it up in the symbol table and return an int if
     found. Takes the line number for error message if symbol not in table. Use
     this instead of a straight lookup for error handling.
     """
@@ -232,9 +232,9 @@ def lookup_symbol(s, n):
     try:
         r = symbol_table[s]
     except KeyError:
-        fatal(n, 'Symbol "{0}" unknown, lookup failed'.format(s)) 
+        fatal(n, 'Symbol "{0}" unknown, lookup failed'.format(s))
     else:
-        return r 
+        return r
 
 
 # The math functions for TinkAsm are very primitive. For the assignments and
@@ -278,20 +278,20 @@ MATH_FUNCS = {'+': operator.add, '-': operator.sub, '*': operator.mul,\
 
 def math_operand(ls, n):
     """Given a list ls of three strings, apply the math function in
-    the second word to the two other operands. Returns an int. If we were 
-    given a symbol instead of a number (which can happend during PASS ASSIGN), 
+    the second word to the two other operands. Returns an int. If we were
+    given a symbol instead of a number (which can happend during PASS ASSIGN),
     try to look it up in the symbol table.
     """
 
     a1_is_number, a1 = convert_number(ls[0])
 
     if not a1_is_number:
-        a1 = lookup_symbol(a1, n) 
+        a1 = lookup_symbol(a1, n)
 
     a2_is_number, a2 = convert_number(ls[2])
 
     if not a2_is_number:
-        a2 = lookup_symbol(a2, n) 
+        a2 = lookup_symbol(a2, n)
 
     try:
         r = MATH_FUNCS[ls[1]](a1, a2)
@@ -417,7 +417,7 @@ dump(sc_load)
 # PASS INCLUDE: Add content from extermal files specified by the INCLUDE
 # directive
 
-# The .include directive must be alone in the line and the second string must 
+# The .include directive must be alone in the line and the second string must
 # be the name of the file without spaces.
 
 sc_include = []
@@ -437,7 +437,7 @@ for num, pay in sc_load:
 
     else:
         sc_include.append((num, pay))
-        
+
 n_passes += 1
 verbose('STEP INCLUDE: Added {0} external files'.format(n_external_files))
 dump(sc_include)
@@ -941,7 +941,7 @@ BRANCHES = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
 # byte is needed for immediate forms such as lda.# with the 65816
 a_len_offset = 0
 xy_len_offset = 0
-mpu_status = 'emulated'   # Start 65816 out in emulated status 
+mpu_status = 'emulated'   # Start 65816 out in emulated status
 A_IMM = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
 XY_IMM = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
 
@@ -1079,15 +1079,15 @@ for num, sta, pay in sc_axy:
     if MPU == '65816':
 
         # TODO rewrite this once we're sure it works
-        
+
         if w[0] == '->native':
             mpu_status = 'native'
-            continue 
+            continue
 
         if w[0] == '->emulated':
             mpu_status = 'emulated'
-            continue 
-       
+            continue
+
         if w[0] == '.a->8':
             a_len_offset = 0
             sc_labels.append((num, sta, pay))
@@ -1149,7 +1149,7 @@ for num, sta, pay in sc_axy:
 
         # If this is a symbol, it must be defined already or we're screwed
         if not is_number:
-            r = lookup_symbol(r, num) 
+            r = lookup_symbol(r, num)
 
         # While we're here, we might as well already convert this to .byte
         # (This is called "Do as I say, don't do as I do")
@@ -1434,7 +1434,6 @@ for num, sta, pay in sc_1byte:
         sc_branches.append((num, CODE_DONE, INDENT+new_pay+opr))
         continue
 
-    # TODO see if we can simplify this 
     if MPU == '65816' and w[0] in BRANCHES[MPU]: 
         new_pay = '.byte '+hexstr(2, mnemonics[w[0]])+' '
         _, branch_addr = convert_number(w[-1])
