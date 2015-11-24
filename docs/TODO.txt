@@ -1,18 +1,17 @@
 TODO List for A Tinkerer's Assember for the 65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 23. Nov 2015
+This version: 24. Nov 2015
 
 BEFORE BETA:
 
-- Add modify & math to assignments
 - Complete documentation 
 
 
-AFTER RELEASE:
+AFTER BETA RELEASE:
 
-- Allow modify & math to branch instructions
 - Add parameters to macros
+- Allow modify & math to branch instructions
 - Add comments to listing file
 - Add system macros (if/then/else, loops)
 - Analysis step: Suggest JSR, RTS --> JMP

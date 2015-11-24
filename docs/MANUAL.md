@@ -11,38 +11,40 @@ hobbyists with an assembler that will run on almost any operating system while
 being easy to understand and easy to modify. 
 
 
-## Philosophy 
+## The General Idea
 
 People who want to play around with assemblers but are not computer scientists
 have a rough time. Like compilers, professional grade assemblers involve things
-like lexers and parsers, formal grammars, descending down to strange places and
-using weird things called ASTs. And if writing one weren't bad enough, but
-trying to adapt other people's assemblers to experiment with them is far worse. 
+like lexers and parsers, formal grammars, want you to descend down to strange
+places and using weird things called ASTs. And if writing one weren't bad
+enough, but trying to adapt other people's assemblers to experiment with them is
+far worse. 
 
-This is an assembler for the 6502, 65c02, and 65816 MPUs for people who like to
-tinker -- hence the name: A Tinkerer's Assembler. Instead of parsing and lexing
-the source code and doing other computer science stuff, the assembly
-process is broken down into a large number of very simple passes that each do
-one thing. Easy to understand, easy to modify. 
+This is an assembler for the 6502, 65c02, and 65816 MPUs for non-computer
+scientists who like to tinker -- hence the name: A Tinkerer's Assembler. Instead
+of parsing and lexing the source code and doing other complicated stuff,
+the assembly process is broken down into a large number of very simple steps 
+that usually only do one thing. Easy to understand, easy to modify, if not very
+fast or efficient.
 
 This, then, is an assembler for those of us who associate the "Wizard Book" with
-*Lord of the Rings* and the "Dragon Book" with *A Song of Ice and Fire.* Enjoy.
+*Lord of the Rings* and the "Dragon Book" with *A Song of Ice and Fire.* 
 
 
 ### Drawbacks
 
 Because of the way it is structured, as an assembler, TinkAsm is horribly
 inefficient as an actual assembler. If you're in it for raw speed, this is not
-the assembler for you. 
+the assembler for you.
 
-TinkAsm assumes that there is one and one menemonic for each opcode. This is why
+TinkAsm assumes that there is one and one mnemonic for each opcode. This is why
 the assembler uses Typist's Assembler Notation (TAN) instead of traditional
 notation for these MPUs. 
 
 
 ### State of Development
 
-TinkAsm is in an very early stage of development. See the `docs/TODO.txt` file for
+TinkAsm is in an early stage of development. See the `docs/TODO.txt` file for
 features that are to be added soon and those that will come later. Suggestions
 are welcome
 
@@ -52,7 +54,7 @@ are welcome
 TinkAsm requires Python 3.4 or later. It will not run with Python 2.7. 
 
 
-### PARAMETERS
+### Options
 
 **-i --input**      - Input assembler file (required) 
 
@@ -62,10 +64,13 @@ TinkAsm requires Python 3.4 or later. It will not run with Python 2.7.
 
 **-v --verbose**    - Print more info about each assembly step
 
-**-d --dump**       - Dump state of inbetween steps, produces lots of output
+**-d --dump**       - Dump state of in between steps, produces lots of output
 
 **-x --hexdump**    - Create a human-readable hexdump file `tasm.hex`
 
+Note that only an input file is required, and there will always be an output
+file written. Note also that TinkAsm will happily overwrite the previous files
+without a warning. 
 
 
 ## The source file 
@@ -78,7 +83,9 @@ case (internally, all is converted to lower case).
 ### Mnemonics 
 
 TinkAsm uses a different format for the actual MPU instructions, the Typist's
-Assembler Notation (TAN).
+Assembler Notation (TAN). See [the
+introduction](https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/)
+to TAN for details.
 
 
 ### Definitions
@@ -90,31 +97,35 @@ process with a FATAL error. Supported MPUs are `6502`, `65c02` (upper and
 lowercase "c" are accepted), and `65816`. 
 
 
-### Asignments 
+### Assignments 
 
 To assign a value to a variable, use either `=` or `.equ` with significant
-whitespace. That means, both
+white space. That means, both
 
 ```
         less = 20 
         more .equ 21
 ```
-are both allowed, but not `nope=19`. The current version does not allow modifiers or math (see
-below). 
+are both allowed, but not `nope=19`. Simple modifications and math terms are
+allowed (see below for details), such as
 
+```
+        less = 0 
+        more = less + 1
+```
 
 ### Labels
 
 TinkAsm sees any string as a label that starts in the first column of a line and
-is not the comment directive (usually `;`) or the local label (default `@`). In
-other words, anything that is *not* a label or a comment must have whitespace in
-front of it. There are no rules for the string itself, so `*!$?` is a perfectly
-legal string. 
+is not the comment directive (usually `;`) or the local label (by default `@`).
+In other words, anything that is *not* a label or a comment must have white space
+in front of it. There are no rules for the string itself, so `*!$?` is a
+perfectly legal string. 
 
 ```
 ice&fire        nop
                 nop
-                jmp ice&fire    ; gobal reference
+                jmp ice&fire    ; global reference
 ```
 Note that in contrast to other assemblers, labels do not have to end with a `:`. 
 
@@ -143,18 +154,18 @@ an operand. It can be modified and subjected to mathematical operations.
                 jmp * + 2
 ```
 In contrast to other assemblers, the current line symbol cannot be used for
-advancing the line counter. Use the directives `.advance` and `.skip` for thise,
+advancing the line counter. Use the directives `.advance` and `.skip` for these,
 see below.
 
 
 ### Modifiers and Math
 
 Normal labels (but not local labels) and symbols can be modified by "modifiers"
-such as `.invert` and simple mathematical terms such as `label + 2` . Whitespace
+such as `.invert` and simple mathematical terms such as `label + 2` . White space
 is significant, so `label+2` is not legal (and will be identified as a symbol).
-The system in its current form is primitive: Assignments, data fields such as
-`.byte` and labels of branches can currently not be modified. See below for a
-complete list of modifiers. 
+The system in its current form is primitive: Data fields such as `.byte` and
+labels of branches cannot currently be modified. See below for a complete list
+of modifiers. 
 
 
 ### Other 
@@ -169,10 +180,11 @@ if it finds them outside of a comment.
 ## Macros
 
 The macro system of TinkAsm is in its first stage. Macros do not accept
-parameters and cannot reference other macros.
+parameters and cannot reference other macros. Including parameters is a high
+priority for the next version.
 
 To define a macro, use the directive `.macro` followed by the name string of the
-macro. No label may preceed the directive. In a future version, parameters will
+macro. No label may precede the directive. In a future version, parameters will
 follow the name string. The actual macro contents follow in the subsequent
 lines in the usual format. The macro definition is terminated by `.endmacro` in
 its own line.
@@ -188,6 +200,9 @@ constructs. These are to be added in a future version.
 
 ### Directives for all MPUs
 
+`@` - The default local label symbol. Used at the very beginning of a line and
+referenced by `+` and `-` for jumps and branches.
+
 `+` - As an operand to a branch or jump instruction: Refer to the next local
 label. Between numbers or symbols in the operand: Math function addition.
 
@@ -202,7 +217,7 @@ operand: Math function multiplication (eg `lda.# 2 * 2`).
 this returns an integer (Python "floor division" function). 
 
 `.advance` - Jump ahead to the address given as parameter, filling the space
-inbetween with zeros.
+in between with zeros.
 
 `.and` - Logically AND two numbers or symbols in the operand. 
 
@@ -255,7 +270,7 @@ Required for the program to run.
 number of bytes given in the second operand (eg `lda.# 01 .rshift 1`).
 
 `.skip` - Jump head by the number of bytes given as a parameter, filling the
-space inbetween with zeros.
+space in between with zeros.
 
 `.string` or `.s` - Store the following ASCII string that is delimited by double
 quotation marks `"` (not single quote marks). 
@@ -324,50 +339,6 @@ insert the control sequences `.a->8` and `.xy->8` as the full directive
 `->native` - Force switch of assembler to native mode. 
 
 
-
-## Internals 
-
-
-### Structure 
-
-The program has the most simple structure possible: It starts at the beginning,
-runs to the end and then stops. No external routines are loaded, only system
-library files are referenced (got to have your batteries). There are no objects.
-The code just brute-forces its way top-down.
-
-On the next lower level, TinkAsm is built up out of passes. Each pass is a
-closed unit that ideally does one thing and one thing only. Information is
-transmitted from one pass to another through a list of two-element tuples. The
-first element of the tuple always contains the original line number of the
-instruction so any problems can be referenced to the source code. The structure
-of the second element depends on the pass. In the beginning, it is a simple
-string with the content of the source code line. In the end, it is a list of
-binary data representing the machine code. 
-
-Information is only passed through these lists, not through "side channels". For
-example, we don't define a flag in one pass to signal something to a pass lower
-down. All information is contained in the lists that are passed. This doesn't
-mean that the passes can't "collect" other information for later use. For
-instance, full-line comments are put in a separate list so that the list file
-can later access them. These, however, are not used by the following step but
-only at the end.
-
-(The sorta, kinda exception are counters for statistical use, for instance, how
-many macros are defined and expanded. These are defined at the beginning of the
-program to show that they are "global", so to speak.) 
-
-Each pass starts by defining the empty list that will filled with the output of
-this stage. Processing the previous list is usually handled by walking through
-each line, modifying what needs to be changed, and then appending the processed
-line to the new list. 
-
-At the end, we offer the options of printing an
-information string if we are in verbose mode, or dumping the complete list.
-
-TinkAsm was developed primarily to code 65816 assembler, because there are lots
-of great assemblers for the 6502 and 65c02 already out there. 
-
-
 ### Notes on various opcodes
 
 TinkAsm enforces the signature byte of `brk` for all processors.
@@ -381,9 +352,9 @@ code from their positions in assembler. The format used here is
                 mvp <src> , <dest>
 ```
 
-Currently, the whitespace around the comma is required, though that might be
+Currently, the white space around the comma is required, though that might be
 changed in future versions. The source and destination parameters can be
-modified (such as `.lsb 1000`) or math termns (`home + 2`). Note if either
+modified (such as `.lsb 1000`) or math terms (`home + 2`). Note if either
 `<src>` or `<dest>` are too large, only the LSB of the term is used -- *not* the
 bank byte -- and the rest is discarded silently. For longer terms, you can use
 the `.bank` directive.
@@ -394,101 +365,62 @@ the `.bank` directive.
 
                 mvp .bank source , .bank target
 ```
-                
 
 
-### Further development plans
+## Internals 
+
+Since this is an assembler that was written to be tinkered with, some notes on
+the code. 
 
 
+### Structure 
 
-# (OLD STUFF BELOW HERE) 
+The program has the most simple structure possible: It starts at the beginning,
+runs to the end, and then stops. Everything is in one file, no external routines
+are loaded, and only system library files are referenced (got to have your
+batteries). There are no objects and no generators, and list comprehensions are
+used sparingly. The code just brute-forces its way top-to-down.
 
+On the next lower level, TinkAsm is built up out of **steps** and **passes**.  A
+pass walks through the complete source code, while a step does something without
+touching everything.  Each is a closed unit that ideally does one thing and one
+thing only. However, this is not a religion: For instance, the data structures
+such as `.word` and `.long` are all converted in one pass. 
 
-The 65816 is the ["big sibling"](http://en.wikipedia.org/wiki/WDC_65816/65802)
-of the venerable 6502 8-bit processor. It is a hybrid processor that can run in
-16-bit ("native") and 8-bit ("emulated") mode.
+Information is transmitted from one step or pass to another through a list of
+tuples. The first element of the tuple always contains the original line number
+of the instruction so any problems can be referenced to the source code. The
+structure of the further elements depends on the pass. In the beginning, it is a
+simple string with the content of the source code line (the "payload"). Later,
+status and address strings are added. For as long as possible, the source code
+passed on is kept human-readable. In the end, it is a list of binary data
+representing the machine code. 
 
-After bulding a 6502 machine as a hobby, [the "Übersquirrel" Mark Zero]
-(http://uebersquirrel.blogspot.de/) (ÜSqM0), I found eight bits to be too
-limiting. The 65816 is the logical next step up, since you can reuse the 8-bit
-code at first. 
+Information is only passed through these lists, not through "side channels". For
+example, we never define a flag in one pass to signal something to a pass lower
+down. This doesn't mean that the passes can't "collect" other information for
+later use. For instance, full-line comments are put in a separate list so that
+the list file can later access them. These, however, are not used by the
+following step but only at the end.
 
-Unfortunately, assemblers for the 65816 are few and far between, so I decided I
-would have to write my own. The first one was a simple single-pass assembler in
-Forth, the ["Typist's Assembler for the 65816 in
-Forth"](https://github.com/scotws/tasm65816). During that time, I developed
-alternative, improved (at least I think so) syntax for the 6502 and 65816.
+(The sorta, kinda exception are counters for statistical use, for instance, how
+many macros are defined and expanded. These are defined at the beginning of the
+program to show that they are "global".) 
 
-Because single-pass assemblers are limited and postfix notation can get on your
-nerves after a while, I decided to write a second assembler in Python. This is
-it.
-
-See `docs/MANUAL.txt` for further information.
-
-
-
-
-
-DIRECTIVES
-
-### By tradition, assembler directives start with a dot.
-
-
-        *
-        .A16
-        .A8
-        .AXY16
-        .AXY8
-        .ADVANCE / .ADV
-        .BYTE / .B
-        .EMULATED
-        .END 
-        .LONG / .L
-        .NATIVE
-        .ORIGIN / .ORG
-        .SKIP 
-        .STRING / .S
-        .STRING0 / .S0
-        .STRINGLF / .SLF
-        .WORD / .W
-        .XY16
-        .XY8
-        = 
-        @ 
-
-### INTERNAL STRUCTURE
-
-The Typist's Assembler was built with a few assumptions in mind. First, the code
-to be assembled will be very small relative to current normal hardware
-specifications: The total memory space of the 65816 is 16 MB, while my machine
-has 16 GB of RAM. Because of this, saving space was a low priority. This is also
-true for speed, because programs are going to be relatively short (if we had
-wanted speed, we'd be using something like C or Go). The top priority was a
-clear design that will break up the process in as many small steps as possible
-to make the program easy to understand, easy to maintain and easy to change. 
-
-For that reason, it was written in a "multipass" structure: Lots of little
-steps, usually as loops, that do exactly one thing and then pass a list on to
-the next step. 
+Each pass starts by defining the empty list that will filled with the output of
+this stage. Processing the previous list is then handled by the next step or
+pass, modifying what needs to be changed, and then appending the processed
+line to the new list. 
 
 
-(Tuples with original line number)
+### Coding Style 
 
+The code attempts to be as clear as possible. It makes heavy use of IF/THEN/ELSE
+and TRY/EXCEPT constructs to show the logic, even with other variants would be
+smaller and/or more efficient. During development, list comprehensions were
+removed again where they were considered too complex. 
 
-
-
-NOTES ON CODING STYLE 
-
-Priority for the coding style was to make the program easy to understand -- and
-thereby also easy to modify and adapt -- for people who might not be familiar
-with the workings of an assembler. This is why Python was chosen as a language.
-Speed and compactness of code are secondary; in both these cases, the
-single-pass assember in Forth (https://github.com/scotws/tasm65816) is probably
-the better choice. 
-
-In practical terms, what this means is that IF constructs were used even in
-cases when the result could have been achieved through calculation, because it
-allows a quicker understanding of the logic involved. 
+The code is heavily commented.
 
 
 ## SOURCES AND THANKS 
@@ -502,5 +434,3 @@ purposes.
 David Salomon's [*Assemblers And
 Loaders*](http://www.davidsalomon.name/assem.advertis/AssemAd.html) was
 invaluable and is highly recommended for anybody who wants to write their own. 
-
-
