@@ -1,7 +1,7 @@
 # Opcodes for the Tinkerer's Assembler for the 6502/65c02/65816 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 23. Okt 2015
-# This version: 18. Nov 2015
+# This version: 03. Dec 2015
 
 # OPCODE TABLE for the 6502
 
@@ -51,7 +51,7 @@ opcode_table = (
     (0x27, 'UNUSED', 0),
     (0x28, 'plp', 1),
     (0x29, 'and.#', 2),
-    (0x2a, 'rol.a', 2),
+    (0x2a, 'rol.a', 1),
     (0x2b, 'UNUSED', 0),
     (0x2c, 'bit', 3),
     (0x2d, 'and', 3),
@@ -126,7 +126,7 @@ opcode_table = (
     (0x72, 'UNUSED', 0),
     (0x73, 'UNUSED', 0),
     (0x74, 'UNUSED', 0),
-    (0x75, 'adx.zx', 2),
+    (0x75, 'adc.zx', 2),
     (0x76, 'ror.zx', 2),
     (0x77, 'UNUSED', 0),
     (0x78, 'sei', 1),
@@ -202,7 +202,7 @@ opcode_table = (
     (0xbe, 'ldx.y', 3),
     (0xbf, 'UNUSED', 0),
     (0xc0, 'cpy.#', 2),
-    (0xc1, 'cpy.zxi', 2),
+    (0xc1, 'cmp.zxi', 2),
     (0xc2, 'UNUSED', 0),
     (0xc3, 'UNUSED', 0),
     (0xc4, 'cpy.z', 2),
@@ -257,7 +257,7 @@ opcode_table = (
     (0xf5, 'sbc.zx', 2),
     (0xf6, 'inc.zx', 2),
     (0xf7, 'UNUSED', 0),
-    (0xf8, 'sec', 1),
+    (0xf8, 'sed', 1),
     (0xf9, 'sbc.y', 3),
     (0xfa, 'UNUSED', 0),
     (0xfb, 'UNUSED', 0),

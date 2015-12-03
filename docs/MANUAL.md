@@ -15,17 +15,17 @@ being easy to understand and easy to modify.
 
 People who want to play around with assemblers but are not computer scientists
 have a rough time. Like compilers, professional grade assemblers involve things
-like lexers and parsers, formal grammars, want you to descend down to strange
-places and using weird things called ASTs. And if writing one weren't bad
-enough, but trying to adapt other people's assemblers to experiment with them is
-far worse. 
+like lexers, parsers, and formal grammars. They want you to descend down to
+strange places and using weird things called ASTs. And if writing one weren't
+bad enough, but trying to adapt other people's assemblers to experiment with
+them is far worse. 
 
 This is an assembler for the 6502, 65c02, and 65816 MPUs for non-computer
 scientists who like to tinker -- hence the name: A Tinkerer's Assembler. Instead
-of parsing and lexing the source code and doing other complicated stuff,
-the assembly process is broken down into a large number of very simple steps 
-that usually only do one thing. Easy to understand, easy to modify, if not very
-fast or efficient.
+of parsing and lexing the source code and doing other complicated stuff, the
+assembly process is broken down into a large number of very simple steps that
+usually only do one thing. The code is written in "primitive" Python.  Easy to
+understand, easy to modify, if not very fast or efficient.
 
 This, then, is an assembler for those of us who associate the "Wizard Book" with
 *Lord of the Rings* and the "Dragon Book" with *A Song of Ice and Fire.* 
@@ -34,8 +34,8 @@ This, then, is an assembler for those of us who associate the "Wizard Book" with
 ### Drawbacks
 
 Because of the way it is structured, as an assembler, TinkAsm is horribly
-inefficient as an actual assembler. If you're in it for raw speed, this is not
-the assembler for you.
+inefficient as an assembler. If you're in it for raw speed, this is not the
+assembler for you.
 
 TinkAsm assumes that there is one and one mnemonic for each opcode. This is why
 the assembler uses Typist's Assembler Notation (TAN) instead of traditional
@@ -44,9 +44,9 @@ notation for these MPUs.
 
 ### State of Development
 
-TinkAsm is in an early stage of development. See the `docs/TODO.txt` file for
-features that are to be added soon and those that will come later. Suggestions
-are welcome
+TinkAsm, though very much functional, is in an early stage of development. See
+the `docs/TODO.txt` file for features that are to be added soon and those that
+will come later. Suggestions are welcome. 
 
 
 ## Requirements 
@@ -373,32 +373,47 @@ Since this is an assembler that was written to be tinkered with, some notes on
 the code. 
 
 
+### Language and coding style
+
+TinkAsm uses Python because it is one of the most widespread languages in use
+and is easy to understand even for those who don't know it ("executable
+pseudo-code"). 
+
+The coding style used can be described as "primitive" Python: It neither uses
+objects nor does it follow a functional paradigm. The code starts at the
+beginning, continues to the end, and then quits. This is an unusual choice in
+the 21. century and might turn out to be oversimplification. A more conventional
+rewrite will be considered after some experience with the code. In the meantime,
+this style makes pylint very unhappy. 
+
+
 ### Structure 
 
 The program has the most simple structure possible: It starts at the beginning,
 runs to the end, and then stops. Everything is in one file, no external routines
 are loaded, and only system library files are referenced (got to have your
 batteries). There are no objects and no generators, and list comprehensions are
-used sparingly. The code just brute-forces its way top-to-down.
+used sparingly. There are no map or filter constructs. The code just
+brute-forces its way top-to-down.
 
 On the next lower level, TinkAsm is built up out of **steps** and **passes**.  A
 pass walks through the complete source code, while a step does something without
-touching everything.  Each is a closed unit that ideally does one thing and one
+touching everything. Each is a closed unit that ideally does one thing and one
 thing only. However, this is not a religion: For instance, the data structures
 such as `.word` and `.long` are all converted in one pass. 
 
-Information is transmitted from one step or pass to another through a list of
-tuples. The first element of the tuple always contains the original line number
-of the instruction so any problems can be referenced to the source code. The
-structure of the further elements depends on the pass. In the beginning, it is a
-simple string with the content of the source code line (the "payload"). Later,
-status and address strings are added. For as long as possible, the source code
-passed on is kept human-readable. In the end, it is a list of binary data
+Information is transmitted from one step or pass to another through a **list of
+tuples.** The first element of the tuple always contains the original line
+number of the instruction so any problems can be referenced to the source code.
+The structure of the further elements depends on the pass. In the beginning, it
+is a simple string with the content of the source code line (the "payload").
+Later, status and address strings are added. For as long as possible, the source
+code passed on is kept human-readable. In the end, it is a list of binary data
 representing the machine code. 
 
 Information is only passed through these lists, not through "side channels". For
 example, we never define a flag in one pass to signal something to a pass lower
-down. This doesn't mean that the passes can't "collect" other information for
+down. This doesn't mean that the passes can't collect other information for
 later use. For instance, full-line comments are put in a separate list so that
 the list file can later access them. These, however, are not used by the
 following step but only at the end.
@@ -412,15 +427,6 @@ this stage. Processing the previous list is then handled by the next step or
 pass, modifying what needs to be changed, and then appending the processed
 line to the new list. 
 
-
-### Coding Style 
-
-The code attempts to be as clear as possible. It makes heavy use of IF/THEN/ELSE
-and TRY/EXCEPT constructs to show the logic, even with other variants would be
-smaller and/or more efficient. During development, list comprehensions were
-removed again where they were considered too complex. 
-
-The code is heavily commented.
 
 
 ## SOURCES AND THANKS 

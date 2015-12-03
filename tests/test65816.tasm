@@ -1,19 +1,49 @@
-; Test file for 
 ; A Tinkerer's Assembler for the 6502/65c02/65816
+; Syntax demonstration for the 65816
 
     .mpu 65816
     .origin 0e000
 
-    vga_base = 8000
+    vga_base = 8000         ; some I/O chip
     vga1 = vga_base + 1
     vga2 = vga_base + 2
-    vga3 = vga_base + 3
-    vga4 = vga_base + 4
+
+    done? = 5
+
+    .macro lazy
+            nop
+            nop
+    .endmacro
+
+            lda.# 00 
+            tax
 
 loop
-
-            lda vga4
-            cmp.# $01
+            cmp.# done? 
+            sta.x vga_base
+            inx
             bne loop 
+            
+    .include tests/includeme.tasm
+
+    .native
+    .axy16
+            
+            phe.# 0000
+            pla
+            cmp.# 0000
+            bne loop        ; always true
+
+            stp 
+
+data
+    .byte 01 02 03 04 05 
+    .word 1000 2000 3000
+    .long 01aaaa 02bbbb
+
+strings
+    .string "The cake is a lie!"
+    .string0 "Terminated by zero"
+    .stringlf "Terminated by LF"
 
     .end 

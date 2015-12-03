@@ -1,4 +1,4 @@
-; Test file for 
+; Test file for .byte formats, 65c02
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 
     .mpu 65c02
