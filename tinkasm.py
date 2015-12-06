@@ -520,36 +520,13 @@ n_passes += 1
 verbose('STEP INLINES: Removed all inline comments and terminating linefeeds')
 dump(sc_inlines)
 
-
-# -------------------------------------------------------------------
-# PASS LOWER: Convert source to lower case
-
-# We can't just lowercase everything in one list comprehension because the
-# strings might contain upper cases we want to keep
-
-sc_lower = []
-
-for num, pay in sc_inlines:
-
-    if '"' not in pay:
-        sc_lower.append((num, pay.lower()))
-    else:
-        w = pay.split()
-        new_inst = w[0].lower()    # only convert the directive 
-        new_pay = INDENT+new_inst+' '+' '.join(w[1:])
-        sc_lower.append((num, new_pay))
-
-n_passes += 1
-verbose('STEP LOWER: Converted all lines to lower case')
-dump(sc_lower)
-
-
 # -------------------------------------------------------------------
 # PASS MPU: NOPARENS
 
 # Enforce ban of parens which are reserved for future use
+# TODO Skip parens that are part of strings
 
-for num, pay in sc_lower:
+for num, pay in sc_inlines:
 
     if '(' in pay or ')' in pay:
         fatal(num, '"(" and ")" are reserved for future use.')
@@ -564,9 +541,12 @@ verbose('PASS NOPARENS: No parens found, proceeding normally.')
 sc_mpu = []
 MPU = ''
 
-for num, pay in sc_lower:
+for num, pay in sc_inlines:
 
-    if '.mpu' in pay:
+
+    # We haven't converted to lower case yet so we have to do this by hand for
+    # now 
+    if '.mpu' in pay.lower():
         MPU = pay.split()[1].strip()
     else:
         sc_mpu.append((num, pay))
@@ -590,7 +570,7 @@ dump(sc_mpu)
 # If we ever have have more than these three types, rewrite
 if MPU == '6502':
     from opcodes6502 import opcode_table
-elif MPU == '65c02':
+elif MPU.lower() == '65c02':
     from opcodes65c02 import opcode_table
 else:
     from opcodes65816 import opcode_table
@@ -602,6 +582,7 @@ if len(opcode_table) != 256:
 
 n_steps += 1
 verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
+
 
 # -------------------------------------------------------------------
 # STEP MNEMONICS: Generate mnemonic list from opcode table
@@ -678,6 +659,30 @@ n_passes += 1
 verbose('PASS BREAKUP: All labels now have a line to themselves')
 dump(sc_breakup)
 
+# -------------------------------------------------------------------
+# PASS LOWER: Convert source to lower case
+
+# We can't just lowercase everything in one list comprehension because the
+# strings might contain upper cases we want to keep
+
+# This pass must come after splitting the labels into their own lines or else we
+# have problem with lines that have both a label and an string directive 
+
+sc_lower = []
+
+for num, sta, pay in sc_breakup:
+
+    if '"' not in pay:
+        sc_lower.append((num, sta, pay.lower()))
+    else:
+        w = pay.split()
+        new_inst = w[0].lower()    # only convert the directive 
+        new_pay = INDENT+new_inst+' '+' '.join(w[1:])
+        sc_lower.append((num, sta, new_pay))
+
+n_passes += 1
+verbose('STEP LOWER: Converted all lines to lower case')
+dump(sc_lower)
 
 # -------------------------------------------------------------------
 # PASS MACROS: Define macros
@@ -690,7 +695,7 @@ macros = {}
 macro_name = ''
 are_defining = False
 
-for num, sta, pay in sc_breakup:
+for num, sta, pay in sc_lower:
 
     w = pay.split()
 
