@@ -1108,6 +1108,27 @@ for num, sta, pay in sc_axy:
         sc_labels.append((num, sta, pay))
         continue
 
+    # .STRING stores characters inside parens
+    if w[0] == '.string' or w[0] == '.str':
+        st = pay.split('"')[1]
+        LCi += len(st)
+        sc_labels.append((num, sta, pay))
+        continue
+
+    # .STRING0 stores characters inside parens plus a zero 
+    if w[0] == '.string0' or w[0] == '.str0':
+        st = pay.split('"')[1]
+        LCi += len(st)+1
+        sc_labels.append((num, sta, pay))
+        continue
+
+    # .STRINGLF stores characters inside parens plus a Line Feed char
+    if w[0] == '.stringlf' or w[0] == '.strlf':
+        st = pay.split('"')[1]
+        LCi += len(st)+1
+        sc_labels.append((num, sta, pay))
+        continue
+
 
     # --- SUBSTEP SWITCHES: Handle Register Switches on the 65816 ---
 
@@ -1551,6 +1572,9 @@ for num, sta, pay  in sc_move:
     else:
         opr = pay.replace(w[0], '').strip()
         res = convert_term(opr, num)
+        # TODO If we have an unidentified symbol, it should crash here with
+        # a Type Error. Test this systematically and then wrap a TRY/EXCEPT
+        # around it
         pay = INDENT+w[0]+' '+hexstr(4, res)
         sta = MODIFIED
 
