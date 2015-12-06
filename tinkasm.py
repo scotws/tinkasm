@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 06. Dec 2015
+# This version: 07. Dec 2015
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -519,20 +519,6 @@ for num, pay in sc_comments:
 n_passes += 1
 verbose('STEP INLINES: Removed all inline comments and terminating linefeeds')
 dump(sc_inlines)
-
-# -------------------------------------------------------------------
-# PASS MPU: NOPARENS
-
-# Enforce ban of parens which are reserved for future use
-# TODO Skip parens that are part of strings
-
-for num, pay in sc_inlines:
-
-    if '(' in pay or ')' in pay:
-        fatal(num, '"(" and ")" are reserved for future use.')
-
-n_passes += 1
-verbose('PASS NOPARENS: No parens found, proceeding normally.')
 
 
 # -------------------------------------------------------------------

@@ -173,9 +173,6 @@ of modifiers.
 It is assumed that branches will always be given a label, not the relative
 offset. There is in fact currently no way to pass on such offset. 
 
-The characters `(` and `)` are reserved for future use. The program will abort
-if it finds them outside of a comment.
-
 
 ## Macros
 
