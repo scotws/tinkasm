@@ -1566,7 +1566,7 @@ for num, sta, pay  in sc_move:
             # turn probably means that we have a symbol that hasn't been defined
             # yet, or even more probably means that we have a typo in the symbol
             # name
-            fatal(num, 'Modifier/math conversion error: {0}'.fatal(res))
+            fatal(num, 'Modifier/math conversion error: {0}'.format(res))
 
         sta = MODIFIED
 

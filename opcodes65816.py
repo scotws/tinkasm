@@ -1,7 +1,7 @@
 # Opcodes for the Tinkerer's Assembler for the 65816 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 23. Okt 2015
-# This version: 03. Dec 2015
+# This version: 07. Dec 2015
 
 # The Immediate Mode forms (<opc>.#) are listed as two-byte instructions and
 # then expanded by the assembler when the relevant instruction is called during
@@ -124,7 +124,7 @@ opcode_table = (
     (0x71, 'adc.diy', 2),
     (0x72, 'adc.di', 2),
     (0x73, 'adc.siy', 2),
-    (0x74, 'stx.dx', 2),
+    (0x74, 'stz.dx', 2),
     (0x75, 'adc.dx', 2),
     (0x76, 'ror.dx', 2),
     (0x77, 'adc.dily', 2),

@@ -1,7 +1,7 @@
 # Opcodes for the Tinkerer's Assembler for the 6502/65c02/65816 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 23. Okt 2015
-# This version: 03. Dec 2015
+# This version: 07. Dec 2015
 
 # OPCODE TABLE for the 65c02
 
@@ -125,7 +125,7 @@ opcode_table = (
     (0x71, 'adc.ziy', 2),
     (0x72, 'adc.zi', 2),
     (0x73, 'UNUSED', 0),
-    (0x74, 'stx.zx', 2),
+    (0x74, 'stz.zx', 2),
     (0x75, 'adc.zx', 2),
     (0x76, 'ror.zx', 2),
     (0x77, 'UNUSED', 0),
