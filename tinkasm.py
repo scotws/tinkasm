@@ -122,7 +122,7 @@ HEX_PREFIX = '$'    # Default prefix for hexadecimal numbers
 BIN_PREFIX = '%'    # Default prefix for binary numbers
 DEC_PREFIX = '&'    # Default prefix for decimal numbers
 
-ST_WIDTH = 10       # Number of chars of symbol from Symbol Table printed
+ST_WIDTH = 20       # Number of chars of symbol from Symbol Table printed
 INDENT = ' '*12     # Indent in whitespace for inserted instructions
 
 LC0 = 0             # Start address of code ("location counter")
