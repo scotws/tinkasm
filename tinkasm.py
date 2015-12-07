@@ -1558,10 +1558,16 @@ for num, sta, pay  in sc_move:
     else:
         opr = pay.replace(w[0], '').strip()
         res = convert_term(opr, num)
-        # TODO If we have an unidentified symbol, it should crash here with
-        # a Type Error. Test this systematically and then wrap a TRY/EXCEPT
-        # around it
-        pay = INDENT+w[0]+' '+hexstr(4, res)
+
+        try:
+            pay = INDENT+w[0]+' '+hexstr(4, res)
+        except TypeError:
+            # A crash here means that we have an unidentified symbol, which in
+            # turn probably means that we have a symbol that hasn't been defined
+            # yet, or even more probably means that we have a typo in the symbol
+            # name
+            fatal(num, 'Modifier/math conversion error: {0}'.fatal(res))
+
         sta = MODIFIED
 
     sc_math.append((num, sta, pay))
