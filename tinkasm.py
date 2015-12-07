@@ -326,7 +326,7 @@ def convert_term(s, n):
     elif n_words == 3:
         res = math_operand(w, n)
     else:
-        fatal(n, 'Too many terms for modifier or math routines')
+        fatal(n, 'Wrong number of terms for modifier or math routines')
 
     return res
 
