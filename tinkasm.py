@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 07. Dec 2015
+# This version: 23. Feb 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -108,8 +108,8 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA 03. December 2015
-Copyright 2015 Scot W. Stevenson <scot.stevenson@gmail.com>
+Version BETA  23. February 2016
+Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
 
@@ -122,7 +122,7 @@ HEX_PREFIX = '$'    # Default prefix for hexadecimal numbers
 BIN_PREFIX = '%'    # Default prefix for binary numbers
 DEC_PREFIX = '&'    # Default prefix for decimal numbers
 
-ST_WIDTH = 20       # Number of chars of symbol from Symbol Table printed
+ST_WIDTH = 24       # Number of chars of symbol from Symbol Table printed
 INDENT = ' '*12     # Indent in whitespace for inserted instructions
 
 LC0 = 0             # Start address of code ("location counter")
@@ -984,9 +984,11 @@ def has_current(s):
     w = s.split()[1:]
     res = False
 
+    # A length of 1 means we have a "jmp *" situation; a '*' at second
+    # place and a length of three means we have a multiply
     if CURRENT in s:
 
-        if not (w[1] == CURRENT and len(w) == 3):  # This is a multiply
+        if len(w) == 1 or not (w[1] == CURRENT and len(w) == 3):
             res = True
 
     return res
