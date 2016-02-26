@@ -191,7 +191,7 @@ opcode_table = (
     (0xb4, 'ldy.dx', 2),
     (0xb5, 'lda.dx', 2),
     (0xb6, 'ldx.dy', 2),
-    (0xb7, 'lda.dy', 2),
+    (0xb7, 'lda.dily', 2),
     (0xb8, 'clv', 1),
     (0xb9, 'lda.y', 3),
     (0xba, 'tsx', 1),
