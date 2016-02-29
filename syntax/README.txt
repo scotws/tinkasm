@@ -7,7 +7,7 @@ This folder includes the vim editor syntax file for Typist's Assembler Notation 
 
 https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ 
 
-for details. This is a copy of the file at 
+for details. There should be a copy of this file at
 
 https://github.com/scotws/Typist-VIM-Syntax 
 
