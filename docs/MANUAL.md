@@ -323,17 +323,17 @@ Internally, the mode and register size switches are handled by inserting
 directly to ensure that the assembler handles the sizes correctly. These do not
 encode any instructions.
 
-`.a->8`, `.a->16` - Force assembler to interpret the A register as 8 or 16 bit.
+`.a8!`, `.a16!` - Tell the assembler to interpret the A register as 8 or 16 bit.
 Note the switch to 16 bit only works in native mode.
 
-`.xy->8`, `.xy->16` - Force assembler to interpret the X and Y register as 8 or
+`.xy8!`, `.xy16!` - Tell the assembler to interpret the X and Y register as 8 or
 16 bit.  Note the switch to 16 bit only works in native mode.
 
-`->emulated` - Force switch of assembler to emulated mode. Note this does not
-insert the control sequences `.a->8` and `.xy->8` as the full directive
+`.emulated!` - Tell the assembler to ensure emulated mode. Note this does not
+insert the control sequences `.a8!` and `.xy8!` as the full directive
 `.emulated` does.
 
-`->native` - Force switch of assembler to native mode. 
+`.native!` - Tell the assembler to ensure we're in native mode. 
 
 
 ### Notes on various opcodes
