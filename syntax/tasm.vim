@@ -1,7 +1,7 @@
 " Vim Syntax File for a Typist's Assembler Notation, Python version 
 " Language: Assembler (6502/65c02/65816 8/16-bit CPU) 
 " Maintainer: Scot W. Stevenson <scot.stevenson@gmail.com>
-" Latest Revision: 11. November 2015
+" Latest Revision: 28. Feb 2016
 
 " This script is distributed in the hope that it will be useful,
 " but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -110,7 +110,7 @@ syn keyword tasmBoring nop wdm
 syn keyword tasmDirective 
     \ .advance .adv .emulated .end .include .mpu .native .origin .skip 
     \ .a8 .a16 .xy8 .xy16 .axy8 .axy16
-    \ .a->8 .a->16 .xy->8 .xy->16
+    \ .a8! .a16! .xy8! .xy16! .native! .emulated!
     \ .byte .b .word .w .long .l 
     \ .string .str .string0 .str0 .stringlf .strlf
     \ .lsb .msb .bank
