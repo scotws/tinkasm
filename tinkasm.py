@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 28. Feb 2016
+# This version: 01. April 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -152,13 +152,13 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 # List of all directives. Note the local label character is not included
 # because this is used to keep the user from using these words as labels
 
-DIRECTIVES = ['.a8!', '.a16!', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
+DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
         '.org', '.end', '.b', '.byte', '.w', '.word', '.l', '.long',\
         '.native', '.emulated', '.s', '.string', '.s0', '.string0', '.slf',\
-        '.stringlf', '.xy8!', '.xy16!', '.xy8', '.xy16', COMMENT,\
+        '.stringlf', '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
         '.and', '.or', '.xor', CURRENT, '.macro', '.endmacro', '.invoke',\
-        '.include', '.native!', '.emulated!']
+        '.include', '.!native', '.!emulated']
 
 
 ### HELPER FUNCTIONS ###
@@ -878,18 +878,18 @@ if MPU == '65816':
         if '.native' in pay:
             sc_modes.append((num, ADDED, INDENT+'clc'))
             sc_modes.append((num, ADDED, INDENT+'xce'))
-            sc_modes.append((num, CONTROL, INDENT+'.native!'))
+            sc_modes.append((num, CONTROL, INDENT+'.!native'))
             continue
 
         if '.emulated' in pay:
             sc_modes.append((num, ADDED, INDENT+'sec'))
             sc_modes.append((num, ADDED, INDENT+'xce'))
-            sc_modes.append((num, CONTROL, INDENT+'.emulated!'))
+            sc_modes.append((num, CONTROL, INDENT+'.!emulated'))
 
             # Emulation drops us into 8-bit modes for A, X, and Y
             # automatically, no REP or SEP commands needed
-            sc_modes.append((num, CONTROL, INDENT+'.a8!'))
-            sc_modes.append((num, CONTROL, INDENT+'.xy8!'))
+            sc_modes.append((num, CONTROL, INDENT+'.!a8'))
+            sc_modes.append((num, CONTROL, INDENT+'.!xy8'))
             continue
 
         sc_modes.append((num, sta, pay))
@@ -913,12 +913,12 @@ sc_axy = []
 if MPU == '65816':
 
     # We don't need to define these if we're not using a 65816
-    AXY_INS = {'.a8':    ((ADDED, 'sep 20'), (CONTROL, '.a8!')),\
-    '.a16': ((ADDED, 'rep 20'), (CONTROL, '.a16!')),\
-    '.xy8': ((ADDED, 'sep 10'), (CONTROL, '.xy8!')),\
-    '.xy16': ((ADDED, 'rep 10'), (CONTROL, '.xy16!')),\
-    '.axy8': ((ADDED, 'sep 30'), (CONTROL, '.a8!'), (CONTROL, '.xy8!')),\
-    '.axy16': ((ADDED, 'rep 30'), (CONTROL, '.a16!'), (CONTROL, '.xy16!'))}
+    AXY_INS = {'.a8':    ((ADDED, 'sep 20'), (CONTROL, '.!a8')),\
+    '.a16': ((ADDED, 'rep 20'), (CONTROL, '.!a16')),\
+    '.xy8': ((ADDED, 'sep 10'), (CONTROL, '.!xy8')),\
+    '.xy16': ((ADDED, 'rep 10'), (CONTROL, '.!xy16')),\
+    '.axy8': ((ADDED, 'sep 30'), (CONTROL, '.!a8'), (CONTROL, '.!xy8')),\
+    '.axy16': ((ADDED, 'rep 30'), (CONTROL, '.!a16'), (CONTROL, '.!xy16'))}
 
     for num, sta, pay in sc_modes:
         have_found = False
@@ -1127,20 +1127,20 @@ for num, sta, pay in sc_axy:
 
     if MPU == '65816':
 
-        if w[0] == '.native!':
+        if w[0] == '.!native':
             mpu_status = 'native'
             continue
 
-        if w[0] == '.emulated!':
+        if w[0] == '.!emulated':
             mpu_status = 'emulated'
             continue
 
-        if w[0] == '.a8!':
+        if w[0] == '.!a8':
             a_len_offset = 0
             sc_labels.append((num, sta, pay))
             continue
 
-        elif w[0] == '.a16!':
+        elif w[0] == '.!a16':
 
             # We can't switch to 16 bit A if we're not in native mode
             if mpu_status == 'emulated':
@@ -1150,12 +1150,12 @@ for num, sta, pay in sc_axy:
             sc_labels.append((num, sta, pay))
             continue
 
-        elif w[0] == '.xy8!':
+        elif w[0] == '.!xy8':
             xy_len_offset = 0
             sc_labels.append((num, sta, pay))
             continue
 
-        elif w[0] == '.xy16!':
+        elif w[0] == '.!xy16':
 
             # We can't switch to 16 bit X/Y if we're not in native mode
             if mpu_status == 'emulated':
@@ -1595,19 +1595,19 @@ for num, sta, pay in sc_math:
         # TODO Rewrite this horrible code once we are sure this is what we want
         # to do. Note it appears twice
         # TODO make sure switch to 16 only works in native mode
-        if w[0] == '.a8!':
+        if w[0] == '.!a8':
             a_len_offset = 0
             continue
 
-        elif w[0] == '.a16!':
+        elif w[0] == '.!a16':
             a_len_offset = 1
             continue
 
-        elif w[0] == '.xy8!':
+        elif w[0] == '.!xy8':
             xy_len_offset = 0
             continue
 
-        elif w[0] == '.xy16!':
+        elif w[0] == '.!xy16':
             xy_len_offset = 1
             continue
 
