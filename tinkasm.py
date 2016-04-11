@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 01. April 2016
+# This version: 11. April 2016 (Commander Shepard's Birthday)
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -75,8 +75,11 @@ def hexstr(n, i):
     portion stripped out and is limited to 24 bit (to correctly handle the
     negative numbers) and is n characters wide.
     """
-    fmtstr = '{0:0'+str(n)+'x}'
-    return fmtstr.format(i & 0x0ffffff)
+    try:
+        fmtstr = '{0:0'+str(n)+'x}'
+        return fmtstr.format(i & 0x0ffffff)
+    except TypeError as err:
+        fatal(num, 'TypeError in hexstr for "{0}": {1}'.format(i, err)) 
 
 def fatal(n, s):
     """Abort program because of fatal error during assembly.
@@ -1330,8 +1333,14 @@ for num, sta, pay in sc_locals:
         bl = []
 
         for ab in bw:
-            _, r = convert_number(ab)
-            bl.append(hexstr(2, r))
+            is_number, r = convert_number(ab)
+
+            # We might still have an operand here, so we need to test if 
+            # we really got a number
+            if is_number:
+                bl.append(hexstr(2, r))
+            else:
+                bl.append(r)
 
         pay = INDENT+'.byte '+' '.join(bl)
 
@@ -1344,10 +1353,13 @@ for num, sta, pay in sc_locals:
         bl = []
 
         for aw in ww:
-            _, r = convert_number(aw)
+            is_number, r = convert_number(aw)
 
-            for b in little_endian_16(r):
-                bl.append(hexstr(2, b))
+            if is_number:
+                for b in little_endian_16(r):
+                    bl.append(hexstr(2, b))
+            else:
+                bl.append(r)
 
         pay = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((num, DATA_DONE, pay))
@@ -1362,10 +1374,13 @@ for num, sta, pay in sc_locals:
 
         for al in lw:
 
-            _, r = convert_number(al)
+            is_number, r = convert_number(al)
 
-            for b in little_endian_24(r):
-                bl.append(hexstr(2, b))
+            if is_number:
+                for b in little_endian_24(r):
+                    bl.append(hexstr(2, b))
+            else:
+                bl.append(r)
 
         pay = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((num, DATA_DONE, pay))
