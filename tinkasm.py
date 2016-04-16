@@ -194,6 +194,8 @@ def string2bytes(s):
     """
     return len(s), [hexstr(2, ord(c)) for c in s]
 
+
+
 def convert_number(s):
     """Convert a number string provided by the user in one of various
     formats to an integer we can use internally. See Manual for details
@@ -248,20 +250,51 @@ def lookup_symbol(s, n):
     else:
         return r
 
-# The math functions of TinkAsm are primitive. For the assignments and
-# instructions with as single operand such as an address, there are two cases:
-#
-# 1) If the operand is split into TWO words, it's a "modifier" with an
-#    action and a number or symbol (eg "lda.# .lsb muggle').
-# 2) If the operand is split into THREE words, it's "math" with an action
-#    between two numbers of symbols (eg "lda.# muggle + 1")
-#
-# Note that in both cases, whitespace is significant. Also, the MVP and MVN
-# instructions of the 65816 are treated separately because their structure does
-# not fit the single-operand format.
+# Math functions are contained in curly brace delimiters ("{1 + 1}"), and
+# sanitized before being sent to Python3's EVAL function. Be careful changing
+# the this function because is EVAL is dangerous (and possibly even evil). Math
+# operators and even round brances must be separated by whitespace, so "{1
+# * ( 2 + 2 )}" is legal, while "{(1*(2+2)}" will throw an error.  Note the MVP
+# and MVN instructions of the 65816 are treated separately.
 
-MODIFIER_FUNCS = {'.lsb': lsb, '.msb': msb, '.bank': bank,\
-        '.invert': operator.invert}
+LEGAL_MATH = ['+', '-', '/', '//', '*', '(', ')',\
+        '%', '**', '|', '^', '&', '<<', '>>', '~']
+
+def convert_mathterm(s):
+    """Given a string with numbers, variables, or Python3 math terms, make sure
+    it only contains these elements so we can (more or less) safely use EVAL."""
+
+    evalstring = []
+
+    for w in s.split():
+
+        # See if it's a number, converting it while we're at it
+        is_number, opr = convert_number(w)
+
+        if is_number:
+            evalstring.append('{0:x}'.format(opr))
+            continue
+
+        # Okay, then see if it's an operand
+        if w in LEGAL_MATH:
+            evalstring.append(w)
+            continue
+
+        # Last chance, maybe it's a variable we already know about
+        try:
+            r = symbol_table[w]
+        except KeyError:
+            fatal(num, 'Illegal term "{0}" in math term'.format(w))
+
+    print(evalstring)
+
+    return ' '.join(evalstring)
+
+
+# We support three modifiers to isolate various bytes of a two- or three-byte
+# number
+
+MODIFIER_FUNCS = {'.lsb': lsb, '.msb': msb, '.bank': bank}
 
 def modify_operand(ls, n):
     """Given a list ls of two strings, apply the modifier function that is
@@ -281,11 +314,6 @@ def modify_operand(ls, n):
 
     return r
 
-
-MATH_FUNCS = {'+': operator.add, '-': operator.sub, '*': operator.mul,\
-        '/': operator.floordiv, '.and': operator.and_, '.or': operator.or_,\
-        '.xor': operator.xor, '.lshift': operator.lshift,\
-        '.rshift': operator.rshift}
 
 def math_operand(ls, n):
     """Given a list ls of three strings, apply the math function in
@@ -1317,13 +1345,92 @@ dump(sc_locals)
 
 verbose('CLAMING there should be no labels or symbols left in the source')
 
+# -------------------------------------------------------------------
+# PASS MATH: Calculate all math terms. Assumes that all symbols and labels are
+# now numbers that are identified as such by str.isdigit()
+
+# Math terms are delimited by "{" and "}", which need to be surrounded by
+# whitespace. They may only contain the basic math terms decribed below. See
+# https://docs.python.org/3/library/stdtypes.html for a detailed description.
+# Note invert ('~') and brackets ('(', ')') must be separated by a space from
+# the number is inverting. 
+
+def have_math(s):
+    """See if a string contains the delimiter that signals the start of a math
+    term ('{'). Returns a bool."""
+    return True if '{' in s else False
+
+sc_math = []
+n_mathterms = 0
+
+for num, sta, pay in sc_locals:
+    
+    if have_math(pay):
+
+        # isolate math term string, saving what is before and after in the 
+        # payload
+        w1 = pay.split('{')
+        pre_math = w1[0]
+        w2 = w1[1].split('}')
+        post_math = w2[1]
+
+        p = w2[0]
+        p_term = convert_mathterm(p)
+        p_eval = eval(p_term)
+
+        p_new = pre_math + str(p_eval) + post_math
+        sc_math.append((num, MODIFIED, p_new))
+    else:
+        sc_math.append((num, sta, pay))
+
+n_passes += 1
+verbose('PASS MATH: Calculated all math terms.')
+dump(sc_locals)
+
+# -------------------------------------------------------------------
+# PASS MODIFIERS: Handle modifiers 
+
+# Assumes that all symbols have been converted to numbers and we have no more
+# math terms. At the end of this step, each opcode remaining should have one and
+# only one operand
+
+sc_modifiers= []
+
+for num, sta, pay in sc_math:
+
+    w = pay.split()
+
+    try:
+        oc = mnemonics[w[0]]
+    except KeyError:
+        pass
+    else:
+        opr = pay.replace(w[0], '').strip()
+        res = convert_term(opr, num)
+
+        try:
+            pay = INDENT+w[0]+' '+hexstr(4, res)
+        except TypeError:
+            # A crash here means that we have an unidentified symbol, which in
+            # turn probably means that we have a symbol that hasn't been defined
+            # yet, or even more probably means that we have a typo in the symbol
+            # name
+            fatal(num, 'Modifier/math conversion error: {0}'.format(res))
+
+        sta = MODIFIED
+
+    sc_modifiers.append((num, sta, pay))
+
+n_passes += 1
+verbose('PASS MODIFIERS: Calculated all modifiers.')
+dump(sc_modifiers)
 
 # -------------------------------------------------------------------
 # PASS BYTEDATA: Convert various data formats like .word and .string to .byte
 
 sc_bytedata = []
 
-for num, sta, pay in sc_locals:
+for num, sta, pay in sc_modifiers:
 
     w = pay.split()
 
@@ -1555,53 +1662,13 @@ else:
 
 
 # -------------------------------------------------------------------
-# PASS MATH: Handle modifiers and math functions
-
-# As discussed above, we distingish between "modifiers" and "math" by the number
-# of whitespace delimited words the operand is made up of. Assumes that all
-# symbols have been converted to numbers. At the end of this step, each opcode
-# remaining should have one and only one operand
-
-sc_math = []
-
-for num, sta, pay  in sc_move:
-
-    w = pay.split()
-
-    try:
-        oc = mnemonics[w[0]]
-    except KeyError:
-        pass
-    else:
-        opr = pay.replace(w[0], '').strip()
-        res = convert_term(opr, num)
-
-        try:
-            pay = INDENT+w[0]+' '+hexstr(4, res)
-        except TypeError:
-            # A crash here means that we have an unidentified symbol, which in
-            # turn probably means that we have a symbol that hasn't been defined
-            # yet, or even more probably means that we have a typo in the symbol
-            # name
-            fatal(num, 'Modifier/math conversion error: {0}'.format(res))
-
-        sta = MODIFIED
-
-    sc_math.append((num, sta, pay))
-
-n_passes += 1
-verbose('PASS MATH: Calculated all modifiers and math terms.')
-dump(sc_math)
-
-
-# -------------------------------------------------------------------
 # PASS ALLIN: Assemble all remaining operands
 
 # This should remove all CONTROL entries as well
 
 sc_allin = []
 
-for num, sta, pay in sc_math:
+for num, sta, pay in sc_move:
 
     w = pay.split()
 
@@ -1684,6 +1751,19 @@ for num, _, pay in sc_allin:
 n_passes += 1
 verbose('PASS VALIDATE: Confirmed that all lines are now byte data')
 
+# -------------------------------------------------------------------
+# PASS BYTECHECK: Make sure all byte values are actually 0 to 256
+
+for num, _, pay in sc_allin:
+
+    bl = pay.split()[1:]
+
+    for b in bl:
+        if int(b) > 256 or int(b) < 0:
+            fatal(num, 'Value of "{0}" does not fit in a byte'.format(b))
+
+n_passes +=1
+verbose('PASS BYTECHECK: All byte values are in range from 0 to 256')
 
 # -------------------------------------------------------------------
 # PASS ADR: Add addresses for human readers and listing generation
