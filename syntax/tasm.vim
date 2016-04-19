@@ -1,7 +1,7 @@
 " Vim Syntax File for a Typist's Assembler Notation, Python version 
 " Language: Assembler (6502/65c02/65816 8/16-bit CPU) 
 " Maintainer: Scot W. Stevenson <scot.stevenson@gmail.com>
-" Latest Revision: 28. Feb 2016
+" Latest Revision: 17. April 2016
 
 " This script is distributed in the hope that it will be useful,
 " but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -108,14 +108,14 @@ syn keyword tasmBoring nop wdm
 " Keywords for directives of the Tinkerer's Assembler
 " See https://github.com/scotws/tinkasm
 syn keyword tasmDirective 
-    \ .advance .adv .emulated .end .include .mpu .native .origin .skip 
+    \ .advance .adv .emulated .end .include .mpu .native .origin .skip .*
     \ .a8 .a16 .xy8 .xy16 .axy8 .axy16
     \ .a8! .a16! .xy8! .xy16! .native! .emulated!
     \ .byte .b .word .w .long .l 
     \ .string .str .string0 .str0 .stringlf .strlf
     \ .lsb .msb .bank
     \ .macro .endmacro .invoke
-    \ .equ = @ + - * / .lshift .rshift .and .or .xor .invert
+    \ .equ = @ + - / * .lshift .rshift .and .or .xor .invert
 
 " Keywords for programmer's notes. The last two are German
 syn keyword tasmTodo TODO CHECK FIXME HIER FEHLT
@@ -144,7 +144,7 @@ syn match tasmComment "\v;.*$"
 syn region tasmString start='"' end='"'
 
 " Define Python Code Instert (experimental)
-" syn region pythonString start='(' end=')'
+syn region pythonString start='{' end='}'
 
 " === Define our own color system === 
 

@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 16. April 2016 (Commander Shepard's Birthday)
+# This version: 19. April 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -71,10 +71,11 @@ args = parser.parse_args()
 ### BASIC OUTPUT FUNCTIONS ###
 
 def hexstr(n, i):
-    """Given an integer, return a hex number as a string that has the '0x'
-    portion stripped out and is limited to 24 bit (to correctly handle the
-    negative numbers) and is n characters wide.
+    """Given an integer i, return a hex number with n digits as a string that
+    has the '0x' portion stripped out and is limited to 24 bit (to correctly
+    handle the negative numbers) and is n characters wide.  
     """
+
     try:
         fmtstr = '{0:0'+str(n)+'x}'
         return fmtstr.format(i & 0x0ffffff)
@@ -111,19 +112,22 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  16. April 2016
+Version BETA  19. April 2016
 Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
 
 COMMENT = ';'       # Default comment marker
-CURRENT = '*'       # Default current location counter
+CURRENT = '.*'      # Default current location counter
 LOCAL_LABEL = '@'   # Default marker for local labels
 SEPARATORS = '[.:]' # Legal separators in number strings for regex
 
 HEX_PREFIX = '$'    # Default prefix for hexadecimal numbers
 BIN_PREFIX = '%'    # Default prefix for binary numbers
 DEC_PREFIX = '&'    # Default prefix for decimal numbers
+
+LEFTMATH = '{'      # Opening bracket for Python math terms
+RIGHTMATH = '}'     # Closing bracket for Python math terms
 
 ST_WIDTH = 24       # Number of chars of symbol from Symbol Table printed
 INDENT = ' '*12     # Indent in whitespace for inserted instructions
@@ -178,6 +182,8 @@ def bank(n):
     """Return Bank Byte of a number"""
     return (n & 0xff0000) >> 16
 
+MODIFIERS = {'.lsb': lsb, '.msb': msb, '.bank': bank}
+
 def little_endian_16(n):
     """Given a number, return a tuple with two bytes in correct format"""
     return lsb(n), msb(n)
@@ -194,8 +200,6 @@ def string2bytes(s):
     """
     return len(s), [hexstr(2, ord(c)) for c in s]
 
-
-
 def convert_number(s):
     """Convert a number string provided by the user in one of various
     formats to an integer we can use internally. See Manual for details
@@ -210,13 +214,13 @@ def convert_number(s):
     # number such as "%01010000". Default is hex.
     c = s1[0]
 
-    if c == DEC_PREFIX:
+    if c == DEC_PREFIX: # usually '&'
         BASE = 10
         s2 = s1[1:]
-    elif c == BIN_PREFIX:
+    elif c == BIN_PREFIX: # usually '%'
         BASE = 2
         s2 = s1[1:]
-    elif c == HEX_PREFIX:
+    elif c == HEX_PREFIX: # usually '$'
         BASE = 16
         s2 = s1[1:]
     else:
@@ -226,7 +230,6 @@ def convert_number(s):
     # If we can convert this to a number, it's a number, otherweise we claim
     # it's a symbol. The default is to convert to a number, so "dead" will be
     # considered a hex number, not a label.
-    
     try:
         r = int(s2, BASE)
         f = True
@@ -236,19 +239,6 @@ def convert_number(s):
 
     return f, r
 
-
-def lookup_symbol(s, n):
-    """Given a string, look it up in the symbol table and return an int if
-    found. Takes the line number for error message if symbol not in table. Use
-    this instead of a straight lookup for error handling.
-    """
-
-    try:
-        r = symbol_table[s]
-    except KeyError:
-        fatal(n, 'Symbol "{0}" unknown, lookup failed'.format(s))
-    else:
-        return r
 
 # Math functions are contained in curly brace delimiters ("{1 + 1}"), and
 # sanitized before being sent to Python3's EVAL function. Be careful changing
@@ -260,7 +250,7 @@ def lookup_symbol(s, n):
 LEGAL_MATH = ['+', '-', '/', '//', '*', '(', ')',\
         '%', '**', '|', '^', '&', '<<', '>>', '~']
 
-def convert_mathterm(s):
+def sanitize_math(s):
     """Given a string with numbers, variables, or Python3 math terms, make sure
     it only contains these elements so we can (more or less) safely use EVAL."""
 
@@ -269,10 +259,10 @@ def convert_mathterm(s):
     for w in s.split():
 
         # See if it's a number, converting it while we're at it
-        is_number, opr = convert_number(w)
+        f_num, opr = convert_number(w)
 
-        if is_number:
-            evalstring.append('{0:x}'.format(opr))
+        if f_num:
+            evalstring.append(str(opr))
             continue
 
         # Okay, then see if it's an operand
@@ -280,86 +270,81 @@ def convert_mathterm(s):
             evalstring.append(w)
             continue
 
-        # Last chance, maybe it's a variable we already know about
+        # Last chance, maybe it's a variable we already know about. In theory,
+        # we should have converted them all already, of course
         try:
             r = symbol_table[w]
         except KeyError:
             fatal(num, 'Illegal term "{0}" in math term'.format(w))
-
-    print(evalstring)
+        else:
+            evalstring.append(str(r))
 
     return ' '.join(evalstring)
 
 
-# We support three modifiers to isolate various bytes of a two- or three-byte
-# number
-
-MODIFIER_FUNCS = {'.lsb': lsb, '.msb': msb, '.bank': bank}
-
-def modify_operand(ls, n):
-    """Given a list ls of two strings, apply the modifier function that is
-    the first word to the actual operand that is the second word. Returns
-    an int.
-    """
-    is_number, opr = convert_number(ls[1])
-
-    # Paranoid, we shouldn't have symbols at this point
-    if not is_number:
-        fatal(n, 'Symbol found during modify function {0}'.format(ls[0]))
-
-    try:
-        r = MODIFIER_FUNCS[ls[0]](opr)
-    except KeyError:
-        fatal(n, 'Illegal modifier {0} given'.format(ls[0]))
-
-    return r
-
-
-def math_operand(ls, n):
-    """Given a list ls of three strings, apply the math function in
-    the second word to the two other operands. Returns an int. If we were
-    given a symbol instead of a number (which can happend during PASS ASSIGN),
-    try to look it up in the symbol table.
+def do_math(s):
+    """Given a payload string with math term inside, replace the math term by
+    a string representation of the number by invoking the Python EVAL routine.
+    What is before and after the math term is conserved.
     """
 
-    a1_is_number, a1 = convert_number(ls[0])
+    # Save the parts that are left and right of the math term
+    w1 = s.split(LEFTMATH)
+    pre_math = w1[0]
+    w2 = w1[1].split(RIGHTMATH)
+    post_math = w2[1]
 
-    if not a1_is_number:
-        a1 = lookup_symbol(a1, n)
+    mt = sanitize_math(w2[0])
+    r = eval(mt)
 
-    a2_is_number, a2 = convert_number(ls[2])
-
-    if not a2_is_number:
-        a2 = lookup_symbol(a2, n)
-
-    try:
-        r = MATH_FUNCS[ls[1]](a1, a2)
-    except KeyError:
-        fatal(n, 'Illegal modifier {0} given'.format(ls[1]))
-
-    return r
+    return pre_math + hexstr(6, r) + post_math
 
 
-def convert_term(s, n):
-    """Given a string that is either a number, a modifier and a number, or
-    a math term, return the resulting number as an int. Also takes line
-    number for errors. This is the highest level modifier or math function. 
-    Returns an int.
+def replace_symbols(sc_tmp):
+    """Given the complete source code, replace all symbols we know so far. 
+    Called from various steps, assumes we have stripped out all commentary,
+    assumes that sc_tmp has three entries (no addresses yet). Will also 
+    replace symbols in math terms. Returns the modified source code, dumps
+    text if requested. 
     """
 
-    w = s.split()
-    n_words = len(w)
+    sc_replaced = []
+    global n_passes
+    
+    for num, pay, sta in sc_tmp:
 
-    if n_words == 1:
-        _, res = convert_number(w[0])
-    elif n_words == 2:
-        res = modify_operand(w, n)
-    elif n_words == 3:
-        res = math_operand(w, n)
-    else:
-        fatal(n, 'Wrong number of terms for modifier or math routines')
+        # Skip this all if we have a label, which can't ever contain a symbol.
+        # This also takes care of any problems with indents
+        if pay[0] not in string.whitespace:
+            sc_replaced.append((num, pay, sta))
+            continue
 
-    return res
+        # We need to go word-by-word because somebody might be defining .byte 
+        # data as symbols
+        wc = []
+        ws = pay.split()
+        s_temp = sta
+
+        for w in ws:
+
+            try:
+                # We don't define the number of digits because we have no idea
+                # what the number they represent are supposed to be
+                w = hexstr(6, symbol_table[w])
+            except KeyError:
+                pass
+            else:
+                s_temp = MODIFIED
+            finally:
+                wc.append(w)
+
+        sc_replaced.append((num, INDENT+' '.join(wc), s_temp))
+
+    n_passes += 1
+    verbose('PASS REPLACED: Replaced currently known symbols with their values')
+    dump(sc_replaced, "nps")
+
+    return sc_replaced
 
 
 def dump(ls, fs='npsa'):
@@ -388,7 +373,7 @@ def dump(ls, fs='npsa'):
             if 's' in fs:
                 s = s + "{0} ".format(l[2])
             if 'a' in fs:
-                s = s + "'{0!s} ".format(l[3])
+                s = s + "{0!s} ".format(l[3])
             if 'p' in fs:
                 s = s + "{0!s}".format(l[1].rstrip())
             if 'r' in fs:
@@ -397,7 +382,6 @@ def dump(ls, fs='npsa'):
             print(s.rstrip())
 
     print()
-
 
 
 def dump_symbol_table(st, s=""):
@@ -413,7 +397,6 @@ def dump_symbol_table(st, s=""):
 
     else:
         print('    (empty)\n')
-
 
 
 ### PASSES AND STEPS ###
@@ -495,8 +478,10 @@ dump(sc_include, 'nr')
 # -------------------------------------------------------------------
 # PASS EMPTY: Strip out empty lines
 
-# We keep the line number of the empty lines to allow us to re-insert them for
-# the listing file (currently not implemented)
+# We want to cut down the number of lines we have to process as early as
+# possible. First, we get rid of the empty lines, then we get rid of the
+# comments. We keep the line number of the empty lines to allow us to re-insert
+# them for the listing file (currently not implemented)
 
 sc_empty = []
 empty_lines = []
@@ -568,9 +553,7 @@ MPU = ''
 
 for num, pay in sc_inlines:
 
-
-    # We haven't converted to lower case yet so we have to do this by hand for
-    # now 
+    # We haven't converted to lower case yet so we have to do this by hand 
     if '.mpu' in pay.lower():
         MPU = pay.split()[1].strip()
     else:
@@ -778,10 +761,10 @@ if originline[0] != '.origin' and originline[0] != '.org':
     n = sc_macros[0][0]   # Fatal always needs a number line, fake it
     fatal(n, 'No ORIGIN directive found, must be first line after macros')
 
-is_number, LC0 = convert_number(originline[1])
+f_num, LC0 = convert_number(originline[1])
 
 # ORIGIN may not take a symbol, because we haven't defined any yet
-if not is_number:
+if not f_num:
     n = sc_macros[0][0]
     fatal(n, 'ORIGIN directive gives "{0}", not number as required')
 
@@ -812,57 +795,90 @@ dump(sc_end, "nps")
 
 
 # -------------------------------------------------------------------
-# PASS ASSIGN: Handle assignments
+# PASS SIMPLEASSIGN: Handle plain number assigments
 
-# We accept two variants of assignment directives , "=" and ".equ". Since we've
-# moved all labels to their own lines, any such directive must be the second
-# word in the line
+# Handle the simplest form of assignments, those were a number is assigned to
+# a variable ('jack = 1'). We can't do full assignments until we've dealt with
+# labels, but we can do this now to cut down on the number of lines we have to
+# go through every time. 
 
-sc_assign = []
+def is_assignment(ps):
+    """See if the payload string contains the assignment directives, 
+    usually ".equ" or "=". Isolated in own function for ease of 
+    modification. Returns bool.
+    """
+
+    # We can't just check to see if the '=' is in the payload, because we
+    # might be dealing with a string directive with that character as part
+    # of the string.
+    w = pay.split() 
+
+    return (w[1] == '=') or (w[2] == '.equ')
+
+
+def vet_newsymbol(s):
+    """Given a word that the user wants to define as a new symbol, make sure
+    that is is legal. Does not return anything if okay, jumps to fatal error
+    if not.
+    """
+
+    # We don't allow using directives as symbols because that gets very
+    # confusing really fast
+    if s in DIRECTIVES:
+        fatal(num, 'Directive "{0}" cannot be redefined as a symbol'.\
+                format(s))
+
+    # We don't allow using mnemonics as symbols because that screws up other
+    # stuff and is really weird anyway
+    if s in mnemonics.keys(): 
+        fatal(num, 'Mnemonic "{0}" cannot be redefined as a symbol'.\
+                format(s))
+
+    # We don't allow redefining existing symbols, this catches various errors 
+    if s in symbol_table.keys():
+        fatal(num, 'Symbol "{0}" already defined'.format(s))
+
+
+sc_simpleassign = []
 
 for num, pay, sta in sc_end:
 
-    w = pay.split()
-
-    # An assigment line must have three words at least. The "at least" part
-    # is so we can modifiy and do math with the assignment lines. Anything
-    # shorter is something else
-    if len(w) < 3:
-        sc_assign.append((num, pay, sta))
+    # Skip labels immediately
+    if pay[0] not in string.whitespace:
+        sc_simpleassign.append((num, pay, sta))
         continue
 
-    # Sorry, Lisp and Forth coders, infix notation only
-    if w[1] == '=' or w[1] == '.equ':
-        sy, va = pay.split(w[1])
+    w = pay.split()
 
-        symbol = sy.split()[-1]
+    # Test for length first or risk index errors
+    if (len(w) != 3) or (not is_assignment(w[1])):
+        sc_simpleassign.append((num, pay, sta))
+        continue
 
-        # We don't allow using directives as symbols because that gets very
-        # confusing really fast
-        if symbol in DIRECTIVES:
-            fatal(num, 'Directive "{0}" cannot be redefined as a symbol'.\
-                    format(symbol))
+    vet_newsymbol(w[0])
 
-        value = convert_term(va, num)
+    # Get the third turm, which should be a number
+    f_num, r = convert_number(w[2])
 
-        # If value is just a single string, then the conversion failed and 
-        # we're struck with some "symbol = symbol" line
-        if isinstance(value, str):
-            fatal(num, 'Value "{0}" not defined'.\
-                    format(value))
-
-        symbol_table[symbol] = value
+    # If it's a number, add it to the symbol table
+    if f_num:
+        symbol_table[w[0]] = r
     else:
-        sc_assign.append((num, pay, sta))
+        sc_simpleassign.append((num, pay, sta))
 
 n_passes += 1
-verbose('PASS ASSIGN: Assigned {0} symbols to symbol table'.\
-        format(len(sc_end)-len(sc_assign)))
-dump(sc_assign, "nps")
+verbose('PASS SIMPLEASSIGN: Assigned {0} new symbol(s) to symbol table'.\
+        format(len(sc_end)-len(sc_simpleassign)))
+dump(sc_simpleassign, "nps")
 
 # Print symbol table
 if args.verbose:
-    dump_symbol_table(symbol_table, "after ASSIGN (numbers in hex)")
+    dump_symbol_table(symbol_table, "after SIMPLEASSIGN (numbers in hex)")
+
+
+# -------------------------------------------------------------------
+# PASS REPLACE (1): Handle known assignments
+sc_replaced01 = replace_symbols(sc_simpleassign)
 
 
 # -------------------------------------------------------------------
@@ -872,9 +888,9 @@ if args.verbose:
 # because those might be present in the macros
 
 sc_invoke = []
-pre_len = len(sc_assign)
+pre_len = len(sc_replaced01)
 
-for num, pay, sta in sc_assign:
+for num, pay, sta in sc_replaced01:
 
     # Usually the line will not be a macro, so get it out of the way
     if '.invoke' not in pay:
@@ -1011,33 +1027,6 @@ mpu_status = 'emulated'   # Start 65816 out in emulated status
 A_IMM = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
 XY_IMM = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
 
-
-# Keep this function in the labels pass
-def has_current(s):
-    """Given a string of the payload, see if we have been given the CURRENT
-    symbol (usually '*') as part of the payload. This can be the case for one
-    word; for two words if the second one is the CURRENT symbol (for example
-    ".lsb *"); for three words if the first one is the symbol (for example "*
-    + 1"). We test the reverse, making sure that '*' is not in the second
-    position in an operand term with three words, which would be a
-    multiplication. Returns a bool. 
-    """
-
-    # TODO rewrite this for math routines
-
-    w = s.split()[1:]
-    res = False
-
-    # A length of 1 means we have a "jmp *" situation; a '*' at second
-    # place and a length of three means we have a multiply
-    if CURRENT in s:
-
-        if len(w) == 1 or not (w[1] == CURRENT and len(w) == 3):
-            res = True
-
-    return res
-
-
 for num, pay, sta in sc_axy:
 
     w = pay.split()
@@ -1047,7 +1036,7 @@ for num, pay, sta in sc_axy:
 
     # This must come before we handle mnemonics. Don't add a continue because
     # that will screw up the line count; we replace in-place
-    if has_current(pay):
+    if CURRENT in pay: 
         pay = pay.replace(CURRENT, hexstr(6, LC0+LCi))
         w = pay.split()
         verbose('Current marker "{0}" in line {1}, replaced with {2}'.\
@@ -1213,11 +1202,14 @@ for num, pay, sta in sc_axy:
     # --- SUBSTEP ADVANCE: See if we have the .advance directive ---
     
     if w[0] == '.advance' or w[0] == '.adv':
-        is_number, r = convert_number(w[1])
+        f_num, r = convert_number(w[1])
 
         # If this is a symbol, it must be defined already or we're screwed
-        if not is_number:
-            r = lookup_symbol(r, num)
+        if not f_num:
+            try:
+                r = symbol_table(r)
+            except KeyError:
+                fatal(num, 'Unknown symbol "{0}"'.format(r))
 
         # Make sure the user is not attempting to advance backwards
         if r < (LCi+LC0):
@@ -1239,10 +1231,10 @@ for num, pay, sta in sc_axy:
     # --- SUBSTEP SKIP: See if we have a .skip directive ---
     #
     if w[0] == '.skip':
-        is_number, r = convert_number(w[1])
+        f_num, r = convert_number(w[1])
 
         # If this is a symbol, it must be defined already or we're screwed
-        if not is_number:
+        if not f_num:
             r = lookup_symbol(r, num)
 
         # While we're here, we might as well already convert this to .byte
@@ -1261,6 +1253,7 @@ for num, pay, sta in sc_axy:
 
 n_passes += 1
 verbose('PASS LABELS: Assigned value to all labels.')
+dump(sc_labels, "nps")
 
 if args.verbose:
     dump_symbol_table(symbol_table, "after LABELS (numbers in hex)")
@@ -1274,7 +1267,129 @@ if args.dump:
     else:
         print('  (none)\n')
 
-dump(sc_labels, "nps")
+
+# -------------------------------------------------------------------
+# PASS ASSIGN: Handle assignments
+
+# We accept two variants of assignment directives , "=" and ".equ". Since we've
+# moved all labels to their own lines, any such directive must be the second
+# word in the line
+
+sc_assign = []
+
+for num, pay, sta in sc_labels:
+
+    w = pay.split()
+
+    # An assigment line must have three words at least. The "at least" part
+    # is so we can modifiy and do math with the assignment lines. Anything
+    # shorter is something else
+    if len(w) < 3:
+        sc_assign.append((num, pay, sta))
+        continue
+
+    # Leave if this is not an assignment
+    if not is_assignment(pay):
+        sc_assign.append((num, pay, sta))
+        continue
+        
+    vet_newsymbol(w[0]) 
+
+
+    # --- SUBSTEP 1: SIMPLE ASSIGNMENT ('jack = 1') ---
+    
+    # We've already done some of those, but because of the CURRENT directive
+    # we might have some left over
+    if len(w) == 3:
+
+        f_num, r = convert_number(w[2])
+
+        # If we have a plain number, add it to the symbol table and 
+        # continue
+        if f_num:
+            symbol_table[w[0]] = r
+            continue
+
+        # No, we have a symbol
+        try:
+            rs = symbol_table[r]
+        except KeyError:
+            fatal(num, 'Symbol "{0}" unknown'.format(r))
+        else:
+            symbol_table[w[0]] = rs
+            continue
+
+
+    # --- SUBSTEP 2: SIMPLE MODIFICATION ('jack = .lsb 0102') ---
+    
+    # This should be the only case where the payload string is four words
+    # long
+    if len(w) == 4:
+
+        f_num, r = convert_number(w[3])
+
+        # If we have a symbol, retrieve it
+        if not f_num: 
+            try:
+                rs = symbol_table[r]
+            except KeyError:
+                fatal(num, 'Symbol "{0}" unknown'.format(r))
+
+        try:
+            rm = MODIFIERS[w[2]](r)
+        except KeyError:
+            fatal(num, 'Illegal modifier "{0}" given'.format(w[2]))
+        else:
+            symbol_table[w[0]] = rm
+            continue
+
+
+    # --- SUBSTEP 3: SIMPLE MATH TERM ('jack = { 1 + 1 }') ---
+
+    # These are distinguished by having '{' as the third word. 
+    if w[2] == LEFTMATH:
+        symbol_table[w[0]] = int(do_math(pay.split('=')[1]))
+        continue
+                
+
+    # --- SUBSTEP 4: MIX OF MODIFY AND MATH ('jack = .lsb { 1 + 1 }') ---
+    
+    # These are distinguished by having a modifier as the third word and a '{'
+    # as the fourth one. 
+    if w[3] == LEFTMATH:
+
+        # Replace math term with number inside the string
+        rs = do_math(pay.split('=')[1])
+
+        # We should now have a string with two words, a modifier and the number
+        r = rs.split()
+
+        try:
+            rm = MODIFIERS[r[0]](int(r[1]))
+        except KeyError:
+            fatal(num, 'Illegal modifier "{0}" given'.format(r[0]))
+        else:
+            symbol_table[w[0]] = rm
+            continue
+
+
+    # --- SUBSTEP OOPS: If we made it to here, something is wrong ---
+    fatal(num, 'Error in assignment directive "{0}"'.format(pay.strip()))
+
+
+n_passes += 1
+verbose('PASS ASSIGN: Assigned {0} symbols to symbol table'.\
+        format(len(sc_end)-len(sc_assign)))
+dump(sc_assign, "nps")
+
+# Print symbol table
+if args.verbose:
+    dump_symbol_table(symbol_table, "after ASSIGN (numbers in hex)")
+
+
+# -------------------------------------------------------------------
+# PASS REPLACE (2): Handle known assignments, reprise
+sc_replaced02 = replace_symbols(sc_assign)
 
 
 # -------------------------------------------------------------------
@@ -1285,36 +1400,62 @@ verbose('CLAMING that all symbols should now be known')
 
 
 # -------------------------------------------------------------------
-# PASS REPLACE: Replace all symbols in code by correct numbers
+# PASS MATH
 
-sc_replace = []
+# Replace all math terms that are left in the text, eg 'jmp { label + 2 }'. 
+# None of these should be in assignments any more
 
-for num, pay, sta in sc_labels:
+# TODO get this to work with .byte, .word etc
 
-    # We need to go word-by-word because somebody might be defining .byte 
-    # data as symbols
-    wc = []
-    ws = pay.split()
-    s_temp = sta
+sc_math = []
 
-    for w in ws:
+for num, pay, sta in sc_replaced02:
 
-        try:
-            # We don't define the number of digits because we have no idea
-            # what the number they represent are supposed to be
-            w = hexstr(6, symbol_table[w])
-        except KeyError:
-            pass
-        else:
-            s_temp = MODIFIED
-        finally:
-            wc.append(w)
+    if LEFTMATH not in pay:
+        sc_math.append((num, pay, sta))
+        continue
 
-    sc_replace.append((num, INDENT+' '.join(wc), s_temp))
+    sc_math.append((num, do_math(pay), MODIFIED))
 
 n_passes += 1
-verbose('PASS REPLACED: Replaced all symbols with their number values')
-dump(sc_replace, "nps")
+verbose('PASS MATH: replaced all math terms by numbers')
+dump(sc_math, "nps")
+
+
+# -------------------------------------------------------------------
+# PASS MODIFY
+
+# Replace all modify terms that are left in the text, eg 'lda.# .msb 1000'. 
+# None of these should be in assignments any more
+
+# TODO get this to work with .byte, .word etc
+
+sc_modify = []
+
+for num, pay, sta in sc_math:
+
+    w = pay.split()
+
+    # The modifier function must come right after the mnemonic
+    # TODO see if we have a problem with MVN and MVP
+    if len(w) < 3 or w[1] not in MODIFIERS:
+        sc_modify.append((num, pay, sta))
+        continue
+
+    # Whatever we are going to modify must be a number by now or else something
+    # has gone very, very wrong
+
+    f_num, r = convert_number(w[2])
+
+    if not f_num:
+        fatal(num, 'Modifier operand "{0}" is not a number'.format(w[2]))
+
+    new_pay = w[0] + ' ' + hexstr(6, MODIFIERS[w[1]](r))
+    sc_modify.append((num, INDENT+new_pay, MODIFIED))
+
+n_passes += 1
+verbose('PASS MODIFY: replaced all modifier terms by numbers')
+dump(sc_modify, "nps")
 
 
 # -------------------------------------------------------------------
@@ -1324,7 +1465,7 @@ dump(sc_replace, "nps")
 
 sc_locals = []
 
-for num, pay, sta in sc_replace:
+for num, pay, sta in sc_modify:
 
     w = pay.split()
 
@@ -1358,97 +1499,13 @@ dump(sc_locals, "nps")
 
 verbose('CLAMING there should be no labels or symbols left in the source')
 
-# -------------------------------------------------------------------
-# PASS MATH: Calculate all math terms. Assumes that all symbols and labels are
-# now numbers that are identified as such by str.isdigit()
-
-# Math terms are delimited by "{" and "}", which need to be surrounded by
-# whitespace. They may only contain the basic math terms decribed below. See
-# https://docs.python.org/3/library/stdtypes.html for a detailed description.
-# Note invert ('~') and brackets ('(', ')') must be separated by a space from
-# the number is inverting. 
-
-def have_math(s):
-    """See if a string contains the delimiter that signals the start of a math
-    term ('{'). Returns a bool."""
-    return True if '{' in s else False
-
-sc_math = []
-n_mathterms = 0
-
-for num, pay, sta in sc_locals:
-    
-    if have_math(pay):
-
-        # isolate math term string, saving what is before and after in the 
-        # payload
-        w1 = pay.split('{')
-        pre_math = w1[0]
-        w2 = w1[1].split('}')
-        post_math = w2[1]
-
-        p = w2[0]
-        p_term = convert_mathterm(p)
-        p_eval = eval(p_term)
-
-        p_new = pre_math + str(p_eval) + post_math
-        sc_math.append((num, p_new, MODIFIED))
-    else:
-        sc_math.append((num, pay, sta))
-
-n_passes += 1
-verbose('PASS MATH: Calculated all math terms.')
-dump(sc_math, "nps")
-
-# -------------------------------------------------------------------
-# PASS MODIFIERS: Handle modifiers 
-
-# Assumes that all symbols have been converted to numbers and we have no more
-# math terms. At the end of this step, each opcode remaining should have one and
-# only one operand
-
-# TODO completely rewrite this
-
-# sc_modifiers= []
-
-sc_modifiers = sc_math
-
-# for num, pay, sta in sc_math:
-
-#     w = pay.split()
-# 
-#     try:
-#         oc = mnemonics[w[0]]
-#     except KeyError:
-#         pass
-#     else:
-#         opr = pay.replace(w[0], '').strip()
-#         res = convert_term(opr, num)
-# 
-#         try:
-#             pay = INDENT+w[0]+' '+hexstr(4, res)
-#         except TypeError:
-#             # A crash here means that we have an unidentified symbol, which in
-#             # turn probably means that we have a symbol that hasn't been defined
-#             # yet, or even more probably means that we have a typo in the symbol
-#             # name
-#             fatal(num, 'Modifier/math conversion error: {0}'.format(res))
-# 
-#         sta = MODIFIED
-# 
-#     sc_modifiers.append((num, pay, sta))
-# 
-# n_passes += 1
-# verbose('PASS MODIFIERS: Calculated all modifiers.')
-
-dump(sc_modifiers, "nps")
 
 # -------------------------------------------------------------------
 # PASS BYTEDATA: Convert various data formats like .word and .string to .byte
 
 sc_bytedata = []
 
-for num, pay, sta in sc_modifiers:
+for num, pay, sta in sc_locals:
 
     w = pay.split()
 
@@ -1458,11 +1515,11 @@ for num, pay, sta in sc_modifiers:
         bl = []
 
         for ab in bw:
-            is_number, r = convert_number(ab)
+            f_num, r = convert_number(ab)
 
             # We might still have an operand here, so we need to test if 
             # we really got a number
-            if is_number:
+            if f_num:
                 bl.append(hexstr(2, r))
             else:
                 bl.append(r)
@@ -1478,9 +1535,9 @@ for num, pay, sta in sc_modifiers:
         bl = []
 
         for aw in ww:
-            is_number, r = convert_number(aw)
+            f_num, r = convert_number(aw)
 
-            if is_number:
+            if f_num:
                 for b in little_endian_16(r):
                     bl.append(hexstr(2, b))
             else:
@@ -1499,9 +1556,9 @@ for num, pay, sta in sc_modifiers:
 
         for al in lw:
 
-            is_number, r = convert_number(al)
+            f_num, r = convert_number(al)
 
-            if is_number:
+            if f_num:
                 for b in little_endian_24(r):
                     bl.append(hexstr(2, b))
             else:
@@ -1644,6 +1701,8 @@ dump(sc_branches, "nps")
 # operands where every other instruction has one. We assume that the operand is
 # split by a comma
 
+# TODO Test these because they probably don't work with new math
+
 sc_move = []
 
 if MPU == '65816':
@@ -1768,21 +1827,27 @@ for num, pay, _ in sc_allin:
 n_passes += 1
 verbose('PASS VALIDATE: Confirmed that all lines are now byte data')
 
+
 # -------------------------------------------------------------------
-# PASS BYTECHECK: Make sure all byte values are actually 0 to 256
-# TODO rewrite this
+# PASS BYTECHECK: Make sure all values are valid bytes
 
+for num, pay, _ in sc_allin:
 
-# for num, pay, _ in sc_allin:
+    bl = pay.split()[1:]
 
-#   bl = pay.split()[1:]
+    for b in bl:
 
-#   for b in bl:
-#       if int(b) > 256 or int(b) < 0:
-#           fatal(num, 'Value of "{0}" does not fit in a byte'.format(b))
+        f_num, r = convert_number(b)
 
-# n_passes +=1
-# verbose('PASS BYTECHECK: All byte values are in range from 0 to 256')
+        if not f_num:
+            fatal(num, 'Found non-number "{0}" in byte list'.format(b))
+
+        if r > 256 or r < 0:
+            fatal(num, 'Value "{0}" does not fit into one byte'.format(b))
+
+n_passes +=1
+verbose('PASS BYTECHECK: Confirmed all byte values are in range from 0 to 256')
+
 
 # -------------------------------------------------------------------
 # PASS ADR: Add addresses for human readers and listing generation
@@ -1937,7 +2002,7 @@ if args.listing:
 
         # Code listing
         f.write('\nLISTING:\n')
-        f.write('       Line Address  Bytes       Instruction\n')
+        f.write('       Line Address  Bytes        Instruction\n')
 
 
         # We start with line 1 because that is the way editors count lines
@@ -1977,7 +2042,7 @@ if args.listing:
                         del sc_tmp[i]
 
             # Format one line 
-            l = '{0:5d} {1:5d} {2}  {3!s} {4}\n'.\
+            l = '{0:5d} {1:5d} {2}  {3!s}  {4}\n'.\
                     format(c, num, adr, bl, instr)
 
             f.write(l)

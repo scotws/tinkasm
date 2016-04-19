@@ -148,10 +148,11 @@ cannot be modified.
 
 ### Current Line Symbol
 
-To reference the current address, by default the symbol `*` is used instead of
-an operand. It can be modified and subjected to mathematical operations.
+To reference the current address, by default the directive `.*` is used 
+instead of an operand. It can be modified and subjected to mathematical 
+operations.
 ```
-                jmp * + 2
+                jmp { .* + 2 }
 ```
 In contrast to other assemblers, the current line symbol cannot be used for
 advancing the line counter. Use the directives `.advance` and `.skip` for these,
