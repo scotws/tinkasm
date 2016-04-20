@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
@@ -1002,6 +1001,46 @@ if MPU == '65816':
 else:
     sc_axy = sc_modes    # Keep the chain going
 
+
+# -------------------------------------------------------------------
+# PASS SPLITMOVE - Split up Move instructions on the 65816
+
+# The MVP and MVN instructions are really, really annoying because they have two
+# operands where every other instruction has one. We deal with this by splitting
+# the instructions into two lines, dealing with the operands, and then later
+# putting them back together again. We assume that the operands are separated by
+# a comma ('mvp 00,01')
+
+sc_splitmove = []
+
+if MPU == '65816':
+
+    for num, pay, sta in sc_axy:
+
+        w = pay.split()
+
+        if w[0] == 'mvp' or w[0] == 'mvn':
+
+            # Catch malformed move instructions
+            try:
+                l_pay, r_pay = pay.split(',') 
+            except ValueError:
+                fatal(num, 'Malformed move instruction')
+
+            sc_splitmove.append((num, INDENT+l_pay.strip(), MODIFIED))
+            sc_splitmove.append((num, INDENT+'DUMMY '+r_pay.strip(), ADDED)) 
+
+        else:
+            sc_splitmove.append((num, pay, sta))
+
+    n_passes += 1
+    verbose('PASS SPLITMOVE: Split mvn/mvp instructions on the 65816')
+    dump(sc_splitmove, "nps")
+
+else:
+    sc_splitmove = sc_axy
+
+
 # -------------------------------------------------------------------
 # PASS LABELS - Construct symbol table by finding all labels
 
@@ -1026,7 +1065,7 @@ mpu_status = 'emulated'   # Start 65816 out in emulated status
 A_IMM = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
 XY_IMM = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
 
-for num, pay, sta in sc_axy:
+for num, pay, sta in sc_splitmove:
 
     w = pay.split()
 
@@ -1692,44 +1731,49 @@ n_passes += 1
 verbose('PASS BRANCHES: Encoded all branch instructions')
 dump(sc_branches, "nps")
 
-
 # -------------------------------------------------------------------
-# PASS MOVE: Handle the 65816 move instructions MVP and MVN
+# PASS FUSEMOVE: Reassemble and convert move instructions
 
-# These two instructions are really, really annoying because they have two
-# operands where every other instruction has one. We assume that the operand is
-# split by a comma
-
-# TODO Test these because they probably don't work with new math
+# All move instructions should have been split up and their operands converted.
+# We now put them back together, remembering that destination comes before
+# source in the machine code of MVN and MVP
 
 sc_move = []
 
 if MPU == '65816':
 
-    for num, pay, sta in sc_branches:
+    # We need to be able to skip ahead in the list so we have to use an iter
+    # object in this case
+    l = iter(sc_branches)
+
+    for num, pay, _ in l:
 
         w = pay.split()
 
         if w[0] == 'mvp' or w[0] == 'mvn':
 
-            tmp_pay = pay.replace(w[0], '').strip()
-            a1, a2 = tmp_pay.split(',')
+            # Handle opcode
+            tmp_pay = INDENT + '.byte ' + str(mnemonics[w[0]]) + ' '
 
-            src = convert_term(a1, num)
-            des = convert_term(a2, num)
+            # Handle source byte
+            _, r = convert_number(w[1])
+            m_src = hexstr(2,r)
 
-            oc = mnemonics[w[0]]
+            # Handle destination byte
+            _, pay2, _ = next(l)
+            _, r = convert_number(pay2.split()[1])
+            m_des = hexstr(2,r)
 
-            # Remember destination comes before source with move instruction
-            pay1 = INDENT+'.byte '+hexstr(2, oc)+' '
-            pay2 = hexstr(2, lsb(des))+' '+hexstr(2, lsb(src))
-            pay = pay1+pay2
-            sta = CODE_DONE
+            # Put it all together
+            tmp_pay = tmp_pay + m_des + ' ' + m_src
+            sc_move.append((num, tmp_pay, CODE_DONE))
 
-        sc_move.append((num, pay, sta))
+        else:
+
+            sc_move.append((num, pay, sta))
 
     n_passes += 1
-    verbose('PASS MOVE: Handled mvn/mvp instructions on the 65816')
+    verbose('PASS FUSEMOVE: Handled mvn/mvp instructions on the 65816')
     dump(sc_move, "nps")
 
 else:
@@ -1841,7 +1885,7 @@ for num, pay, _ in sc_allin:
         if not f_num:
             fatal(num, 'Found non-number "{0}" in byte list'.format(b))
 
-        if r > 256 or r < 0:
+        if r > 0xff or r < 0:
             fatal(num, 'Value "{0}" does not fit into one byte'.format(b))
 
 n_passes +=1
