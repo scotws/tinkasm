@@ -106,12 +106,13 @@ white space. That means, both
         less = 20 
         more .equ 21
 ```
-are both allowed, but not `nope=19`. Simple modifications and math terms are
+are both allowed, but not `nope=19`. Modifications and math terms are
 allowed (see below for details), such as
 
 ```
-        less = 0 
-        more = less + 1
+        less = 20
+        some = .lsb less
+        more = { less + 1 }
 ```
 
 ### Labels
@@ -162,11 +163,14 @@ see below.
 ### Modifiers and Math
 
 Normal labels (but not local labels) and symbols can be modified by "modifiers"
-such as `.invert` and simple mathematical terms such as `label + 2` . White space
-is significant, so `label+2` is not legal (and will be identified as a symbol).
+such as `.lsb` and simple mathematical terms such as `{ label + 2 }` .  White
+space is significant, so `label+2` is not legal (and will be identified as a
+symbol).  You can use anything that is a simple Python 3 math instruction
+(including `**`), as the term between the brackets is santized and then sent to
+EVAL. Yes, EVAL is evil. 
+
 The system in its current form is primitive: Data fields such as `.byte` and
-labels of branches cannot currently be modified. See below for a complete list
-of modifiers. 
+labels of branches cannot currently be modified oder be subjected to math terms.
 
 
 ### Other 
@@ -202,22 +206,16 @@ constructs. These are to be added in a future version.
 referenced by `+` and `-` for jumps and branches.
 
 `+` - As an operand to a branch or jump instruction: Refer to the next local
-label. Between numbers or symbols in the operand: Math function addition.
+label. 
 
 `-` - As an operand to a branch or jump instruction: Refer to previous local
-label. Between numbers or symbols in the operand: Math function subtraction.
+label. 
 
-`*` - As an operand in the first position after the mnemonic: Marks current
-address (eg `jmp * + 2`). As an operand between numbers or symbols in the
-operand: Math function multiplication (eg `lda.# 2 * 2`). 
-
-`/` - Between numbers or symbols in the operand: Math function division. Note
-this returns an integer (Python "floor division" function). 
+`.*` - As an operand in the first position after the mnemonic: Marks current
+address (eg `jmp { .* + 2 }`). 
 
 `.advance` - Jump ahead to the address given as parameter, filling the space
 in between with zeros.
-
-`.and` - Logically AND two numbers or symbols in the operand. 
 
 `.bank` - Isolate bank byte - the highest byte - of following number. This is a
 modifier. Thought it pretty much only makes sense for the 65816 MPU, it is
@@ -234,9 +232,6 @@ original source file. Required.
 `.include` - Inserts code from an external file, the name of which is given as a
 parameter. 
 
-`.invert` - Inverts the following symbol or number in the operand (eg `lda.#
-.invert 0ff`).
-
 `.invoke` - Inserts the macro given as parameter. 
 
 `.long` or `.l` - Store the following list of space-delimited 24-bit as bytes.
@@ -245,9 +240,6 @@ in any supported number base or symbols, but not modified or math terms.
 
 `.lsb` - Isolate least significant byte of following number. This is a 
 modifier.
-
-`.lshift` - Shift the the first number or symbol in the operand left by the
-number of bytes given in the second operand (eg `lda.# 01 .lshift 1`).
 
 `.macro` - Start definition of the macros, the name of which follows
 immediately as the next string. Parameters are not supported in this version.
@@ -259,13 +251,8 @@ modifier.
 `.mpu` - Provides the target MPU as the parameter. Required. Legal values are
 `6502`, `65c02`, or `65816`. 
 
-`.or` - Logically OR two numbers or symbols in the operand. 
-
 `.origin` or `.org` - Start assembly at the address provided as a parameter.
 Required for the program to run.
-
-`.rshift` - Shift the the first number or symbol in the operand right by the
-number of bytes given in the second operand (eg `lda.# 01 .rshift 1`).
 
 `.skip` - Jump head by the number of bytes given as a parameter, filling the
 space in between with zeros.
@@ -286,8 +273,6 @@ bytes. The assembler handles the conversion to little-endian format. Parameters
 can be in any supported number base or symbols, but not modified or math terms.
 Note that WDC uses "double byte" for 16-bit values, but the rest of the world
 uses "word". 
-
-`.xor` - Logically XOR (exclusive OR) two numbers or symbols in the operand. 
 
 
 ### Directives for 65816 only
@@ -347,15 +332,12 @@ one operand. Also, the source and destination parameters are reversed in machine
 code from their positions in assembler. The format used here is 
 
 ```
-                mvp <src> , <dest>
+                mvp <src>,<dest>
 ```
 
-Currently, the white space around the comma is required, though that might be
-changed in future versions. The source and destination parameters can be
-modified (such as `.lsb 1000`) or math terms (`home + 2`). Note if either
-`<src>` or `<dest>` are too large, only the LSB of the term is used -- *not* the
-bank byte -- and the rest is discarded silently. For longer terms, you can use
-the `.bank` directive.
+The source and destination parameters can be modified (such as `.lsb 1000`) or
+consist of math terms (`{ home + 2 }`).  For longer terms, you can use the
+`.bank` directive.
 
 ```
         source = 01:0000

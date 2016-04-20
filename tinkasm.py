@@ -1417,7 +1417,7 @@ for num, pay, sta in sc_labels:
 
 n_passes += 1
 verbose('PASS ASSIGN: Assigned {0} symbols to symbol table'.\
-        format(len(sc_end)-len(sc_assign)))
+        format(len(sc_labels)-len(sc_assign)))
 dump(sc_assign, "nps")
 
 # Print symbol table

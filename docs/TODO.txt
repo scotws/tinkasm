@@ -1,11 +1,12 @@
 TODO List for A Tinkerer's Assember for the 6502/65c02/65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 03. Dec 2015
+This version: 20. April 2016
 
 
 AFTER BETA RELEASE:
 
+- Make .byte and friends worth with math and modify terms
 - Add parameters to macros (PRIORITY)
 - Allow modify & math to branch instructions
 - Add comments to listing file
