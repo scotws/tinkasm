@@ -2,7 +2,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 19. April 2016
+# This version: 20. April 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -112,7 +112,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  19. April 2016
+Version BETA  20. April 2016
 Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -165,7 +165,7 @@ DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
         '.stringlf', '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
         '.and', '.or', '.xor', CURRENT, '.macro', '.endmacro', '.invoke',\
-        '.include', '.!native', '.!emulated']
+        '.include', '.!native', '.!emulated', LEFTMATH, RIGHTMATH]
 
 
 ### HELPER FUNCTIONS ###
@@ -1001,7 +1001,6 @@ if MPU == '65816':
 
 else:
     sc_axy = sc_modes    # Keep the chain going
-
 
 # -------------------------------------------------------------------
 # PASS LABELS - Construct symbol table by finding all labels
