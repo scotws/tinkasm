@@ -4,9 +4,11 @@
     .mpu 65816
     .origin 0e000
 
-    vga_base = 8000         ; some I/O chip
-    vga1 = vga_base + 1
-    vga2 = vga_base + 2
+    vga_base = 8000             ; some I/O chip
+    vga1 = { vga_base + 1 }     ; should be 8001
+    vga2 = { vga_base + 2 }     ; should be 8002
+
+    vga2_msb = .msb { vga_base + 2 }    ; should be 80
 
     done? = 5
 
@@ -18,11 +20,11 @@
             lda.# 00 
             tax
 
-loop
+@
             cmp.# done? 
             sta.x vga_base
             inx
-            bne loop 
+            bne -
             
     .include tests/includeme.tasm
 
@@ -32,7 +34,7 @@ loop
             phe.# 0000
             pla
             cmp.# 0000
-            bne loop        ; always true
+            bne -       ; always true
 
             stp 
 

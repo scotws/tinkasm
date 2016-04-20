@@ -284,7 +284,8 @@ def sanitize_math(s):
 def do_math(s):
     """Given a payload string with math term inside, replace the math term by
     a string representation of the number by invoking the Python EVAL routine.
-    What is before and after the math term is conserved.
+    What is before and after the math term is conserved. Returns a string 
+    representation of a hex number
     """
 
     # Save the parts that are left and right of the math term
@@ -1386,7 +1387,8 @@ for num, pay, sta in sc_labels:
 
     # These are distinguished by having '{' as the third word. 
     if w[2] == LEFTMATH:
-        symbol_table[w[0]] = int(do_math(pay.split('=')[1]))
+        _, r = convert_number(do_math(pay.split('=')[1]))
+        symbol_table[w[0]] = r
         continue
                 
 
@@ -1403,7 +1405,8 @@ for num, pay, sta in sc_labels:
         r = rs.split()
 
         try:
-            rm = MODIFIERS[r[0]](int(r[1]))
+            _, ro = convert_number(r[1])
+            rm = MODIFIERS[r[0]](ro)
         except KeyError:
             fatal(num, 'Illegal modifier "{0}" given'.format(r[0]))
         else:
