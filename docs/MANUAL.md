@@ -167,11 +167,8 @@ such as `.lsb` and simple mathematical terms such as `{ label + 2 }` .  White
 space is significant, so `label+2` is not legal (and will be identified as a
 symbol).  You can use anything that is a simple Python 3 math instruction
 (including `**`), as the term between the brackets is santized and then sent to
-EVAL. Yes, EVAL is evil. 
-
-The system in its current form is primitive: Data fields such as `.byte` and
-labels of branches cannot currently be modified. Math terms, however, are
-possible, such as `.byte { 0 + 1 } { 0 + 2 }` 
+EVAL. Yes, EVAL is evil. Modifiers and math terms can be used in data lines,
+such as `.byte .lsb { 1 + 1 } .msb { 2 + 2 }`
 
 
 ### Other 
@@ -223,7 +220,7 @@ modifier. Thought it pretty much only makes sense for the 65816 MPU, it is
 supported for other formats as well. 
 
 `.byte` or `.b` - Store the following list of space-delimited bytes. Parameters
-can be in any supported number base or symbols, but not modified or math terms. 
+can be in any supported number base or symbols. 
 
 `.end` - Marks the end of the assembly source code. Must be last line in
 original source file. Required. 
@@ -237,7 +234,7 @@ parameter.
 
 `.long` or `.l` - Store the following list of space-delimited 24-bit as bytes.
 The assembler handles the conversion to little-endian format. Parameters can be
-in any supported number base or symbols, but not modified or math terms. 
+in any supported number base or symbols.
 
 `.lsb` - Isolate least significant byte of following number. This is a 
 modifier.
@@ -271,9 +268,8 @@ ASCII character.
 
 `.word` or `.w` - Store the following list of space-delimited 16-bit words as
 bytes. The assembler handles the conversion to little-endian format. Parameters
-can be in any supported number base or symbols, but not modified or math terms.
-Note that WDC uses "double byte" for 16-bit values, but the rest of the world
-uses "word". 
+can be in any supported number base or symbols. Note that WDC uses "double 
+byte" for 16-bit values, but the rest of the world uses "word". 
 
 
 ### Directives for 65816 only

@@ -1483,26 +1483,38 @@ dump(sc_math, "nps")
 
 sc_modify = []
 
+def has_modifier(s):
+    """Given a string with space-separated words, return True if one of 
+    these words is a modifier, else false.
+    """
+    return bool([i for i in MODIFIERS if i in s])
+
+
 for num, pay, sta in sc_math:
 
-    w = pay.split()
+    if has_modifier(pay):
+        
+        # We need to use next entry once we find a modifier, so we need to make
+        # this iterable
+        new_pay = ""
+        ws = iter(pay.split())
 
-    # The modifier function must come right after the mnemonic
-    # TODO see if we have a problem with MVN and MVP
-    if len(w) < 3 or w[1] not in MODIFIERS:
-        sc_modify.append((num, pay, sta))
-        continue
+        for w in ws:
 
-    # Whatever we are going to modify must be a number by now or else something
-    # has gone very, very wrong
+            if w in MODIFIERS:
+                f_num, r = convert_number(next(ws))
 
-    f_num, r = convert_number(w[2])
+                if f_num:
+                    w = hexstr(6, MODIFIERS[w](r))
+                else: 
+                    fatal(num, 'Modifier operand "{0}" not a number'.format(w))
 
-    if not f_num:
-        fatal(num, 'Modifier operand "{0}" is not a number'.format(w[2]))
+            new_pay = new_pay + ' ' + w
+             
+        pay = new_pay
+        sta = MODIFIED
 
-    new_pay = w[0] + ' ' + hexstr(6, MODIFIERS[w[1]](r))
-    sc_modify.append((num, INDENT+new_pay, MODIFIED))
+    sc_modify.append((num, INDENT+pay.strip(), sta))
 
 n_passes += 1
 verbose('PASS MODIFY: replaced all modifier terms by numbers')
