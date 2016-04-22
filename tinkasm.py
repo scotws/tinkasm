@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 20. April 2016
+# This version: 22. April 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -289,9 +289,9 @@ def do_math(s):
     """
 
     # Save the parts that are left and right of the math term
-    w1 = s.split(LEFTMATH)
+    w1 = s.split(LEFTMATH, 1)
     pre_math = w1[0]
-    w2 = w1[1].split(RIGHTMATH)
+    w2 = w1[1].split(RIGHTMATH, 1)
     post_math = w2[1]
 
     mt = sanitize_math(w2[0])
@@ -1456,7 +1456,17 @@ for num, pay, sta in sc_replaced02:
         sc_math.append((num, pay, sta))
         continue
 
-    sc_math.append((num, do_math(pay), MODIFIED))
+    # Life is still easy if we only have one bracket
+    if pay.count(LEFTMATH) == 1:
+        sc_math.append((num, do_math(pay), MODIFIED))
+        continue
+
+    # More than one math term, so we have to do this the hard way
+    while LEFTMATH in pay:
+        pay = do_math(pay)
+
+    sc_math.append((num, pay, MODIFIED))
+    
 
 n_passes += 1
 verbose('PASS MATH: replaced all math terms by numbers')

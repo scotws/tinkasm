@@ -170,7 +170,8 @@ symbol).  You can use anything that is a simple Python 3 math instruction
 EVAL. Yes, EVAL is evil. 
 
 The system in its current form is primitive: Data fields such as `.byte` and
-labels of branches cannot currently be modified oder be subjected to math terms.
+labels of branches cannot currently be modified. Math terms, however, are
+possible, such as `.byte { 0 + 1 } { 0 + 2 }` 
 
 
 ### Other 
