@@ -2,12 +2,12 @@
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 
     .mpu 6502
-    .origin 0e000
+    .origin 0x0e000
 
-            lda.# 0000
+            lda.# 0x0000
             tax
 loop
-            sta.x 1000 
+            sta.x 0x1000 
             dex
             bne loop 
 
