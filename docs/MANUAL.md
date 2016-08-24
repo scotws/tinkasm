@@ -112,8 +112,7 @@ followed by the symbol and the value.
 ```
         .equ a_bore 4
 ```
-are both allowed, but not `nope=19`. Modifications and math terms are
-allowed (see below for details), such as
+Modifications and math terms are allowed (see below for details).
 
 ```
         .equ less 8001
