@@ -116,14 +116,15 @@ Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
 
-COMMENT = ';'       # Default comment marker
-CURRENT = '.*'      # Default current location counter
-LOCAL_LABEL = '@'   # Default marker for anonymous labels
+COMMENT = ';'       # Comment marker, default is ";"
+CURRENT = '.*'      # Current location counter, default is ".*"
+LOCAL_LABEL = '@'   # Marker for anonymous labels, default is "@"
 SEPARATORS = '[.:]' # Legal separators in number strings for regex
 
-HEX_PREFIX = '$'    # Default prefix for hexadecimal numbers
-BIN_PREFIX = '%'    # Default prefix for binary numbers
-DEC_PREFIX = '&'    # Default prefix for decimal numbers
+HEX_PREFIX = '$'    # Prefix for hexadecimal numbers, default is "$"
+BIN_PREFIX = '%'    # Prefix for binary numbers, default is "%"
+DEC_PREFIX = '&'    # Prefix for decimal numbers, default "&"
+                    # Note octal numbers are not supported
 
 LEFTMATH = '{'      # Opening bracket for Python math terms
 RIGHTMATH = '}'     # Closing bracket for Python math terms

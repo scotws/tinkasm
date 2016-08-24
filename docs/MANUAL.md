@@ -167,7 +167,14 @@ advancing the line counter. Use the directives `.advance` and `.skip` for these,
 see below.
 
 
-### Modifiers and Math
+### Numbers, Modifiers and Math
+
+TinkAsm follows the TAN convention that all numbers are hexadecimal by default,
+because this is by far the most common format used in assembly and reduces
+visual clutter. To enforce decimal use, add `&` to the number (for example,
+`lda.# &10`). The common hex prefixes `$` and `0x` are recognized, with `0x`
+being the recommended format. For binary numbers, use `%`. Octal numbers are
+not supported.
 
 Normal labels (but not anonymous labels) and symbols can be modified by "modifiers"
 such as `.lsb` and simple mathematical terms such as `{ label + 2 }` .  White
