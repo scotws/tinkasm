@@ -73,11 +73,14 @@ file written. Note also that TinkAsm will happily overwrite the previous files
 without a warning. 
 
 
-## The source file 
+## The Source File 
 
 TinkAsm requires a text format source file that is passed with the `-i` or
 `--input` options. The assembler does not distinguish between upper and lower
 case (internally, all is converted to lower case). 
+
+Directives always come first in their line (except for the Current Line Symbol,
+see below). Assignments for example are `.equ mynumber 13.`
 
 
 ### Mnemonics 
@@ -113,9 +116,10 @@ are both allowed, but not `nope=19`. Modifications and math terms are
 allowed (see below for details), such as
 
 ```
-        .equ less 3210
+        .equ less 8001
         .equ some .lsb less
         .equ more { less + 1 }
+        .equ other .msb { less + 1 }
 ```
 Note that numbers by default are in hexadecimal format (see below).
 

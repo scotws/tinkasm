@@ -160,7 +160,7 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 # because this is used to keep the user from using these words as labels
 
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
-        '.end', '.byte', '.word', '.long', '.advance', '.skip',\
+        '.end', '.equ', '.byte', '.word', '.long', '.advance', '.skip',\
         '.native', '.emulated', '.string', '.string0',\
         '.stringlf', '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
@@ -795,25 +795,23 @@ dump(sc_end, "nps")
 
 
 # -------------------------------------------------------------------
-# PASS SIMPLEASSIGN: Handle plain number assigments
+# PASS SIMPLE ASSIGN: Handle plain number assigments
 
 # Handle the simplest form of assignments, those were a number is assigned to
-# a variable ('jack = 1'). We can't do full assignments until we've dealt with
-# labels, but we can do this now to cut down on the number of lines we have to
-# go through every time. 
+# a variable ('.equ jack 1') without modifiers, math, or symbols. We can't do
+# full assignments until we've dealt with labels, but we can do this now to cut
+# down on the number of lines we have to go through every time. 
 
 def is_assignment(ps):
-    """See if the payload string contains the assignment directives, 
-    usually ".equ" or "=". Isolated in own function for ease of 
-    modification. Returns bool.
+    """See if the payload string contains the assignment directive ".equ". 
+    Isolated in own function for ease of modification. Returns bool.
     """
 
-    # We can't just check to see if the '=' is in the payload, because we
-    # might be dealing with a string directive with that character as part
-    # of the string.
-    w = pay.split() 
+    # We can't just check to see if '.equ' is in the payload, because we
+    # might be dealing with a string 
+    w = ps.split() 
 
-    return (w[1] == '=') or (w[2] == '.equ')
+    return (w[0] == '.equ')
 
 
 def vet_newsymbol(s):
@@ -838,7 +836,6 @@ def vet_newsymbol(s):
     if s in symbol_table.keys():
         fatal(num, 'Symbol "{0}" already defined'.format(s))
 
-
 sc_simpleassign = []
 
 for num, pay, sta in sc_end:
@@ -850,24 +847,25 @@ for num, pay, sta in sc_end:
 
     w = pay.split()
 
-    # Test for length first or risk index errors
-    if (len(w) != 3) or (not is_assignment(w[1])):
+    # Test for length first or risk index errors. The crude test for three words
+    # works because we're only looking for simple assignments.
+    if (len(w) != 3) or (not is_assignment(pay)):
         sc_simpleassign.append((num, pay, sta))
         continue
 
-    vet_newsymbol(w[0])
+    vet_newsymbol(w[1])
 
     # Get the third turm, which should be a number
     f_num, r = convert_number(w[2])
 
-    # If it's a number, add it to the symbol table
+    # If it's a number, add it to the symbol table, otherwise we'll have to wait
     if f_num:
-        symbol_table[w[0]] = r
+        symbol_table[w[1]] = r
     else:
         sc_simpleassign.append((num, pay, sta))
 
 n_passes += 1
-verbose('PASS SIMPLEASSIGN: Assigned {0} new symbol(s) to symbol table'.\
+verbose('PASS SIMPLE ASSIGN: Assigned {0} new symbol(s) to symbol table'.\
         format(len(sc_end)-len(sc_simpleassign)))
 dump(sc_simpleassign, "nps")
 
@@ -1310,8 +1308,8 @@ if args.dump:
 # -------------------------------------------------------------------
 # PASS ASSIGN: Handle assignments
 
-# We accept two variants of assignment directives , "=" and ".equ". Since we've
-# moved all labels to their own lines, any such directive must be the second
+# We accept assignments in the form ".equ <SYM> <NBR>". Since we've
+# moved all labels to their own lines, any such directive must be the first
 # word in the line
 
 sc_assign = []
@@ -1332,10 +1330,10 @@ for num, pay, sta in sc_labels:
         sc_assign.append((num, pay, sta))
         continue
         
-    vet_newsymbol(w[0]) 
+    vet_newsymbol(w[1]) 
 
 
-    # --- SUBSTEP 1: SIMPLE ASSIGNMENT ('jack = 1') ---
+    # --- SUBSTEP 1: SIMPLE ASSIGNMENT ('.equ jack 1') ---
     
     # We've already done some of those, but because of the CURRENT directive
     # we might have some left over
@@ -1346,7 +1344,7 @@ for num, pay, sta in sc_labels:
         # If we have a plain number, add it to the symbol table and 
         # continue
         if f_num:
-            symbol_table[w[0]] = r
+            symbol_table[w[1]] = r
             continue
 
         # No, we have a symbol
@@ -1355,11 +1353,11 @@ for num, pay, sta in sc_labels:
         except KeyError:
             fatal(num, 'Symbol "{0}" unknown'.format(r))
         else:
-            symbol_table[w[0]] = rs
+            symbol_table[w[1]] = rs
             continue
 
 
-    # --- SUBSTEP 2: SIMPLE MODIFICATION ('jack = .lsb 0102') ---
+    # --- SUBSTEP 2: SIMPLE MODIFICATION ('.equ jack .lsb 0102') ---
     
     # This should be the only case where the payload string is four words
     # long
@@ -1379,38 +1377,39 @@ for num, pay, sta in sc_labels:
         except KeyError:
             fatal(num, 'Illegal modifier "{0}" given'.format(w[2]))
         else:
-            symbol_table[w[0]] = rm
+            symbol_table[w[1]] = rm
             continue
 
 
-    # --- SUBSTEP 3: SIMPLE MATH TERM ('jack = { 1 + 1 }') ---
+    # --- SUBSTEP 3: SIMPLE MATH TERM ('.equ jack { 1 + 1 }') ---
 
     # These are distinguished by having '{' as the third word. 
     if w[2] == LEFTMATH:
-        _, r = convert_number(do_math(pay.split('=')[1]))
-        symbol_table[w[0]] = r
+        _, r = convert_number(do_math(" ".join(w[2:])))
+        symbol_table[w[1]] = r
         continue
                 
 
-    # --- SUBSTEP 4: MIX OF MODIFY AND MATH ('jack = .lsb { 1 + 1 }') ---
+    # --- SUBSTEP 4: MIX OF MODIFY AND MATH ('.equ jack .lsb { 1 + 1 }') ---
     
     # These are distinguished by having a modifier as the third word and a '{'
     # as the fourth one. 
     if w[3] == LEFTMATH:
 
         # Replace math term with number inside the string
-        rs = do_math(pay.split('=')[1])
+        rs = do_math(pay)
 
-        # We should now have a string with two words, a modifier and the number
+        # We should now have a string with two words, a modifier, and the number
+        # ('.equ jack .lsb <NBR>')
         r = rs.split()
 
         try:
-            _, ro = convert_number(r[1])
-            rm = MODIFIERS[r[0]](ro)
+            _, ro = convert_number(r[3])
+            rm = MODIFIERS[r[2]](ro)
         except KeyError:
-            fatal(num, 'Illegal modifier "{0}" given'.format(r[0]))
+            fatal(num, 'Illegal modifier "{0}" given'.format(r[2]))
         else:
-            symbol_table[w[0]] = rm
+            symbol_table[w[1]] = rm
             continue
 
 

@@ -4,20 +4,21 @@
     .mpu 65816
     .origin 0e000
 
-    vga_base = 8000             ; some I/O chip
-    vga1 = { vga_base + 1 }     ; should be 8001
-    vga2 = { vga_base + 2 }     ; should be 8002
+    .equ vga_base 8000             ; some I/O chip
+    .equ vga_msb .msb vga_base     ; should be 80
+    .equ vga1 { vga_base + 1 }     ; should be 8001
+    .equ vga2 { vga_base + 2 }     ; should be 8002
 
-    vga2_msb = .msb { vga_base + 2 }    ; should be 80
+    .equ vga2_msb .msb { vga_base + 2 }    ; should be 80
 
-    done? = 5
+    .equ done? 5
 
     .macro lazy
             nop
             nop
     .endmacro
 
-            lda.# 00 
+            lda.# { 0 + 0 }
             tax
 
 @
