@@ -246,7 +246,7 @@ parameter.
 
 `.invoke` - Inserts the macro given as parameter. 
 
-`.long` or - Store the following list of space-delimited 24-bit as bytes.
+`.long` - Store the following list of space-delimited 24-bit as bytes.
 The assembler handles the conversion to little-endian format. Parameters can be
 in any supported number base or symbols.
 
