@@ -36,6 +36,8 @@
             cmp.# 0000
             bne -       ; always true
 
+    .invoke lazy
+
             stp 
 
 data

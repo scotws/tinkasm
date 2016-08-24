@@ -111,7 +111,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  08. July 2016
+Version BETA  24. August 2016
 Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -892,12 +892,12 @@ pre_len = len(sc_replaced01)
 
 for num, pay, sta in sc_replaced01:
 
+    w = pay.split()
+
     # Usually the line will not be a macro, so get it out of the way
-    if '.invoke' not in pay:
+    if w[0] != '.invoke':
         sc_invoke.append((num, pay, sta))
         continue
-
-    w = pay.split()
 
     # Name of macro to invoke must be second word in line
     try:
