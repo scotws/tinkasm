@@ -160,7 +160,7 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 # because this is used to keep the user from using these words as labels
 
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
-        '.end', '.byte', '.word', '.long',\
+        '.end', '.byte', '.word', '.long', '.advance', '.skip',\
         '.native', '.emulated', '.string', '.string0',\
         '.stringlf', '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
@@ -968,9 +968,9 @@ else:
 
 sc_axy = []
 
+# We don't need to define these if we're not using a 65816
 if MPU == '65816':
 
-    # We don't need to define these if we're not using a 65816
     AXY_INS = {'.a8':    (('sep 20', ADDED), ('.!a8', CONTROL)),\
     '.a16': (('rep 20', ADDED), ('.!a16', CONTROL)),\
     '.xy8': (('sep 10', ADDED), ('.!xy8', CONTROL)),\
@@ -1240,7 +1240,7 @@ for num, pay, sta in sc_splitmove:
 
     # --- SUBSTEP ADVANCE: See if we have the .advance directive ---
     
-    if w[0] == '.advance' or w[0] == '.adv':
+    if w[0] == '.advance':
         f_num, r = convert_number(w[1])
 
         # If this is a symbol, it must be defined already or we're screwed
@@ -1248,7 +1248,7 @@ for num, pay, sta in sc_splitmove:
             try:
                 r = symbol_table(r)
             except KeyError:
-                fatal(num, 'Unknown symbol "{0}"'.format(r))
+                fatal(num, 'Unknown symbol "{0}" after .advance'.format(r))
 
         # Make sure the user is not attempting to advance backwards
         if r < (LCi+LC0):
