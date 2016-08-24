@@ -87,11 +87,15 @@ Assembler Notation (TAN). See [the
 introduction](https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/)
 to TAN for details.
 
+TinkAsm and TAN try to ensure that all source files have the same formatting, a
+philosophy it takes from the Go programming language. An equivalent tool to Go's
+`gofmt` is planned. 
+
 
 ### Definitions
 
 TinkAsm requires two definitions at the beginning of the source file: Where
-assembly is to start (`.origin` or `.org`) and which processor the code is to be
+assembly is to start (`.origin`) and which processor the code is to be
 generated for (`.mpu`). Failure to provide either one will abort the assembly
 process with a FATAL error. Supported MPUs are `6502`, `65c02` (upper and
 lowercase "c" are accepted), and `65816`. 
@@ -222,7 +226,7 @@ in between with zeros.
 modifier. Thought it pretty much only makes sense for the 65816 MPU, it is
 supported for other formats as well. 
 
-`.byte` or `.b` - Store the following list of space-delimited bytes. Parameters
+`.byte` - Store the following list of space-delimited bytes. Parameters
 can be in any supported number base or symbols. 
 
 `.end` - Marks the end of the assembly source code. Must be last line in
@@ -235,7 +239,7 @@ parameter.
 
 `.invoke` - Inserts the macro given as parameter. 
 
-`.long` or `.l` - Store the following list of space-delimited 24-bit as bytes.
+`.long` or - Store the following list of space-delimited 24-bit as bytes.
 The assembler handles the conversion to little-endian format. Parameters can be
 in any supported number base or symbols.
 
@@ -252,24 +256,24 @@ modifier.
 `.mpu` - Provides the target MPU as the parameter. Required. Legal values are
 `6502`, `65c02`, or `65816`. 
 
-`.origin` or `.org` - Start assembly at the address provided as a parameter.
+`.origin` - Start assembly at the address provided as a parameter.
 Required for the program to run.
 
 `.skip` - Jump head by the number of bytes given as a parameter, filling the
 space in between with zeros.
 
-`.string` or `.s` - Store the following ASCII string that is delimited by double
+`.string` - Store the following ASCII string that is delimited by double
 quotation marks `"` (not single quote marks). 
 
-`.string0` or `.s0` - Store the following ASCII string that is delimited by double
+`.string0` - Store the following ASCII string that is delimited by double
 quotation marks `"` (not single quote marks) as well as a zero byte as last
 characters. 
 
-`.stringlf` or `.slf` - Store the following ASCII string that is delimited by
+`.stringlf` - Store the following ASCII string that is delimited by
 double quotation marks `"` (not single quote marks) followed by a line feed
 ASCII character. 
 
-`.word` or `.w` - Store the following list of space-delimited 16-bit words as
+`.word` - Store the following list of space-delimited 16-bit words as
 bytes. The assembler handles the conversion to little-endian format. Parameters
 can be in any supported number base or symbols. Note that WDC uses "double 
 byte" for 16-bit values, but the rest of the world uses "word". 

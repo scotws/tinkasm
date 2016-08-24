@@ -159,8 +159,8 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 # because this is used to keep the user from using these words as labels
 
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
-        '.org', '.end', '.b', '.byte', '.w', '.word', '.l', '.long',\
-        '.native', '.emulated', '.s', '.string', '.s0', '.string0', '.slf',\
+        '.end', '.byte', '.word', '.long',\
+        '.native', '.emulated', '.string', '.string0',\
         '.stringlf', '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
         '.and', '.or', '.xor', CURRENT, '.macro', '.endmacro', '.invoke',\
@@ -750,14 +750,13 @@ if args.dump:
 # -------------------------------------------------------------------
 # STEP ORIGIN: Find .ORIGIN directive
 
-# Origin line should be at the top of the list now. We accept both 
-# ".origin" and ".org".
+# Origin line should be at the top of the list now. 
 
 sc_origin = []
 
 originline = sc_macros[0][1].strip().split()
 
-if originline[0] != '.origin' and originline[0] != '.org':
+if originline[0] != '.origin':
     n = sc_macros[0][0]   # Fatal always needs a number line, fake it
     fatal(n, 'No ORIGIN directive found, must be first line after macros')
 
@@ -1151,39 +1150,39 @@ for num, pay, sta in sc_splitmove:
     # point, but just count their bytes
 
     # .BYTE stores one byte per whitespace separated word
-    if w[0] == '.byte' or w[0] == '.b':
+    if w[0] == '.byte':
         LCi += len(w)-1
         sc_labels.append((num, pay, sta))
         continue
 
     # .WORD stores two bytes per whitespace separated word
-    if w[0] == '.word' or w[0] == '.w':
+    if w[0] == '.word':
         LCi += 2*(len(w)-1)
         sc_labels.append((num, pay, sta))
         continue
 
     # .LONG stores three bytes per whitespace separated word
-    if w[0] == '.long' or w[0] == '.l':
+    if w[0] == '.long':
         LCi += 3*(len(w)-1)
         sc_labels.append((num, pay, sta))
         continue
 
     # .STRING stores characters inside parens
-    if w[0] == '.string' or w[0] == '.str':
+    if w[0] == '.string':
         st = pay.split('"')[1]
         LCi += len(st)
         sc_labels.append((num, pay, sta))
         continue
 
     # .STRING0 stores characters inside parens plus a zero 
-    if w[0] == '.string0' or w[0] == '.str0':
+    if w[0] == '.string0':
         st = pay.split('"')[1]
         LCi += len(st)+1
         sc_labels.append((num, pay, sta))
         continue
 
     # .STRINGLF stores characters inside parens plus a Line Feed char
-    if w[0] == '.stringlf' or w[0] == '.strlf':
+    if w[0] == '.stringlf':
         st = pay.split('"')[1]
         LCi += len(st)+1
         sc_labels.append((num, pay, sta))
