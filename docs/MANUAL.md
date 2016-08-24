@@ -118,7 +118,7 @@ allowed (see below for details), such as
 ### Labels
 
 TinkAsm sees any string as a label that starts in the first column of a line and
-is not the comment directive (usually `;`) or the local label (by default `@`).
+is not the comment directive (usually `;`) or the anonymous label (by default `@`).
 In other words, anything that is *not* a label or a comment must have white space
 in front of it. There are no rules for the string itself, so `*!$?` is a
 perfectly legal string. 
@@ -131,9 +131,9 @@ ice&fire        nop
 Note that in contrast to other assemblers, labels do not have to end with a `:`. 
 
 
-### Local Labels 
+### Anonymous Labels 
 
-Local labels are used for trivial uses such as loops that don't warrant a full
+Anonymous labels are used for trivial uses such as loops that don't warrant a full
 label. It consists of `@` as the generic label, used as a normal label, and
 either a `+` or a `-` after the jump or branch instruction. 
 
@@ -145,6 +145,9 @@ either a `+` or a `-` after the jump or branch instruction.
 
 The `-` or `+` always refers to the next or previous `@`. These directives
 cannot be modified. 
+
+*(In earlier versions of TinkAsm, these labels were called "local" labels. They
+were renamed to fit the common usage.)*
 
 
 ### Current Line Symbol
@@ -162,7 +165,7 @@ see below.
 
 ### Modifiers and Math
 
-Normal labels (but not local labels) and symbols can be modified by "modifiers"
+Normal labels (but not anonymous labels) and symbols can be modified by "modifiers"
 such as `.lsb` and simple mathematical terms such as `{ label + 2 }` .  White
 space is significant, so `label+2` is not legal (and will be identified as a
 symbol).  You can use anything that is a simple Python 3 math instruction
@@ -200,13 +203,13 @@ constructs. These are to be added in a future version.
 
 ### Directives for all MPUs
 
-`@` - The default local label symbol. Used at the very beginning of a line and
+`@` - The default anonymous label symbol. Used at the very beginning of a line and
 referenced by `+` and `-` for jumps and branches.
 
-`+` - As an operand to a branch or jump instruction: Refer to the next local
+`+` - As an operand to a branch or jump instruction: Refer to the next anonymous 
 label. 
 
-`-` - As an operand to a branch or jump instruction: Refer to previous local
+`-` - As an operand to a branch or jump instruction: Refer to previous anonymous
 label. 
 
 `.*` - As an operand in the first position after the mnemonic: Marks current

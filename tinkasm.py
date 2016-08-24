@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 08. Jul 2016
+# This version: 24. Aug 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -118,7 +118,7 @@ This program comes with ABSOLUTELY NO WARRANTY
 
 COMMENT = ';'       # Default comment marker
 CURRENT = '.*'      # Default current location counter
-LOCAL_LABEL = '@'   # Default marker for local labels
+LOCAL_LABEL = '@'   # Default marker for anonymous labels
 SEPARATORS = '[.:]' # Legal separators in number strings for regex
 
 HEX_PREFIX = '$'    # Default prefix for hexadecimal numbers
@@ -140,7 +140,7 @@ LIST_FILE = 'tink.lst'  # Name of listing file
 SUPPORTED_MPUS = ['6502', '65c02', '65816']
 
 symbol_table = {}
-local_labels = []
+anon_labels = []
 
 
 # Line Status. Leave these as strings so humans can read them. We start with
@@ -155,7 +155,7 @@ MACRO = 'MACRO      '      # Line created by macro expansion
 SOURCE = 'source     '     # Raw entry line (without whitespace)
 MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 
-# List of all directives. Note the local label character is not included
+# List of all directives. Note the anonymous label character is not included
 # because this is used to keep the user from using these words as labels
 
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
@@ -632,7 +632,7 @@ dump(sc_status, 'nps')
 # line. To make life easier for the following routines, here we make sure each
 # label has it's own line. Since we have gotten rid of the full-line comments,
 # anything that is in the first column and is not whitespace is then considered
-# a label. We don't distinguish between global and local labels at this point
+# a label. We don't distinguish between global and anonymous labels at this point
 
 # This step also cleans up the formating in the source codes for the user
 # by standardizing the indent
@@ -1118,15 +1118,15 @@ for num, pay, sta in sc_splitmove:
 
     # --- SUBSTEP LABELS: Figure out where our labels are ---
 
-    # Labels and local labels are the only things that should be in the first
+    # Labels and anonymous labels are the only things that should be in the first
     # column at this point
 
     if pay[0] not in string.whitespace:
 
         # Local labels are easiest, start with them first
         if w[0] == LOCAL_LABEL:
-            local_labels.append((num, LC0+LCi))
-            verbose('New local label found in line {0}, address {1:06x}'.\
+            anon_labels.append((num, LC0+LCi))
+            verbose('New anonymous label found in line {0}, address {1:06x}'.\
                     format(num, LC0+LCi))
             continue
 
@@ -1298,9 +1298,9 @@ if args.verbose:
     dump_symbol_table(symbol_table, "after LABELS (numbers in hex)")
 
 if args.dump:
-    print('Local Labels:')
-    if len(local_labels) > 0:
-        for ln, ll in local_labels:
+    print('Anonymous Labels:')
+    if len(anon_labels) > 0:
+        for ln, ll in anon_labels:
             print('{0:5}: {1:06x} '.format(ln, ll))
         print('\n')
     else:
@@ -1435,7 +1435,7 @@ sc_replaced02 = replace_symbols(sc_assign)
 
 # -------------------------------------------------------------------
 # CLAIM: At this point we should have all symbols present and known in the
-# symbol table, and local labels in the local label list
+# symbol table, and anonymous labels in the anonymous label list
 
 verbose('CLAMING that all symbols should now be known')
 
@@ -1522,38 +1522,38 @@ dump(sc_modify, "nps")
 
 
 # -------------------------------------------------------------------
-# PASS LOCALS: Replace all local label references by correct numbers
+# PASS ANONYMOUS: Replace all anonymous label references by correct numbers
 
-# We don't modify local labels or do math on them
+# We don't modify anonymous labels or do math on them
 
-sc_locals = []
+sc_anons = []
 
 for num, pay, sta in sc_modify:
 
     w = pay.split()
 
-    # We only allow the local references to be in the second word of the line,
+    # We only allow the anonymous references to be in the second word of the line,
     # that is, as an operand to an opcode
 
     if len(w) > 1 and w[1] == '+':
-        for ln, ll in local_labels:
+        for ln, ll in anon_labels:
             if ln > num:
                 pay = pay.replace('+', hexstr(6, ll))
                 sta = MODIFIED
                 break
 
     if len(w) > 1 and w[1] == '-':
-        for ln, ll in reversed(local_labels):
+        for ln, ll in reversed(anon_labels):
             if ln < num:
                 pay = pay.replace('-', hexstr(6, ll))
                 sta = MODIFIED
                 break
 
-    sc_locals.append((num, pay, sta))
+    sc_anons.append((num, pay, sta))
 
 n_passes += 1
-verbose('PASS LOCALS: Replaced all local labels with address values')
-dump(sc_locals, "nps")
+verbose('PASS ANONYMOUS: Replaced all anonymous labels with address values')
+dump(sc_anons, "nps")
 
 
 # -------------------------------------------------------------------
@@ -1568,7 +1568,7 @@ verbose('CLAMING there should be no labels or symbols left in the source')
 
 sc_bytedata = []
 
-for num, pay, sta in sc_locals:
+for num, pay, sta in sc_anons:
 
     w = pay.split()
 
