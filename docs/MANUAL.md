@@ -173,22 +173,32 @@ advancing the line counter. Use the directives `.advance` and `.skip` for these,
 see below.
 
 
-### Numbers, Modifiers and Math
+### Numbers 
 
 TinkAsm follows the TAN convention that all numbers are hexadecimal by default,
 because this is by far the most common format used in assembly and reduces
-visual clutter. To enforce decimal use, add `&` to the number (for example,
+visual clutter. To flag decimal use, add `&` to the number (for example,
 `lda.# &10`). The common hex prefixes `$` and `0x` are recognized, with `0x`
 being the recommended format. For binary numbers, use `%`. Octal numbers are
 not supported.
 
-Normal labels (but not anonymous labels) and symbols can be modified by "modifiers"
-such as `.lsb` and simple mathematical terms such as `{ label + 2 }` .  White
-space is significant, so `label+2` is not legal (and will be identified as a
-symbol).  You can use anything that is a simple Python 3 math instruction
-(including `**`), as the term between the brackets is santized and then sent to
-EVAL. Yes, EVAL is evil. Modifiers and math terms can be used in data lines,
-such as `.byte .lsb { 1 + 1 } .msb { 2 + 2 }`
+Numbers may contain `.` and `:` for better readability.
+
+```
+        .equ address 00:fffa
+```
+
+This is especially useful for the bank bytes of the 65816.
+
+### Modifiers and Math
+
+Normal references to labels (but not anonymous labels) and symbols can be
+modified by "modifiers" such as `.lsb` and simple mathematical terms such as `{
+label + 2 }` .  White space is significant, so `label+2` is not legal (and will
+be identified as a symbol). You can use anything that is a simple Python 3 math
+instruction (including `**`) because  the term between the brackets is santized
+and then sent to EVAL. Yes, EVAL is evil. Modifiers and math terms can be used
+in data lines, such as `.byte .lsb { 1 + 1 } .msb { 2 + 2 }`
 
 
 ### Other 
@@ -357,8 +367,8 @@ consist of math terms (`{ home + 2 }`).  For longer terms, you can use the
 `.bank` directive.
 
 ```
-        source = 01:0000
-        target = 02:0000
+        .equ source 01:0000
+        .equ target 02:0000
 
                 mvp .bank source , .bank target
 ```
