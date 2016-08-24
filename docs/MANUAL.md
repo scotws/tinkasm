@@ -103,21 +103,24 @@ lowercase "c" are accepted), and `65816`.
 
 ### Assignments 
 
-To assign a value to a variable, use either `=` or `.equ` with significant
-white space. That means, both
+To assign a value to a variable, use `.equ` with significant white space,
+followed by the symbol and the value.
 
 ```
-        less = 20 
-        more .equ 21
+        .equ a_bore 4
 ```
 are both allowed, but not `nope=19`. Modifications and math terms are
 allowed (see below for details), such as
 
 ```
-        less = 20
-        some = .lsb less
-        more = { less + 1 }
+        .equ less 3210
+        .equ some .lsb less
+        .equ more { less + 1 }
 ```
+Note that numbers by default are in hexadecimal format (see below).
+
+*(Earlier versions of TinkAsm allowed assigments with the equal sign in the form
+`of_course = 2a.` This has been removed to enforce a common style.)*
 
 ### Labels
 

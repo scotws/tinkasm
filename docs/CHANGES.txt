@@ -4,7 +4,7 @@ First version: 27. Oct 2015
 This version: 24. Aug 2016
 
 24. Aug 2016 - Renamed "local" labels als "anonymous"; removed alternatives such 
-        as ".b" and ".org" (one version only)
+        as ".b" and ".org"; removed "=" assignments; ".equ" now at start of line
 20. Apr 2016 - Added Python math terms
 03. Dec 2015 - Completed BETA version
 11. Nov 2015 - Uploaded PRE-ALPHA to GitHub for backup
