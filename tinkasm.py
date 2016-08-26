@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 24. Aug 2016
+# This version: 26. Aug 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -111,7 +111,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  24. August 2016
+Version BETA  25. August 2016
 Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -161,8 +161,8 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
         '.end', '.equ', '.byte', '.word', '.long', '.advance', '.skip',\
-        '.native', '.emulated', '.string', '.string0',\
-        '.stringlf', '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
+        '.native', '.emulated',\
+        '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
         '.and', '.or', '.xor', CURRENT, '.macro', '.endmacro', '.invoke',\
         '.include', '.!native', '.!emulated', LEFTMATH, RIGHTMATH]
@@ -192,13 +192,20 @@ def little_endian_24(n):
     """Given a number, return a tuple with three bytes in correct format"""
     return lsb(n), msb(n), bank(n)
 
-def string2bytes(s):
-    """Given a string marked with quotation marks, isolate what is between them
-    and return the number of characters and a list of the hex ASCII values of
-    the characters in that string. Assumes that there is one and only one
-    string in the line that is delimited by quotation marks.
+def string2bytestring(s):
+    """Given a string marked with quotation marks, return a string that is a
+    comma-separated list of their hex ASCII values. Assumes that there is one 
+    and only one string in the line that is delimited by quotation marks.
+    Example: "abc" -> "61, 62, 63"
     """
-    return len(s), [hexstr(2, ord(c)) for c in s]
+
+    # We slice one character off both ends because those are the quotation marks
+    t = ' '.join([hexstr(2, ord(c))+',' for c in s[1:-1]])
+
+    # We don't want to add a comma to the end of the list because either the
+    # string was at the end of the line or there is already a comma present
+    # from the listing
+    return t[:-1]
 
 def convert_number(s):
     """Convert a number string provided by the user in one of various
@@ -680,6 +687,9 @@ dump(sc_breakup, "nps")
 # This pass must come after splitting the labels into their own lines or else we
 # have problem with lines that have both a label and an string directive 
 
+# TODO test this more extensively, possibly string and character conversion must
+# be moved up
+
 sc_lower = []
 
 for num, pay, sta in sc_breakup:
@@ -920,6 +930,82 @@ dump(sc_invoke, "nps")
 
 
 # -------------------------------------------------------------------
+# PASS STRINGS: Convert strings to bytes and byte lists
+
+# Since we have gotten rid of comments, every quotation mark must belong to
+# a string. We convert these strings to comma-separated byte lists 
+# Example: "aaa" -> 61, 61, 61
+
+# This method could also work for single-character strings in instructions such
+# as 'lda.# "a"'. However, this could be source of errors because the assembler
+# will happily also try to turn multi-character strings into byte lists in this
+# instance as well ('lda.# "ab"' would become 'lda.# 61, 62'). Use 
+# single-quotation marks for this, see next step.
+
+sc_strings = []
+p = re.compile('\".*?\"')
+
+for num, pay, sta in sc_invoke:
+
+        # Most lines won't have a string, so we skip them first
+        if '"' not in pay:
+            sc_strings.append((num, pay, sta))
+            continue 
+
+        ma = p.findall(pay)
+        new_pay = pay
+
+        # Replace the contents of the strings with a comma-separated list of 
+        # bytes
+        for m in ma:
+
+            # It is an error to use double quotation marks for a single
+            # character, use 'a' instead, see next step
+            if len(m) == 3:
+                fatal(num,\
+                        "Found single-character string {0}, use 'x' for chars".\
+                        format(m))
+
+            new_pay = new_pay.replace(m, string2bytestring(m))
+        
+        sc_strings.append((num, new_pay, sta))
+
+verbose('PASS STRINGS: Converted all strings to byte lists')
+dump(sc_strings, "nps")
+
+# -------------------------------------------------------------------
+# PASS CHARS: Convert single characters delimited by single quotes
+
+# Single characters are put in single quotes ('a'). This step must come after
+# the conversion of strings to make sure that we don't accidently find single
+# characters that are part of a string.
+
+sc_chars = []
+p = re.compile("\'.\'")
+
+for num, pay, sta in sc_strings:
+    
+    # We usually don't have a single quote in a line so we get rid of that
+    # immediately
+    if "'" not in pay:
+        sc_chars.append((num, pay, sta))
+        continue
+
+    ma = p.findall(pay)
+    new_pay = pay
+
+    # Replace each instance of a single-quoted string with the string of its
+    # hex number. Note that ord() returns unicode, but we currently slice off 
+    # anything that is not the last two hex digits
+    for m in ma:
+        new_pay = new_pay.replace(m, hexstr(2, ord(m[1])))
+
+    sc_chars.append((num, new_pay, sta))
+
+verbose('PASS CHARS: Converted all single characters to bytes')
+dump(sc_chars, "nps")
+
+# -------------------------------------------------------------------
 # PASS MODES: Handle '.native' and '.emulated' directives on the 65816
 
 # Since we have moved labels to their own lines, we assume that both .native
@@ -929,7 +1015,7 @@ sc_modes = []
 
 if MPU == '65816':
 
-    for num, pay, sta in sc_invoke:
+    for num, pay, sta in sc_chars:
 
         if '.native' in pay:
             sc_modes.append((num, INDENT+'clc', ADDED))
@@ -955,7 +1041,7 @@ if MPU == '65816':
     dump(sc_modes, "nps")
 
 else:
-    sc_modes = sc_invoke    # Keep the chain going
+    sc_modes = sc_strings # Keep the chain going
 
 
 # -------------------------------------------------------------------
@@ -1068,7 +1154,6 @@ for num, pay, sta in sc_splitmove:
 
     w = pay.split()
 
-
     # --- SUBSTEP CURRENT: Replace the CURRENT symbol by current address
 
     # This must come before we handle mnemonics. Don't add a continue because
@@ -1146,44 +1231,26 @@ for num, pay, sta in sc_splitmove:
     # --- SUBSTEP DATA: See if we were given data to store ---
     
     # Because of ideological reasons, we don't convert the instructions at this
-    # point, but just count their bytes
+    # point, but just count their bytes. Note these entries are not separated by
+    # spaces, but by commas, so we have to split them all over again.
 
-    # .BYTE stores one byte per whitespace separated word
+    d = pay.split(',')
+
+    # .BYTE stores one byte per comma-separated word
     if w[0] == '.byte':
-        LCi += len(w)-1
+        LCi += len(d)-1
         sc_labels.append((num, pay, sta))
         continue
 
-    # .WORD stores two bytes per whitespace separated word
+    # .WORD stores two bytes per comma-separated word
     if w[0] == '.word':
-        LCi += 2*(len(w)-1)
+        LCi += 2*(len(d)-1)
         sc_labels.append((num, pay, sta))
         continue
 
-    # .LONG stores three bytes per whitespace separated word
+    # .LONG stores three bytes per comma-separated word
     if w[0] == '.long':
-        LCi += 3*(len(w)-1)
-        sc_labels.append((num, pay, sta))
-        continue
-
-    # .STRING stores characters inside parens
-    if w[0] == '.string':
-        st = pay.split('"')[1]
-        LCi += len(st)
-        sc_labels.append((num, pay, sta))
-        continue
-
-    # .STRING0 stores characters inside parens plus a zero 
-    if w[0] == '.string0':
-        st = pay.split('"')[1]
-        LCi += len(st)+1
-        sc_labels.append((num, pay, sta))
-        continue
-
-    # .STRINGLF stores characters inside parens plus a Line Feed char
-    if w[0] == '.stringlf':
-        st = pay.split('"')[1]
-        LCi += len(st)+1
+        LCi += 3*(len(d)-1)
         sc_labels.append((num, pay, sta))
         continue
 
@@ -1629,38 +1696,6 @@ for num, pay, sta in sc_anons:
         pay = INDENT+'.byte '+' '.join(bl)
         sc_bytedata.append((num, pay, DATA_DONE))
         verbose('Converted .long directive in line {0} to .byte directive'.\
-                format(num))
-        continue
-
-    # SUBSTEP STRING: Convert .string directive to bytes
-    if w[0] == '.string' or w[0] == '.str':
-        st = pay.split('"')[1]
-        _, bl = string2bytes(st)
-        pay = INDENT+'.byte '+' '.join(bl)
-        sc_bytedata.append((num, pay, DATA_DONE))
-        verbose('Converted .string directive in line {0} to .byte directive'.\
-                format(num))
-        continue
-
-    # SUBSTEP STRING0: Convert .string0 directive to bytes
-    if w[0] == '.string0' or w[0] == '.str0':
-        st = pay.split('"')[1]
-        _, bl = string2bytes(st)
-        bl.append(hexstr(2, 00))
-        pay = INDENT+'.byte '+' '.join(bl)
-        sc_bytedata.append((num, pay, DATA_DONE))
-        verbose('Converted .string0 directive in line {0} to .byte directive'.\
-                format(num))
-        continue
-
-    # SUBSTEP STRINGLF: Convert .stringlf directive to bytes
-    if w[0] == '.stringlf' or w[0] == '.strlf':
-        st = pay.split('"')[1]
-        _, bl = string2bytes(st)
-        bl.append(hexstr(2, ord('\n')))
-        pay = INDENT+'.byte '+' '.join(bl)
-        sc_bytedata.append((num, pay, DATA_DONE))
-        verbose('Converted .stringlf directive in line {0} to .byte directive'.\
                 format(num))
         continue
 

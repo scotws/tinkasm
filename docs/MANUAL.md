@@ -2,7 +2,6 @@
 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 
-
 ## Overview
 
 The Tinkerer's Assembler (TinkAsm for short) is a multi-pass assembler for the
@@ -40,7 +39,6 @@ assembler for you.
 TinkAsm assumes that there is one and one mnemonic for each opcode. This is why
 the assembler uses Typist's Assembler Notation (TAN) instead of traditional
 notation for these MPUs. 
-
 
 ### State of Development
 
@@ -190,6 +188,16 @@ Numbers may contain `.` and `:` for better readability.
 
 This is especially useful for the bank bytes of the 65816.
 
+
+### Single Characters and Strings
+
+Single characters are marked in single quotes (`lda.# 'a'`). Because of the way
+Python 3 handles characters, the Unicode value is used, but might not fit into
+the register. Strings are marked in double quotes (`.byte "Kaylee"`). The
+assembler enforces not using double quotes for single characters (`"a"`) to
+prevent errors.
+
+
 ### Modifiers and Math
 
 Normal references to labels (but not anonymous labels) and symbols can be
@@ -249,8 +257,9 @@ in between with zeros.
 modifier. Thought it pretty much only makes sense for the 65816 MPU, it is
 supported for other formats as well. 
 
-`.byte` - Store the following list of space-delimited bytes. Parameters
+`.byte` - Store the following list of comma-delimited bytes. Parameters
 can be in any supported number base or symbols. 
+Example: `.byte 'a', 2, { size + 1 }, "Kaylee", %11001001`
 
 `.end` - Marks the end of the assembly source code. Must be last line in
 original source file. Required. 
@@ -262,7 +271,7 @@ parameter.
 
 `.invoke` - Inserts the macro given as parameter. 
 
-`.long` - Store the following list of space-delimited 24-bit as bytes.
+`.long` - Store the following list of comma-delimited 24-bit as bytes.
 The assembler handles the conversion to little-endian format. Parameters can be
 in any supported number base or symbols.
 
@@ -285,18 +294,7 @@ Required for the program to run.
 `.skip` - Jump head by the number of bytes given as a parameter, filling the
 space in between with zeros.
 
-`.string` - Store the following ASCII string that is delimited by double
-quotation marks `"` (not single quote marks). 
-
-`.string0` - Store the following ASCII string that is delimited by double
-quotation marks `"` (not single quote marks) as well as a zero byte as last
-characters. 
-
-`.stringlf` - Store the following ASCII string that is delimited by
-double quotation marks `"` (not single quote marks) followed by a line feed
-ASCII character. 
-
-`.word` - Store the following list of space-delimited 16-bit words as
+`.word` - Store the following list of comma-delimited 16-bit words as
 bytes. The assembler handles the conversion to little-endian format. Parameters
 can be in any supported number base or symbols. Note that WDC uses "double 
 byte" for 16-bit values, but the rest of the world uses "word". 
@@ -434,7 +432,10 @@ this stage. Processing the previous list is then handled by the next step or
 pass, modifying what needs to be changed, and then appending the processed
 line to the new list. 
 
+### Known Issues
 
+There is currently no way to load the quotation mark character directly without
+having to enter the hex value by hand (`lda.# '"'` or such will not work).
 
 ## SOURCES AND THANKS 
 

@@ -42,13 +42,8 @@
             stp 
 
 data
-    .byte 01 02 03 04 05 
-    .word 1000 2000 3000
-    .long 01aaaa 02bbbb
-
-strings
-    .string "The cake is a lie!"
-    .string0 "Terminated by zero"
-    .stringlf "Terminated by LF"
+    .byte 01, 02, 03, 04, 05 
+    .word 1000, 2000, 3000
+    .long 01aaaa, 02bbbb
 
     .end 

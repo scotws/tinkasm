@@ -1,8 +1,12 @@
 Major changes to the Tinkerer's Assembler for the 6502/65c02/65816
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 27. Oct 2015
-This version: 24. Aug 2016
+This version: 25. Aug 2016
 
+26. Aug 2016 - Removed .string directives, strings can now be in .byte and
+        other lists. Added single-character formats.
+25. Aug 2016 - Arguments for .byte et al now separated by commas, not spaces;
+        added section in Manual on known issues
 24. Aug 2016 - Renamed "local" labels als "anonymous"; removed alternatives such 
         as ".b" and ".org"; removed "=" assignments; ".equ" now at start of line
 20. Apr 2016 - Added Python math terms
