@@ -134,21 +134,21 @@ perfectly legal string.
 ```
 ice&fire        nop
                 nop
-                jmp ice&fire    ; global reference
+                jmp ice&fire
 ```
 Note that in contrast to other assemblers, labels do not have to end with a `:`. 
 
 
 ### Anonymous Labels 
 
-Anonymous labels are used for trivial uses such as loops that don't warrant a full
-label. It consists of `@` as the generic label, used as a normal label, and
+Anonymous labels are used for trivial uses such as loops that don't warrant a
+full label. It consists of `@` as the generic label, used as a normal label, and
 either a `+` or a `-` after the jump or branch instruction. 
 
 ```
 @               nop
                 nop
-                jmp -           ; local reference 
+                jmp -           ; anonymous reference 
 ```
 
 The `-` or `+` always refers to the next or previous `@`. These directives
@@ -187,6 +187,10 @@ Numbers may contain `.` and `:` for better readability.
 ```
 
 This is especially useful for the bank bytes of the 65816.
+
+In cases where a term could be an already defined symbol or a hex number (for
+example `aaa`), the assembler assumes a symbol. To force the use of a number,
+use a hex prefix such as `0x` or `$`.
 
 
 ### Single Characters and Strings
@@ -434,8 +438,9 @@ line to the new list.
 
 ### Known Issues
 
-There is currently no way to load the quotation mark character directly without
-having to enter the hex value by hand (`lda.# '"'` or such will not work).
+There is currently no way to load the single quotation mark character directly
+without having to enter the hex value by hand (`lda.# "'"` or such will not
+work).
 
 ## SOURCES AND THANKS 
 

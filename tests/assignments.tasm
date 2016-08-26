@@ -23,5 +23,7 @@
     .equ l .bank { 8000 + 2 }
 
     .equ m a 
+    .equ n 0xa
+    .equ o $a
 
     .end 

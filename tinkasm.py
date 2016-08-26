@@ -139,6 +139,7 @@ HEX_FILE = 'tink.hex'   # Name of hexdump file
 LIST_FILE = 'tink.lst'  # Name of listing file
 
 SUPPORTED_MPUS = ['6502', '65c02', '65816']
+DATA_DIRECTIVES = ['.byte', '.word', '.long']
 
 symbol_table = {}
 anon_labels = []
@@ -447,6 +448,8 @@ def convert_term(n, s):
     # default, terms such as 'abc' will be seen as symbols; numbers must start
     # with '0x' or '$' if they only have hex letters
 
+    s = s.strip()
+
     try:
         r = symbol_table[s]
     except KeyError:
@@ -454,7 +457,7 @@ def convert_term(n, s):
     else:
         return r
 
-    # --- SUBSTEP 2: NUMBER ('1') ---
+    # --- SUBSTEP 2: NUMBER ('1', '%000001') ---
     
     f_num, r = convert_number(s)
 
@@ -1148,7 +1151,7 @@ else:
 
 
 # -------------------------------------------------------------------
-# PASS SPLITMOVE - Split up Move instructions on the 65816
+# PASS SPLIT MOVES - Split up Move instructions on the 65816
 
 # The MVP and MVN instructions are really, really annoying because they have two
 # operands where every other instruction has one. We deal with this by splitting
@@ -1179,7 +1182,7 @@ if MPU == '65816':
             sc_splitmove.append((num, pay, sta))
 
     n_passes += 1
-    verbose('PASS SPLITMOVE: Split mvn/mvp instructions on the 65816')
+    verbose('PASS SPLIT MOVES: Split mvn/mvp instructions on the 65816')
     dump(sc_splitmove, "nps")
 
 else:
@@ -1481,6 +1484,57 @@ sc_replaced02 = replace_symbols(sc_assign)
 
 verbose('CLAMING that all symbols should now be known')
 
+# -------------------------------------------------------------------
+# PASS DATA: Convert various data formats like .byte
+
+sc_data = []
+
+for num, pay, sta in sc_replaced02:
+
+    w = pay.split()
+
+    if w[0] in DATA_DIRECTIVES:
+
+        # Regardless of which format we have, it should contain a list of
+        # comma-separated terms
+        ps = pay.strip().split(' ', 1)[1] # Get rid of the directive
+        ts = ps.split(',')
+        new_t = []
+
+        for t in ts:
+            new_t.append(convert_term(num, t))
+
+        # We now have a list of the numbers, but need to break them down into
+        # their bytes. This could be solved a lot more elegantly, but this is
+        # easier to understand
+        byte_t = []
+
+        if w[0] == '.byte':
+            byte_t = new_t
+
+        elif w[0] == '.word':
+            for n in new_t:
+                for b in little_endian_16(n):
+                    byte_t.append(b)
+
+        elif w[0] == '.long':
+            for n in new_t:
+                for b in little_endian_24(n):
+                    byte_t.append(b)
+
+        # Reassemble the datastring, getting rid of the trailing comma
+        new_pay = INDENT+'.byte '+' '.join([hexstr(2, b)+',' for b in byte_t])
+        new_pay = new_pay[:-1]
+        
+        sc_data.append((num, new_pay, DATA_DONE))
+
+    else:
+
+        sc_data.append((num, pay, sta))
+
+n_passes += 1
+verbose('PASS DATA: Converted all data formats to .byte')
+dump(sc_data, "nps")
 
 # -------------------------------------------------------------------
 # PASS MATH
@@ -1488,11 +1542,9 @@ verbose('CLAMING that all symbols should now be known')
 # Replace all math terms that are left in the text, eg 'jmp { label + 2 }'. 
 # None of these should be in assignments any more
 
-# TODO get this to work with .byte, .word etc
-
 sc_math = []
 
-for num, pay, sta in sc_replaced02:
+for num, pay, sta in sc_data:
 
     if LEFTMATH not in pay:
         sc_math.append((num, pay, sta))
@@ -1520,8 +1572,6 @@ dump(sc_math, "nps")
 
 # Replace all modify terms that are left in the text, eg 'lda.# .msb 1000'. 
 # None of these should be in assignments any more
-
-# TODO get this to work with .byte, .word etc
 
 sc_modify = []
 
@@ -1597,91 +1647,12 @@ n_passes += 1
 verbose('PASS ANONYMOUS: Replaced all anonymous labels with address values')
 dump(sc_anons, "nps")
 
-
 # -------------------------------------------------------------------
 # CLAIM: At this point we should have completely replaced all labels and
 # symbols with numerical values.
 
 verbose('CLAMING there should be no labels or symbols left in the source')
 
-
-# HIER HIER 
-# -------------------------------------------------------------------
-# PASS BYTEDATA: Convert various data formats like .word and .string to .byte
-
-sc_bytedata = []
-
-for num, pay, sta in sc_anons:
-
-    w = pay.split()
-
-    # SUBSTEP BYTE: Change status of .byte instructions
-    if w[0] == '.byte':
-        bw = w[1:]
-        bl = []
-
-        for ab in bw:
-            f_num, r = convert_number(ab)
-
-            # We might still have an operand here, so we need to test if 
-            # we really got a number
-            if f_num:
-                bl.append(hexstr(2, r))
-            else:
-                bl.append(r)
-
-        pay = INDENT+'.byte '+' '.join(bl)
-
-        sc_bytedata.append((num, pay, DATA_DONE))
-        continue
-
-    # SUBSTEP WORD: Produce two byte per word
-    if w[0] == '.word':
-        ww = w[1:]
-        bl = []
-
-        for aw in ww:
-            f_num, r = convert_number(aw)
-
-            if f_num:
-                for b in little_endian_16(r):
-                    bl.append(hexstr(2, b))
-            else:
-                bl.append(r)
-
-        pay = INDENT+'.byte '+' '.join(bl)
-        sc_bytedata.append((num, pay, DATA_DONE))
-        verbose('Converted .word directive in line {0} to .byte directive'.\
-                format(num))
-        continue
-
-    # SUBSTEP LONG: Produce three bytes per word
-    if w[0] == '.long':
-        lw = w[1:]
-        bl = []
-
-        for al in lw:
-
-            f_num, r = convert_number(al)
-
-            if f_num:
-                for b in little_endian_24(r):
-                    bl.append(hexstr(2, b))
-            else:
-                bl.append(r)
-
-        pay = INDENT+'.byte '+' '.join(bl)
-        sc_bytedata.append((num, pay, DATA_DONE))
-        verbose('Converted .long directive in line {0} to .byte directive'.\
-                format(num))
-        continue
-
-    # If this is something else, just keep it
-    sc_bytedata.append((num, pay, sta))
-
-n_passes += 1
-verbose('PASS BYTEDATA: Converted all other data formats to .byte')
-dump(sc_bytedata, "nps")
 
 # -------------------------------------------------------------------
 # CLAIM: At this point there should only be .byte data directives in the code
@@ -1697,7 +1668,7 @@ verbose('CLAMING that all data is now contained in .byte directives')
 
 sc_1byte = []
 
-for num, pay, sta in sc_bytedata:
+for num, pay, sta in sc_anons:
 
     w = pay.split()
 
@@ -1708,7 +1679,7 @@ for num, pay, sta in sc_bytedata:
     else:
 
         if opcode_table[oc][2] == 1:    # look up length of instruction
-            bl = INDENT+'.byte '+hexstr(2, oc)
+            bl = INDENT+'.byte '+hexstr(2, oc)+','
             sc_1byte.append((num, bl, CODE_DONE))
         else:
             sc_1byte.append((num, pay, sta))
@@ -1756,7 +1727,7 @@ for num, pay, sta in sc_1byte:
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
         bl, bm = little_endian_16(target_addr - branch_addr - 3)
-        opr = INDENT+new_pay+hexstr(2, bl)+' '+hexstr(2, bm)
+        opr = INDENT+new_pay+hexstr(2, bl)+', '+hexstr(2, bm)+','
         sc_branches.append((num, opr, CODE_DONE))
         continue
 
@@ -1881,6 +1852,7 @@ for num, pay, sta in sc_move:
 
         # Reassemble payload as a byte instruction. We keep the data in
         # human-readable form instead of converting it to binary data
+        # TODO Add commas
         pay = '{0}.byte {1:02x} {2}'.\
                 format(INDENT, oc, ' '.join([hexstr(2, i) for i in bl]))
         sc_allin.append((num, pay, CODE_DONE))
@@ -1909,6 +1881,7 @@ verbose('PASS VALIDATE: Confirmed that all lines are now byte data')
 
 # -------------------------------------------------------------------
 # PASS BYTECHECK: Make sure all values are valid bytes
+# TODO handle commas
 
 for num, pay, _ in sc_allin:
 
