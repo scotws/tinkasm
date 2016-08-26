@@ -1,0 +1,27 @@
+; Assigment tests for TinkAsm 
+; Scot W. Stevenson <scot.stevenson@gmail.com>
+; First version: 26. Aug 2016
+; This version: 26. Aug 2016
+
+    .mpu 65816
+    .origin 0x0e000
+
+    .equ a 1
+    .equ b %00000010
+    .equ c &30
+    .equ d 0x40
+
+    .equ e .lsb 332211
+    .equ f .msb 332211
+    .equ g .bank 332211
+
+    .equ h { 1 + 0 }
+    .equ i { a + 1 }
+
+    .equ j .lsb { 8000 + 1 }
+    .equ k .msb { 8000 + a }
+    .equ l .bank { 8000 + 2 }
+
+    .equ m a 
+
+    .end 

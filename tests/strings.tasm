@@ -1,0 +1,17 @@
+; Test file for strings and chars
+; A Tinkerer's Assembler for the 6502/65c02/65816
+
+    .mpu 65816
+    .origin 0x0e000
+
+            lda.# 'a'
+            lda.# { 'b' + 2 }
+            nop
+
+    .byte "aaa" 
+    .byte "bbb", "ccc"
+    .byte "ddd", 1, "eee"
+    .byte "fff", 1, "ggg", 2
+    .byte "a 'a' a"
+
+    .end 

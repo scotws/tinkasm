@@ -1,0 +1,19 @@
+; Data Test for TinkAsm 
+; Scot W. Stevenson <scot.stevenson@gmail.com>
+; First version: 26. Aug 2016
+; This version: 26. Aug 2016
+
+    .mpu 65816
+    .origin 0x0e000
+
+    .byte 1, 2, 3
+    .byte %00000001, %00000002, %00000003
+    .byte &10, &20, &30
+    .byte 'a', 'b', 'c'
+    .byte "aaa", "bbb", "ccc"
+    .byte { 1 + 0 }, { 1 + 1 }, { 1 + 2 }
+    .byte .lsb 302010, .msb 302010, .bank 302010
+    .byte .lsb { 8000 + 1 }, .msb { 8000 + 2 }
+
+    .end 
+ 
