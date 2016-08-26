@@ -118,13 +118,13 @@ This program comes with ABSOLUTELY NO WARRANTY
 
 COMMENT = ';'       # Comment marker, default is ";"
 CURRENT = '.*'      # Current location counter, default is ".*"
+ASSIGNMENT = '.equ' # Assignment directive, default is ".equ"
 LOCAL_LABEL = '@'   # Marker for anonymous labels, default is "@"
 SEPARATORS = '[.:]' # Legal separators in number strings for regex
 
 HEX_PREFIX = '$'    # Prefix for hexadecimal numbers, default is "$"
 BIN_PREFIX = '%'    # Prefix for binary numbers, default is "%"
 DEC_PREFIX = '&'    # Prefix for decimal numbers, default "&"
-                    # Note octal numbers are not supported
 
 LEFTMATH = '{'      # Opening bracket for Python math terms
 RIGHTMATH = '}'     # Closing bracket for Python math terms
@@ -160,7 +160,7 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 # because this is used to keep the user from using these words as labels
 
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
-        '.end', '.equ', '.byte', '.word', '.long', '.advance', '.skip',\
+        '.end', ASSIGNMENT, '.byte', '.word', '.long', '.advance', '.skip',\
         '.native', '.emulated',\
         '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
@@ -307,6 +307,27 @@ def do_math(s):
 
     return pre_math + hexstr(6, r) + post_math
 
+def vet_newsymbol(s):
+    """Given a word that the user wants to define as a new symbol, make sure
+    that is is legal. Does not return anything if okay, jumps to fatal error
+    if not.
+    """
+
+    # We don't allow using directives as symbols because that gets very
+    # confusing really fast
+    if s in DIRECTIVES:
+        fatal(num, 'Directive "{0}" cannot be redefined as a symbol'.\
+                format(s))
+
+    # We don't allow using mnemonics as symbols because that screws up other
+    # stuff and is really weird anyway
+    if s in mnemonics.keys(): 
+        fatal(num, 'Mnemonic "{0}" cannot be redefined as a symbol'.\
+                format(s))
+
+    # We don't allow redefining existing symbols, this catches various errors 
+    if s in symbol_table.keys():
+        fatal(num, 'Symbol "{0}" already defined'.format(s))
 
 def replace_symbols(sc_tmp):
     """Given the complete source code, replace all symbols we know so far. 
@@ -405,6 +426,63 @@ def dump_symbol_table(st, s=""):
 
     else:
         print('    (empty)\n')
+
+
+def convert_term(n, s): 
+    """Given the line number and a string that can be a number (in various 
+    formats), a symbol (that must already be known), a modifier (such as
+    '.lsb'), a math term (such as '{ 1 + 1 }') or a combination of modifier
+    and math term ('.lsb { 1 + 1 }'), return a string represenation of the
+    hex number they result in. Abort with fatal error, printing the line
+    number, if conversion is unsuccessful.
+
+    Characters ('a') and strings ("abc") are not included in this routine
+    because there are assumed to have been already converted as part of a 
+    diffent step.
+    """
+    
+    # --- SUBSTEP 1: KNOWN SYMBOL ---
+       
+    # We test to see if the term is a symbol before it is a number. Therefore, by
+    # default, terms such as 'abc' will be seen as symbols; numbers must start
+    # with '0x' or '$' if they only have hex letters
+
+    try:
+        r = symbol_table[s]
+    except KeyError:
+        pass
+    else:
+        return r
+
+    # --- SUBSTEP 2: NUMBER ('1') ---
+    
+    f_num, r = convert_number(s)
+
+    if f_num:
+        return r
+
+    # --- SUBSTEP 3: MATH TERM ('{ 1 + 1 }') ---
+
+    if (s[0] == LEFTMATH):
+        _, r = convert_number(do_math(s))
+        return r
+
+    # --- SUBSTEP 3: MODIFICATION ('.lsb 0102', '.msb { 1 + 1 }') ---
+
+    w = s.split()
+
+    if (w[0] in MODIFIERS):
+
+        # The parameter offered to the modification can be a number, symbol, 
+        # math term etc itself. We isolate it and send it and call ourselves to
+        # convert it again
+        rt = convert_term(n, s.split(' ', 1)[1])
+        r = MODIFIERS[w[0]](rt)
+        return r 
+
+    # --- SUBSTEP OOPS: If we made it to here, something is wrong ---
+    fatal(n, 'Cannot convert term "{0}"'.format(s))
+
 
 
 ### PASSES AND STEPS ###
@@ -773,7 +851,8 @@ if originline[0] != '.origin':
 
 f_num, LC0 = convert_number(originline[1])
 
-# ORIGIN may not take a symbol, because we haven't defined any yet
+# ORIGIN may not take a symbol, because we haven't defined any yet, and
+# we don't accept math or modifiers either
 if not f_num:
     n = sc_macros[0][0]
     fatal(n, 'ORIGIN directive gives "{0}", not number as required')
@@ -805,70 +884,45 @@ dump(sc_end, "nps")
 
 
 # -------------------------------------------------------------------
-# PASS SIMPLE ASSIGN: Handle plain number assigments
+# PASS SIMPLE ASSIGN: Handle first round of basic assigments
 
 # Handle the simplest form of assignments, those were a number is assigned to
-# a variable ('.equ jack 1') without modifiers, math, or symbols. We can't do
-# full assignments until we've dealt with labels, but we can do this now to cut
-# down on the number of lines we have to go through every time. 
-
-def is_assignment(ps):
-    """See if the payload string contains the assignment directive ".equ". 
-    Isolated in own function for ease of modification. Returns bool.
-    """
-
-    # We can't just check to see if '.equ' is in the payload, because we
-    # might be dealing with a string 
-    w = ps.split() 
-
-    return (w[0] == '.equ')
-
-
-def vet_newsymbol(s):
-    """Given a word that the user wants to define as a new symbol, make sure
-    that is is legal. Does not return anything if okay, jumps to fatal error
-    if not.
-    """
-
-    # We don't allow using directives as symbols because that gets very
-    # confusing really fast
-    if s in DIRECTIVES:
-        fatal(num, 'Directive "{0}" cannot be redefined as a symbol'.\
-                format(s))
-
-    # We don't allow using mnemonics as symbols because that screws up other
-    # stuff and is really weird anyway
-    if s in mnemonics.keys(): 
-        fatal(num, 'Mnemonic "{0}" cannot be redefined as a symbol'.\
-                format(s))
-
-    # We don't allow redefining existing symbols, this catches various errors 
-    if s in symbol_table.keys():
-        fatal(num, 'Symbol "{0}" already defined'.format(s))
+# a variable ('.equ jack 1') or a symbol we already know ('.equ jill jack')
+# without modifiers or math. We can't do full assignments until we've dealt with
+# labels, but we can do this now to cut down on the number of lines we have to
+# go through every time. 
 
 sc_simpleassign = []
 
 for num, pay, sta in sc_end:
 
-    # Skip labels immediately
-    if pay[0] not in string.whitespace:
+    w = pay.split()
+ 
+    if w[0] != ASSIGNMENT:
         sc_simpleassign.append((num, pay, sta))
         continue
 
-    w = pay.split()
-
-    # Test for length first or risk index errors. The crude test for three words
-    # works because we're only looking for simple assignments.
-    if (len(w) != 3) or (not is_assignment(pay)):
+    # We want the length to be exactly three words so we don't get involved
+    # modifiers or math terms
+    if len(w) != 3:
         sc_simpleassign.append((num, pay, sta))
         continue
 
     vet_newsymbol(w[1])
 
-    # Get the third turm, which should be a number
+    # In '.equ frog abc', 'abc' can either be a symbol or a number. We want it
+    # to be a symbol by default, so we check the symbol table first
+    try:
+        r = symbol_table[w[2]]
+        symbol_table[w[1]] = r
+        continue
+    except KeyError:
+        pass
+
     f_num, r = convert_number(w[2])
 
     # If it's a number, add it to the symbol table, otherwise we'll have to wait
+    # until we've figured out more stuff
     if f_num:
         symbol_table[w[1]] = r
     else:
@@ -894,6 +948,7 @@ sc_replaced01 = replace_symbols(sc_simpleassign)
 
 # Macros must be expanded before we touch the .NATIVE and .AXY directives
 # because those might be present in the macros
+# TODO add parameters, which might force us to move this to a later point
 
 sc_invoke = []
 pre_len = len(sc_replaced01)
@@ -931,6 +986,8 @@ dump(sc_invoke, "nps")
 
 # -------------------------------------------------------------------
 # PASS STRINGS: Convert strings to bytes and byte lists
+
+# Since strings are constants, we can convert them very early on
 
 # Since we have gotten rid of comments, every quotation mark must belong to
 # a string. We convert these strings to comma-separated byte lists 
@@ -973,8 +1030,11 @@ for num, pay, sta in sc_invoke:
 verbose('PASS STRINGS: Converted all strings to byte lists')
 dump(sc_strings, "nps")
 
+
 # -------------------------------------------------------------------
 # PASS CHARS: Convert single characters delimited by single quotes
+
+# Since characters are constants, we can convert them early on
 
 # Single characters are put in single quotes ('a'). This step must come after
 # the conversion of strings to make sure that we don't accidently find single
@@ -1304,6 +1364,7 @@ for num, pay, sta in sc_splitmove:
 
 
     # --- SUBSTEP ADVANCE: See if we have the .advance directive ---
+    # TODO make sure this works with math and modifiers
     
     if w[0] == '.advance':
         f_num, r = convert_number(w[1])
@@ -1333,7 +1394,8 @@ for num, pay, sta in sc_splitmove:
 
 
     # --- SUBSTEP SKIP: See if we have a .skip directive ---
-    #
+    # TODO make sure this works with math and modifiers
+    
     if w[0] == '.skip':
         f_num, r = convert_number(w[1])
 
@@ -1373,7 +1435,7 @@ if args.dump:
 
 
 # -------------------------------------------------------------------
-# PASS ASSIGN: Handle assignments
+# PASS ASSIGN: Handle complex assignments
 
 # We accept assignments in the form ".equ <SYM> <NBR>". Since we've
 # moved all labels to their own lines, any such directive must be the first
@@ -1385,104 +1447,18 @@ for num, pay, sta in sc_labels:
 
     w = pay.split()
 
-    # An assigment line must have three words at least. The "at least" part
-    # is so we can modifiy and do math with the assignment lines. Anything
-    # shorter is something else
-    if len(w) < 3:
-        sc_assign.append((num, pay, sta))
-        continue
-
-    # Leave if this is not an assignment
-    if not is_assignment(pay):
+    # Leave if this is not an assignment (line doesn't start with '.equ')
+    if w[0] != ASSIGNMENT:
         sc_assign.append((num, pay, sta))
         continue
         
     vet_newsymbol(w[1]) 
-
-
-    # --- SUBSTEP 1: SIMPLE ASSIGNMENT ('.equ jack 1') ---
     
-    # We've already done some of those, but because of the CURRENT directive
-    # we might have some left over
-    if len(w) == 3:
-
-        f_num, r = convert_number(w[2])
-
-        # If we have a plain number, add it to the symbol table and 
-        # continue
-        if f_num:
-            symbol_table[w[1]] = r
-            continue
-
-        # No, we have a symbol
-        try:
-            rs = symbol_table[r]
-        except KeyError:
-            fatal(num, 'Symbol "{0}" unknown'.format(r))
-        else:
-            symbol_table[w[1]] = rs
-            continue
-
-
-    # --- SUBSTEP 2: SIMPLE MODIFICATION ('.equ jack .lsb 0102') ---
-    
-    # This should be the only case where the payload string is four words
-    # long
-    if len(w) == 4:
-
-        f_num, r = convert_number(w[3])
-
-        # If we have a symbol, retrieve it
-        if not f_num: 
-            try:
-                rs = symbol_table[r]
-            except KeyError:
-                fatal(num, 'Symbol "{0}" unknown'.format(r))
-
-        try:
-            rm = MODIFIERS[w[2]](r)
-        except KeyError:
-            fatal(num, 'Illegal modifier "{0}" given'.format(w[2]))
-        else:
-            symbol_table[w[1]] = rm
-            continue
-
-
-    # --- SUBSTEP 3: SIMPLE MATH TERM ('.equ jack { 1 + 1 }') ---
-
-    # These are distinguished by having '{' as the third word. 
-    if w[2] == LEFTMATH:
-        _, r = convert_number(do_math(" ".join(w[2:])))
-        symbol_table[w[1]] = r
-        continue
-                
-
-    # --- SUBSTEP 4: MIX OF MODIFY AND MATH ('.equ jack .lsb { 1 + 1 }') ---
-    
-    # These are distinguished by having a modifier as the third word and a '{'
-    # as the fourth one. 
-    if w[3] == LEFTMATH:
-
-        # Replace math term with number inside the string
-        rs = do_math(pay)
-
-        # We should now have a string with two words, a modifier, and the number
-        # ('.equ jack .lsb <NBR>')
-        r = rs.split()
-
-        try:
-            _, ro = convert_number(r[3])
-            rm = MODIFIERS[r[2]](ro)
-        except KeyError:
-            fatal(num, 'Illegal modifier "{0}" given'.format(r[2]))
-        else:
-            symbol_table[w[1]] = rm
-            continue
-
-
-    # --- SUBSTEP OOPS: If we made it to here, something is wrong ---
-    fatal(num, 'Error in assignment directive "{0}"'.format(pay.strip()))
-
+    # Everything after the assignment directive and the symbol has to be part of
+    # the term
+    cp = pay.strip()
+    rs = convert_term(num, cp.split(' ', 2)[2])
+    symbol_table[w[1]] = rs
 
 n_passes += 1
 verbose('PASS ASSIGN: Assigned {0} symbols to symbol table'.\
@@ -1629,6 +1605,7 @@ dump(sc_anons, "nps")
 verbose('CLAMING there should be no labels or symbols left in the source')
 
 
+# HIER HIER 
 # -------------------------------------------------------------------
 # PASS BYTEDATA: Convert various data formats like .word and .string to .byte
 
