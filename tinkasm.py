@@ -1238,19 +1238,19 @@ for num, pay, sta in sc_splitmove:
 
     # .BYTE stores one byte per comma-separated word
     if w[0] == '.byte':
-        LCi += len(d)-1
+        LCi += len(d)
         sc_labels.append((num, pay, sta))
         continue
 
     # .WORD stores two bytes per comma-separated word
     if w[0] == '.word':
-        LCi += 2*(len(d)-1)
+        LCi += 2*(len(d))
         sc_labels.append((num, pay, sta))
         continue
 
     # .LONG stores three bytes per comma-separated word
     if w[0] == '.long':
-        LCi += 3*(len(d)-1)
+        LCi += 3*(len(d))
         sc_labels.append((num, pay, sta))
         continue
 
