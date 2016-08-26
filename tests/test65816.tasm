@@ -2,47 +2,21 @@
 ; Syntax demonstration for the 65816
 
     .mpu 65816
-    .origin 0e000
+    .origin e000
 
-    .equ vga_base 8000             ; some I/O chip
-    .equ vga_msb .msb vga_base     ; should be 80
-    .equ vga1 { vga_base + 1 }     ; should be 8001
-    .equ vga2 { vga_base + 2 }     ; should be 8002
-
-    .equ vga2_msb .msb { vga_base + 2 }    ; should be 80
-
-    .equ done? 5
-
-    .macro lazy
-            nop
-            nop
-    .endmacro
-
+            lda.# 00
             lda.# { 0 + 0 }
-            tax
-
-@
-            cmp.# done? 
-            sta.x vga_base
-            inx
-            bne -
-            
-    .include tests/includeme.tasm
-
     .native
-    .axy16
-            
-            phe.# 0000
-            pla
-            cmp.# 0000
-            bne -       ; always true
+    .a16
+            lda.# 00
+            lda.# { 0 + 0 }
 
-    .invoke lazy
+    .a8
+            lda.# 00
+            lda.# { 0 + 0 }
 
-            stp 
 
-data
-    .byte 01, 02, 03, 04, 05 
+    .byte 1, %00000010, &2, 'a', "aaa", .lsb { 8000 + 11 }
     .word 1000, 2000, 3000
     .long 01aaaa, 02bbbb
 

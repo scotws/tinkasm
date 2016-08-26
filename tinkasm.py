@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 26. Aug 2016
+# This version: 28. Aug 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -111,7 +111,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  25. August 2016
+Version BETA  28. August 2016
 Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -143,7 +143,6 @@ DATA_DIRECTIVES = ['.byte', '.word', '.long']
 
 symbol_table = {}
 anon_labels = []
-
 
 # Line Status. Leave these as strings so humans can read them. We start with
 # SOURCE and end up with everything either as CODE_DONE or DATA_DONE. Make
@@ -1367,17 +1366,9 @@ for num, pay, sta in sc_splitmove:
 
 
     # --- SUBSTEP ADVANCE: See if we have the .advance directive ---
-    # TODO make sure this works with math and modifiers
     
     if w[0] == '.advance':
-        f_num, r = convert_number(w[1])
-
-        # If this is a symbol, it must be defined already or we're screwed
-        if not f_num:
-            try:
-                r = symbol_table(r)
-            except KeyError:
-                fatal(num, 'Unknown symbol "{0}" after .advance'.format(r))
+        r = convert_term(num, w[1])
 
         # Make sure the user is not attempting to advance backwards
         if r < (LCi+LC0):
@@ -1397,14 +1388,9 @@ for num, pay, sta in sc_splitmove:
 
 
     # --- SUBSTEP SKIP: See if we have a .skip directive ---
-    # TODO make sure this works with math and modifiers
     
     if w[0] == '.skip':
-        f_num, r = convert_number(w[1])
-
-        # If this is a symbol, it must be defined already or we're screwed
-        if not f_num:
-            r = lookup_symbol(r, num)
+        r = convert_term(num, w[1])
 
         # While we're here, we might as well already convert this to .byte
         # though it is against our ideology ("Do as I say, don't do as I do")
@@ -1493,44 +1479,48 @@ for num, pay, sta in sc_replaced02:
 
     w = pay.split()
 
-    if w[0] in DATA_DIRECTIVES:
-
-        # Regardless of which format we have, it should contain a list of
-        # comma-separated terms
-        ps = pay.strip().split(' ', 1)[1] # Get rid of the directive
-        ts = ps.split(',')
-        new_t = []
-
-        for t in ts:
-            new_t.append(convert_term(num, t))
-
-        # We now have a list of the numbers, but need to break them down into
-        # their bytes. This could be solved a lot more elegantly, but this is
-        # easier to understand
-        byte_t = []
-
-        if w[0] == '.byte':
-            byte_t = new_t
-
-        elif w[0] == '.word':
-            for n in new_t:
-                for b in little_endian_16(n):
-                    byte_t.append(b)
-
-        elif w[0] == '.long':
-            for n in new_t:
-                for b in little_endian_24(n):
-                    byte_t.append(b)
-
-        # Reassemble the datastring, getting rid of the trailing comma
-        new_pay = INDENT+'.byte '+' '.join([hexstr(2, b)+',' for b in byte_t])
-        new_pay = new_pay[:-1]
-        
-        sc_data.append((num, new_pay, DATA_DONE))
-
-    else:
-
+    # This is for .byte, .word, and .long
+    if w[0] not in DATA_DIRECTIVES:
         sc_data.append((num, pay, sta))
+        continue 
+
+    # Stuff like .advance and .skip might already be done, we don't have to do
+    # it over
+    if sta == DATA_DONE or sta == CODE_DONE:
+        sc_data.append((num, pay, sta))
+        continue 
+
+    # Regardless of which format we have, it should contain a list of
+    # comma-separated terms
+    ps = pay.strip().split(' ', 1)[1] # Get rid of the directive
+    ts = ps.split(',')
+    new_t = []
+
+    for t in ts:
+        new_t.append(convert_term(num, t))
+
+    # We now have a list of the numbers, but need to break them down into
+    # their bytes. This could be solved a lot more elegantly, but this is
+    # easier to understand
+    byte_t = []
+
+    if w[0] == '.byte':
+        byte_t = new_t
+
+    elif w[0] == '.word':
+        for n in new_t:
+            for b in little_endian_16(n):
+                byte_t.append(b)
+
+    elif w[0] == '.long':
+        for n in new_t:
+            for b in little_endian_24(n):
+                byte_t.append(b)
+
+    # Reassemble the datastring, getting rid of the trailing comma
+    new_pay = INDENT+'.byte '+' '.join([hexstr(2, b) for b in byte_t])
+    
+    sc_data.append((num, new_pay, DATA_DONE))
 
 n_passes += 1
 verbose('PASS DATA: Converted all data formats to .byte')
@@ -1679,7 +1669,7 @@ for num, pay, sta in sc_anons:
     else:
 
         if opcode_table[oc][2] == 1:    # look up length of instruction
-            bl = INDENT+'.byte '+hexstr(2, oc)+','
+            bl = INDENT+'.byte '+hexstr(2, oc)
             sc_1byte.append((num, bl, CODE_DONE))
         else:
             sc_1byte.append((num, pay, sta))
@@ -1727,7 +1717,7 @@ for num, pay, sta in sc_1byte:
         _, branch_addr = convert_number(w[-1])
         _, target_addr = convert_number(w[-2])
         bl, bm = little_endian_16(target_addr - branch_addr - 3)
-        opr = INDENT+new_pay+hexstr(2, bl)+', '+hexstr(2, bm)+','
+        opr = INDENT+new_pay+hexstr(2, bl)+' '+hexstr(2, bm)
         sc_branches.append((num, opr, CODE_DONE))
         continue
 
@@ -1794,6 +1784,11 @@ else:
 
 sc_allin = []
 
+# On the 65816, remember to start in emulated, 8-bit mode at the beginning
+mpu_status = 'emulated'
+a_len_offset = 0
+xy_len_offset = 0
+
 for num, pay, sta in sc_move:
 
     w = pay.split()
@@ -1852,7 +1847,6 @@ for num, pay, sta in sc_move:
 
         # Reassemble payload as a byte instruction. We keep the data in
         # human-readable form instead of converting it to binary data
-        # TODO Add commas
         pay = '{0}.byte {1:02x} {2}'.\
                 format(INDENT, oc, ' '.join([hexstr(2, i) for i in bl]))
         sc_allin.append((num, pay, CODE_DONE))
@@ -1881,7 +1875,6 @@ verbose('PASS VALIDATE: Confirmed that all lines are now byte data')
 
 # -------------------------------------------------------------------
 # PASS BYTECHECK: Make sure all values are valid bytes
-# TODO handle commas
 
 for num, pay, _ in sc_allin:
 
