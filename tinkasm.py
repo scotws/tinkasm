@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 28. Aug 2016
+# This version: 27. Aug 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
