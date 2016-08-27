@@ -1,7 +1,7 @@
 " Vim Syntax File for a Typist's Assembler Notation, Python version 
 " Language: Assembler (6502/65c02/65816 8/16-bit CPU) 
 " Maintainer: Scot W. Stevenson <scot.stevenson@gmail.com>
-" Latest Revision: 17. April 2016
+" Latest Revision: 27. August 2016
 
 " This script is distributed in the hope that it will be useful,
 " but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -16,7 +16,7 @@ endif
 
 " === Basic Setup ===
 setlocal iskeyword=!,@,33-35,%,$,38-64,91-96,a-z,123-126,128-255
-setlocal ts=4 shiftwidth=4 expandtab tw=80 nowrap number fo=cronq1
+setlocal ts=8 shiftwidth=8 expandtab tw=80 nowrap number fo=cronq1
 
 
 " === Keyword Lists ===
@@ -108,17 +108,15 @@ syn keyword tasmBoring nop wdm
 " Keywords for directives of the Tinkerer's Assembler
 " See https://github.com/scotws/tinkasm
 syn keyword tasmDirective 
-    \ .advance .adv .emulated .end .include .mpu .native .origin .skip .*
+    \ .advance .emulated .end .include .mpu .native .origin .skip .*
     \ .a8 .a16 .xy8 .xy16 .axy8 .axy16
-    \ .a8! .a16! .xy8! .xy16! .native! .emulated!
-    \ .byte .b .word .w .long .l 
-    \ .string .str .string0 .str0 .stringlf .strlf
-    \ .lsb .msb .bank
-    \ .macro .endmacro .invoke
-    \ .equ = @ + - / * .lshift .rshift .and .or .xor .invert
+    \ .!a8 .!a16 .!xy8 .!xy16 .!native .!emulated
+    \ .byte .word .long .lsb .msb .bank
+    \ .macro .endmacro .invoke .save
+    \ .equ @ + - 
 
 " Keywords for programmer's notes. The last two are German
-syn keyword tasmTodo TODO CHECK FIXME HIER FEHLT
+syn keyword tasmTodo TODO CHECK HERE FIXME HIER FEHLT 
 
 
 " === Define Numbers ===
@@ -143,7 +141,7 @@ syn match tasmComment "\v;.*$"
 " Define Strings
 syn region tasmString start='"' end='"'
 
-" Define Python Code Instert (experimental)
+" Define Python Code Instert
 syn region pythonString start='{' end='}'
 
 " === Define our own color system === 
