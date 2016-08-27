@@ -1,23 +1,23 @@
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 ; Syntax demonstration for the 65816
 
-    .mpu 65816
-    .origin e000
+	.mpu 65816
+	.origin e000
 
-            lda.# 00
-            lda.# { 0 + 0 }
-    .native
-    .a16
-            lda.# 00
-            lda.# { 0 + 0 }
+		lda.# 00
+		lda.# { 0 + 0 }
+	.native
+	.a16
+		lda.# 00
+		lda.# { 0 + 0 }
 
-    .a8
-            lda.# 00
-            lda.# { 0 + 0 }
+	.a8
+		lda.# 00
+		lda.# { 0 + 0 }
 
 
-    .byte 1, %00000010, &2, 'a', "aaa", .lsb { 8000 + 11 }
-    .word 1000, 2000, 3000
-    .long 01aaaa, 02bbbb
+	.byte 1, %00000010, &2, 'a', "aaa", .lsb { 8000 + 11 }
+	.word 1000, 2000, 3000
+	.long 01aaaa, 02bbbb
 
-    .end 
+	.end 

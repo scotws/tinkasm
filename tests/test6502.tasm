@@ -1,21 +1,20 @@
 ; Test file for .byte formats, 6502
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 
-    .mpu 6502
-    .origin 0x0e000
+	.mpu 6502
+	.origin 0x0e000
 
-            lda.# 0x0000
-            tax
+        	lda.# 0x0000
+            	tax
 loop
-            sta.x 0x1000 
-            dex
-            bne loop 
+            	sta.x 0x1000 
+            	dex
+            	bne loop 
 
-    .byte 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0a, 0b, 0c
-    .byte $0, $1, $2, $3
-    .byte 0x0, 0x1, 0x2, 0x3
-    .byte %0, %1, %10, %11
-    .byte &10, &11, &12, &13
-    .byte "aaa"
-
-    .end 
+	.byte 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0a, 0b, 0c
+	.byte $0, $1, $2, $3
+	.byte 0x0, 0x1, 0x2, 0x3
+	.byte %0, %1, %10, %11
+	.byte &10, &11, &12, &13
+	.byte "aaa"
+	.end 
