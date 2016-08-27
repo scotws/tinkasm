@@ -1,22 +1,20 @@
 TODO List for A Tinkerer's Assember for the 6502/65c02/65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 26. Aug 2016
+This version: 27. Aug 2016
 
 
 AFTER BETA RELEASE:
 
-- See if verbose messages should come at start of pass (for error messages)
-- Create conversion program for TAN to other 65816 notations
+- Move verbose messages to start of each pass to make errors easier to spot
 - Create formatter to make sure all source code is formatted the same
+- Create conversion program for TAN to other 65816 notations
 - Support conversion of UTF-8 Unicode strings to bytes
-- Make .byte and friends work with math and modify terms
 - Add parameters to macros
 - Allow modify & math to work with branch instructions
 - Add comments to listing file
 - List file should show complete bytes from .byte
 - Add empty lines to listing file
 - Add advanced system macros (if/then/else, loops)
-- Analysis step: Suggest JSR, RTS --> JMP
+- Analysis step: Suggest JSR, RTS --> JMP; catch TAY TYA; 2 x NOP
 - Add counts for 65816 mode and register size switches
-- Enable direct loading of the " character (lda.# '#' or such)
