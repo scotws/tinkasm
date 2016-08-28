@@ -11,8 +11,8 @@ what is going on. Go comes with "gofmt", Tinkasm with "tinkfmt".
 More importantly, Tinkfmt will allow you to just slap down code without any
 though of formatting and let the machine handle that. So we can start off with
 ```
-.origin 8000
 .mpu 65816
+.origin 8000
 
 .equ athena 01
 .equ zeus 02
@@ -30,8 +30,8 @@ bra loop
 and get this:
 
 ```
-        .origin 8000
         .mpu 65816
+        .origin 8000
 
         .equ athena   01
         .equ zeus     02
