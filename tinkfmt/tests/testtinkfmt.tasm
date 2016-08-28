@@ -1,0 +1,33 @@
+; Test File for the Formatter for Tinkerer's Assembler
+; Scot W. Stevenson <scot.stevenson@gmail.com>
+; First version: 28. Aug 2016
+; This version: 28. Aug 2016
+
+.origin 8000
+.mpu 65816
+
+; This line should be left intact
+
+.equ jack 01
+.equ jonathan 02
+.equ julian 03
+.equ justin 04
+
+        ; keep this indentation for the love of God
+        .equ kaylee 03
+        .equ malcome 04
+
+.native  ; switch to native code
+frog lda.# 00
+         sta.l 01:ffff
+         bra frog  ; loop
+
+mike .byte 1, 2, 3, 4, 5  ; just a bunch of numbers
+micha .byte "Yes I can dance", 0
+tricky
+        .byte ';',     1, ';'
+        .byte ';', 2, ';', "   ", 4  ; note the string with spaces
+zoot  ; now where does this comment go?
+        .byte "A semicolon ; is here!", '3', ';'
+
+        .end

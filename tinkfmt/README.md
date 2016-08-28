@@ -10,18 +10,53 @@ what is going on. Go comes with "gofmt", TinkAsm with "tinkfmt".
 
 The basic rules are currently:
 
-- Comments are kept unchanged
-- All directives and opcodes are lower case 
-- Label target (including anonymous labels) start in the first column
-- All directives are indented by one unit (a tab's worth of spaces)
-- All code is indented by two units (two tab's worth of spaces)
+- All full-line comments are kept unchanged, including their indentation
+- Inline comments are separated by two spaces from the last code character in
+  the line (`lda.# 01  ; not too close`)
+- All labels, directives, and opcodes are lower case (case-sensitive labels are
+  a nasty source of errors)
+- Label target (including anonymous labels) start in the first column. Nothing
+  else (execpt comments) may be there
 - Spaces are used for indentation, not tabs
-- The default indentation unit is eight characters
-- There is only one space between terms
+- The default "indentation unit" is eight characters
+- Directives are indented by one unit (a tab's worth of spaces; but see blocks)
+- Code is indented by two units (two tab's worth of spaces; but see blocks)
+- There is only one space between terms of .byte, .word, and .long
+- Blocks of code are formatted together (see below).
 
 Tinkfmt requires a filename at start. The resulting, reformated file takes the
-name of this file, while the original version is given the extension `.old`. The
-converter uses a temporary file to avoid a loss of data during a crash. 
+name of this file, while the original version is given the extension `.orig`. 
+
+## Definition and Data Blocks
+
+Definitions that follow each other are coded as blocks. For instance:
+
+```
+        .equ derrial 1000
+        .equ hoban   2000
+        .equ inara   3000
+        .equ jayne   4000
+        .equ kaylee  5000  ; should be higher
+        .equ malcolm 6000
+        .equ river   7000
+        .equ simon   8000
+        .equ zoe     9000
+```
+
+Note the parameter is in one column. Definition blocks are separated by at
+least one empty line.
+
+As definition blocks, data blocks are formatted in columns. They also break with
+the normal indentation rules
+
+```
+my_data    .byte 01, 02, 03, 04, 05, 06
+his_data   .byte 11, 12, 13, 14, 15, 16
+yalls_data .byte a1, a2, a3, a4, a5, a6
+```
+
+Note the `.byte` directive is formatted in columns. If there is an in-line
+comment behind the label, it is not considered for blocks.
 
 See the TinkAsm manual in `docs/MANUAL.txt` for further information.
 

@@ -161,7 +161,7 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
         '.end', ASSIGNMENT, '.byte', '.word', '.long', '.advance', '.skip',\
-        '.native', '.emulated',\
+        '.native', '.emulated', '.mpu',\
         '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
         '.and', '.or', '.xor', CURRENT, '.macro', '.endmacro', '.invoke',\

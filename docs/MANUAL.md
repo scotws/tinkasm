@@ -137,6 +137,7 @@ ice&fire        nop
                 jmp ice&fire
 ```
 Note that in contrast to other assemblers, labels do not have to end with a `:`. 
+You cannot have more than one label in the same line. 
 
 
 ### Anonymous Labels 
