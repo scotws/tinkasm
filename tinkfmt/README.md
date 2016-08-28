@@ -6,7 +6,45 @@ This is a formatter for 6502/65c02/65816 assembler code written in Typist's
 Assembler Notation (TAN) for the Tinkerer's Assembler. The general philosophy is
 take from the Go programming language (golang): Every source code file should be
 formatted exactly the same. This makes it easier for everybody to understand
-what is going on. Go comes with "gofmt", TinkAsm with "tinkfmt".
+what is going on. Go comes with "gofmt", Tinkasm with "tinkfmt".
+
+More importantly, Tinkfmt will allow you to just slap down code without any
+though of formatting and let the machine handle that. So we can start off with
+```
+.origin 8000
+.mpu 65816
+
+.equ athena 01
+.equ zeus 02
+.equ poseidon 03
+
+.native
+loop lda.# 00 ; naught for all!
+sta.x 1000
+bra loop
+
+.byte 01,    02, 03 ; bad spaces!
+.end
+```
+
+and get this:
+
+```
+        .origin 8000
+        .mpu 65816
+
+        .equ athena   01
+        .equ zeus     02
+        .equ poseidon 03
+
+        .native
+loop            lda.# 00  ; naught for all!
+                sta.x 1000
+                bra loop
+
+        .byte 01, 02, 03  ; bad spaces!
+        .end
+```
 
 The basic rules are currently:
 
