@@ -9,7 +9,7 @@
 ; This line should be left intact
 
 .equ jack 01
-.equ jonathan 02
+.equ jonathan 02 ; totally overpaid
 .equ julian 03
 .equ justin 04
 

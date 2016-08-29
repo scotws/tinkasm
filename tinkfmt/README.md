@@ -67,8 +67,6 @@ name of this file, while the original version is given the extension `.orig`.
 
 ## Definition and Data Blocks
 
-CURRENTLY NOT IMPLEMENTED
-
 Definitions that follow each other are coded as blocks. For instance:
 
 ```
@@ -86,8 +84,10 @@ Definitions that follow each other are coded as blocks. For instance:
 Note the parameter is in one column. Definition blocks are separated by at
 least one empty line.
 
+DEFINTION BLOCKS ARE CURRENTLY NOT IMPLEMENTED
+
 As definition blocks, data blocks are formatted in columns. They also break with
-the normal indentation rules
+the normal indentation rules.
 
 ```
 my_data    .byte 01, 02, 03, 04, 05, 06

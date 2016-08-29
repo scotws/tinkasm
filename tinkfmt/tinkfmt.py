@@ -1,7 +1,7 @@
 # A Formatter for the Tinkerer's Assembler 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 27. Aug 2016
-# This version: 28. Aug 2016
+# This version: 29. Aug 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -233,21 +233,81 @@ for num, line in sc_in:
 
 ### DEFINITION BLOCKS
 
+# A definition block consists of two or more .equ statements in sequence. We want
+# them to be formatted so that the first, second, and third element are all
+# justified:
+#
+#       .equ athena   100
+#       .equ zeus     1000
+#       .equ poseidon 11
+#
+# Any inline comments follow in their lines as usual with two spaces distance.
+
+sc_defs = []
+block = []
+in_block = False 
+
+for num, line in sc_out:
+
+    # If we have an .equ directive, split it up. Need the try/except routine so
+    # we don't crash on empty lines
+    try:
+
+        if line.split()[0] == '.equ':
+            e = line.strip().split(' ', 2)
+
+            # If we're not already in a block, create a new one
+            if not in_block:
+                block = []
+                in_block = True
+
+            block.append(e)
+            continue 
+
+    except IndexError:
+        pass
+
+    # If this is not a definition directive and we're in a block, the block is
+    # done and we need to format and save it
+    if in_block:
+
+        # Get the maximal width of the second word (the name of the symbol)
+        max_width = max([len(row[1]) for row in block])
+
+        for row in block:
+            sc_defs.append((num, '{0}{1} {2:<{mw}} {3}'\
+                    .format(INDENT, row[0], row[1], row[2], mw=max_width)))
+
+        in_block = False
+
+    sc_defs.append((num, line))
+
 
 ### DATA BLOCKS
+
+# A data block consists of two or more data directives (.byte, .word, .long)
+# with an identifying label. The usual space between the label and the directive
+# is removed:
+#
+# first  .byte 01, 02, 03, 04 ; computer people count funny
+# second .byte 11, 12, 13, 14
+# third  .byte 21, 22, 23, 24
+#
+# They need to be formatted so that the data directives are all justified. This
+# should also be true for lines where one label is not present.
     
 
 ### OUTPUT
 
 if args.test:
-    for l in sc_out:
+    for l in sc_defs:
         print(l[1])
 else:
     filename, file_ext = os.path.splitext(args.source)
     os.rename(args.source, filename+'.orig')
 
     with open(filename+'.tasm', 'w') as f:
-        for l in sc_out:
+        for l in sc_defs:
             f.write(l[1]+'\n')
 
 verbose('All done. Enjoy your cake!')
