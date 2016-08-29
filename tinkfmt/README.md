@@ -53,7 +53,7 @@ The basic rules are currently:
   the line (`lda.# 01  ; not too close`)
 - All labels, directives, and opcodes are lower case (case-sensitive labels are
   a nasty source of errors)
-- Label target (including anonymous labels) start in the first column. Nothing
+- Label targets (including anonymous labels) start in the first column. Nothing
   else (execpt comments) may be there
 - Spaces are used for indentation, not tabs
 - The default "indentation unit" is eight characters
@@ -66,6 +66,8 @@ Tinkfmt requires a filename at start. The resulting, reformated file takes the
 name of this file, while the original version is given the extension `.orig`. 
 
 ## Definition and Data Blocks
+
+CURRENTLY NOT IMPLEMENTED
 
 Definitions that follow each other are coded as blocks. For instance:
 
