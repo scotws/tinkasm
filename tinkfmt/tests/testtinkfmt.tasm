@@ -1,7 +1,7 @@
 ; Test File for the Formatter for Tinkerer's Assembler
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ; First version: 28. Aug 2016
-; This version: 28. Aug 2016
+; This version: 31. Aug 2016
 
 .origin 8000
 .mpu 65816
@@ -9,25 +9,40 @@
 ; This line should be left intact
 
 .equ jack 01
-.equ jonathan 02 ; totally overpaid
+.equ jonathan 02 ; I'll stick around
 .equ julian 03
 .equ justin 04
 
-        ; keep this indentation for the love of God
+        ; keep this indentation because it's correct
         .equ kaylee 03
         .equ malcome 04
 
-.native  ; switch to native code
-frog lda.# 00
-         sta.l 01:ffff
-         bra frog  ; loop
+alone1 ; we don't like inline comments after labels
+alone2 nop ; comments after labels with code stay with code
 
-mike .byte 1, 2, 3, 4, 5  ; just a bunch of numbers
-micha .byte "Yes I can dance", 0
+.native ; comments after directives are fine
+cat
+dog lda.# 00
+         sta.l 01:ffff
+         bra frog                     ; help! I'm way over here!
+long nop
+reallylong .a16
+reallyreallylong nop
+short .a8
+
+.byte "I'm a lonesome data block"
+.byte "with no label to my name"
+
+mike .byte 1, 2,    3, 4, 5 ; just look at that ugly spacing
+micha .byte "This line is mostly filler", 0
+muppetmania .byte "My label is really, really long as well"
 tricky
         .byte ';',     1, ';'
-        .byte ';', 2, ';', "   ", 4  ; note the string with spaces
-zoot  ; now where does this comment go?
-        .byte "A semicolon ; is here!", '3', ';'
+        .word 00, 01, 02, 03 ; I'm part of this data block, too
+        .long 00, 01, 02, 03
+bye     .byte ';', 2, ';', "   ", 4  ; note the string with spaces
+zoot  ; comments break data blocks. This is a feature
+.byte "A semicolon ; is here!", '3', ';'
+.byte "That's all folks!"
 
         .end

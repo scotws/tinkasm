@@ -1,0 +1,6 @@
+TODO for the Tinkfmt Formatter 
+Scot W. Stevenson <scot.stevenson@gmail.com>
+First version: 31. Aug 2016
+This version: 31. Aug 2016
+
+- Labels in definition blocks should be moved to the start of the block, with the block then formatted as one

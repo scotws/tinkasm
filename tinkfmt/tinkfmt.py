@@ -1,7 +1,7 @@
 # A Formatter for the Tinkerer's Assembler 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 27. Aug 2016
-# This version: 29. Aug 2016
+# This version: 31. Aug 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,9 +19,9 @@
 """TinkFmt is a formatting program for assembler source code that was 
 written for the Tinkerer's Assembler for the 6502/65c02/65816. Based on
 the idea behind Go's gofmt program, it strives to make sure all Tinkerer
-source code is formatted the same. This makes it easier to understand
-the logic. See the README.md file for more details and a discussion
-of the basic rules.
+source code is formatted the same. This makes writing code faster - the
+machine does the formatting - and the code itself easier to understand. 
+See the README.md file for more details and a discussion of the basic rules.
 """
 
 ### SETUP ###
@@ -43,8 +43,8 @@ if sys.version_info.major != 3:
 
 TITLE_STRING = \
 """A Formatter for the Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  28. August 2016
-Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
+Version BETA  31. August 2016
+Copyright 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
 
@@ -80,6 +80,66 @@ def verbose(s):
         print(s)
 
 
+def has_label(s):
+    """Given a line of code as a string, test to see if it starts with a 
+    label. Assumes that all non-labels start with whitespace. Returns a
+    bool.
+    """
+
+    try:
+        f = (s[0] not in string.whitespace) and (s[0] != ';')
+    except IndexError:
+        return False
+    else:
+        return f
+
+
+def is_data(s):
+    """Takes a line of code and determines if it is a data entry (starts
+    with .byte, .word, or .line). Returns a bool: True if it is a data,
+    false if not. Should give correct result if there is a label or not. 
+    Calls has_label()
+    """
+
+    # Get rid of empty strings and single labels
+    if len(s.split()) < 2:
+        return False
+    
+    # If we have a label, get rid of it
+    if has_label:
+        s = s.split(' ', 1)[1]
+
+    # We keep a list of data directives to check against
+    t = s.strip().split()
+
+    return (t[0] in DATA_DIRECTIVES)
+
+
+def is_label_too_long(label, line):
+    """Checks to see if a label is too long to fit in the whitespace before the 
+    first character in a line. Assumes that the line itself does not contain a
+    label. Returns a bool.
+    """
+    ws = len(line) - len(line.lstrip())
+
+    # We leave one space for padding
+    return (len(label) > ws-1)
+
+
+def flush_data(bl, l):
+    """When a data block is complete, take it and the list of lines we have so far.
+    Add the correctly formatted data block to the list, returnign the list. It is 
+    the caller's responsibility to handle any flags.
+    """
+    # Get the maximal width of the first entry (the labels)
+    max_width = max([len(row[0]) for row in bl])
+
+    for row in bl:
+        l.append((num, '{0:<{mw}} {1}'.format(row[0], row[1], mw=max_width)))
+
+    return l
+
+
 
 ### PARSE INPUT
 
@@ -104,6 +164,7 @@ verbose('Read {0} lines from {1}'.format(len(sc_in), args.source))
 
 
 ### PROCESSOR SETUP
+
 MPU = ""
 
 for num, line in sc_in:
@@ -138,6 +199,12 @@ if MPU != '65816':
 
 ### CONVERSION
 
+# The conversion routines themselves are in three stages: The most general stage
+# comes first, with labels being moved to their own lines, everything being
+# turned into lowercase, and directives and opcodes indented as they should be.
+# The next two steps handle the block formatting of directives and data
+# separately, making it easier to change these later.
+
 for num, line in sc_in: 
 
     # RULE 1: Keep empty lines (for now)
@@ -169,24 +236,28 @@ for num, line in sc_in:
     for q in sqa:
         tmp_line = tmp_line.replace(q, 'x'*len(q))
 
-    # Any semicolon left in the line must a comment indicator
+    # After that, any semicolon left in the line must a comment indicator
     try:
         sc = tmp_line.index(';')
     except ValueError:
         pay = line
+        # We don't like inline comments after labels, so we signal that we don't
+        # have them by explicitly marking ilc as an empty string
+        ilc = ''
     else:
         pay = line[:sc]
         ilc = '  '+line[sc:].strip() # Adjust the number of spaces before inlines here
 
-    # CLAIM: pay should not contain any more comments
+    # CLAIM: line should not contain any more comments
     
     # Get rid of the user's formatting for mnemonics, directives, and labels,
-    # because it might suck anyway
+    # because it probably sucks anyway. This step liberates the user from having
+    # to care about formatting at all while entering the code.
     pay = pay.strip()
     w = pay.split()
 
     # LABELS: We deal with them first because we might have something that comes
-    # on the same line. 
+    # on the same line. All labels get their own line at first.
     if (w[0] not in MNEMONICS) and (w[0] not in DIRECTIVES):
         w[0] = w[0].lower()
 
@@ -194,8 +265,16 @@ for num, line in sc_in:
         try:
             w[1]
         except IndexError:
-            sc_out.append((num, w[0]+ilc))
+
+            # If we had an inline comment after the label, we move it before the label
+            # because we don't like comments after labels
+            if ilc:
+                sc_out.append((num, ilc.strip()))
+
+            sc_out.append((num, w[0]))
+
             continue
+
         # No such luck, there is more. Save the label in its own line for later
         # processing and look at the rest, which must be either an mnemonic or
         # a directive (or something is seriously wrong)
@@ -242,6 +321,8 @@ for num, line in sc_in:
 #       .equ poseidon 11
 #
 # Any inline comments follow in their lines as usual with two spaces distance.
+# TODO: If there is a label in a definition block, move it before or after the
+# block instead of leaving it in the middle
 
 sc_defs = []
 block = []
@@ -249,7 +330,7 @@ in_block = False
 
 for num, line in sc_out:
 
-    # If we have an .equ directive, split it up. Need the try/except routine so
+    # If we have an .equ directive, split it up. Need the try/except so
     # we don't crash on empty lines
     try:
 
@@ -283,34 +364,131 @@ for num, line in sc_out:
     sc_defs.append((num, line))
 
 
+### LABELS
+
+# Labels should go in front of a mnemonic or directive (with special rules for
+# data directives) if there is the space, otherwise they stay on their own line
+# If there was an inline comment after a label, we put it in front of the label,
+# because we don't like that sort of thing
+
+# For data directives, we put any labels in front of .byte etc for now and deal
+# with the formatting later in a different step
+
+sc_labels = []
+prev_line = ''
+have_label = False
+
+for num, line in sc_defs:
+
+    # Get rid of empty lines 
+    if not line.strip():
+        sc_labels.append((num, line))
+        continue
+
+    # Get rid of comments
+    if line.strip()[0] == ';':
+        sc_labels.append((num, line))
+        continue
+
+    if has_label(line):
+        
+        # If we have more than one label, we just print them one below each
+        # other
+        if have_label:
+            sc_labels.append((num, prev_line))
+        else:
+            have_label = True
+
+        prev_line = line
+        continue
+
+    # Whatever is left must be a directive or a mnemonic. 
+    if have_label:
+
+        l = prev_line.strip()
+
+        # If this is a data line (.byte etc), we just put the label in front of
+        # the data directive and let a later step deal with the problem of
+        # formatting
+        if is_data(line):
+            line = l + ' ' + line
+        
+        # In all other cases, we make sure that the label will fit, otherwise we
+        # put the next line in a new line
+        else:
+       
+            if is_label_too_long(l, line):
+                sc_labels.append((num-1, l))
+            else:    
+                line = l + line[len(l):]
+        
+    # We've already checked for double labels
+    have_label = False
+    sc_labels.append((num, line))
+    continue
+
+
 ### DATA BLOCKS
 
-# A data block consists of two or more data directives (.byte, .word, .long)
-# with an identifying label. The usual space between the label and the directive
-# is removed:
+# The last step is to adjust the formatting of data blocks. At this point, 
+# data lines (.byte etc) are either indented like normal directives, or have
+# a label in front of them with incorrect formatting. We want to change this so
+# that the .byte (etc) column starts after the longest label:
 #
-# first  .byte 01, 02, 03, 04 ; computer people count funny
+#
+# one    .byte 01, 02, 03, 04 ; computer people count funny
 # second .byte 11, 12, 13, 14
-# third  .byte 21, 22, 23, 24
+# four?  .byte "I really hate counting"
 #
-# They need to be formatted so that the data directives are all justified. This
-# should also be true for lines where one label is not present.
-    
+# If there is line without a label inside the data block, it should keep the
+# formatting.
+
+sc_data = []
+block = []
+in_block = False
+
+for num, line in sc_labels:
+
+    if not is_data(line):
+
+        # If we were part of a block, now is the time to print it
+        if in_block:
+            sc_data = flush_data(block, sc_data)
+            block = []
+            in_block = False
+
+        sc_data.append((num, line))
+        continue
+
+    # This is a date line. Start new block if we're not already in one
+    if not in_block:
+        block = []
+        in_block = True
+
+    # See if we have a label, and if yes, isolate it
+    if has_label(line):
+        l, d = line.split(' ', 1)
+    else:
+        l = '' # At least one space so we don't look like a label
+        d = line
+
+    block.append((l, d.lstrip()))
+
 
 ### OUTPUT
 
 if args.test:
-    for l in sc_defs:
+    for l in sc_data:
         print(l[1])
 else:
     filename, file_ext = os.path.splitext(args.source)
     os.rename(args.source, filename+'.orig')
 
     with open(filename+'.tasm', 'w') as f:
-        for l in sc_defs:
+        for l in sc_data:
             f.write(l[1]+'\n')
 
 verbose('All done. Enjoy your cake!')
 sys.exit(0)
 
-### END ###
+## END ###
