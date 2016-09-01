@@ -1,7 +1,7 @@
 # A Formatter for the Tinkerer's Assembler 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 27. Aug 2016
-# This version: 31. Aug 2016
+# This version: 01. Sep 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -469,7 +469,7 @@ for num, line in sc_labels:
     if has_label(line):
         l, d = line.split(' ', 1)
     else:
-        l = '' # At least one space so we don't look like a label
+        l = ' '*(INDENT_SIZE-1)  # So we don't look like a label
         d = line
 
     block.append((l, d.lstrip()))

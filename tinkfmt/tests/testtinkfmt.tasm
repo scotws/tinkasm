@@ -3,46 +3,48 @@
 ; First version: 28. Aug 2016
 ; This version: 31. Aug 2016
 
-.origin 8000
-.mpu 65816
+        .origin 8000
+        .mpu 65816
 
 ; This line should be left intact
 
-.equ jack 01
-.equ jonathan 02 ; I'll stick around
-.equ julian 03
-.equ justin 04
+        .equ jack     01
+        .equ jonathan 02  ; I'll stick around
+        .equ julian   03
+        .equ justin   04
 
         ; keep this indentation because it's correct
-        .equ kaylee 03
+        .equ kaylee  03
         .equ malcome 04
 
-alone1 ; we don't like inline comments after labels
-alone2 nop ; comments after labels with code stay with code
+; we don't like inline comments after labels
+alone1
+alone2          nop  ; comments after labels with code stay with code
 
-.native ; comments after directives are fine
+        .native  ; comments after directives are fine
 cat
-dog lda.# 00
-         sta.l 01:ffff
-         bra frog                     ; help! I'm way over here!
-long nop
-reallylong .a16
-reallyreallylong nop
-short .a8
+dog             lda.# 00
+                sta.l 01:ffff
+                bra frog  ; help! I'm way over here!
+long            nop
+reallylong
+        .a16
+reallyreallylong
+                nop
+short   .a8
 
-.byte "I'm a lonesome data block"
-.byte "with no label to my name"
+        .byte "I'm a lonesome data block"
+        .byte "with no label to my name"
 
-mike .byte 1, 2,    3, 4, 5 ; just look at that ugly spacing
-micha .byte "This line is mostly filler", 0
+mike        .byte 1, 2, 3, 4, 5  ; just look at that ugly spacing
+micha       .byte "This line is mostly filler", 0
 muppetmania .byte "My label is really, really long as well"
-tricky
-        .byte ';',     1, ';'
-        .word 00, 01, 02, 03 ; I'm part of this data block, too
-        .long 00, 01, 02, 03
-bye     .byte ';', 2, ';', "   ", 4  ; note the string with spaces
-zoot  ; comments break data blocks. This is a feature
-.byte "A semicolon ; is here!", '3', ';'
-.byte "That's all folks!"
+tricky      .byte ';', 1, ';'
+            .word 00, 01, 02, 03  ; I'm part of this data block, too
+            .long 00, 01, 02, 03
+bye         .byte ';', 2, ';', " ", 4  ; note the string with spaces
+; comments break data blocks. This is a feature
+zoot    .byte "A semicolon ; is here!", '3', ';'
+        .byte "That's all folks!"
 
         .end

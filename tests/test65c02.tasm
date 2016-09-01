@@ -1,20 +1,19 @@
 ; Test file for .byte formats, 65c02
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 
-	.mpu 65c02
-	.origin 0e000
+        .mpu 65c02
+        .origin e000
 
-		lda.# 00
-		tax
-loop
-		sta.x 1000 
-		dex
-		bne loop 
+                lda.# 00
+                tax
+loop            sta.x 1000
+                dex
+                bne loop
 
-		bra loop
+                bra loop
 
-	.include tests/includeme.tasm
+        .include tests/includeme.tasm
 
-	.word 3000, 4000, 5000
+        .word 3000, 4000, 5000
 
-	.end 
+        .end
