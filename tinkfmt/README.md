@@ -51,19 +51,31 @@ The basic rules are currently:
 - All full-line comments are kept unchanged, including their indentation
 - Inline comments are separated by two spaces from the last code character in
   the line (`lda.# 01  ; not too close`)
+- There are no inline comment after labels. If users place them there, they will
+  be moved to before the label.
 - All labels, directives, and opcodes are lower case (case-sensitive labels are
   a nasty source of errors)
-- Label targets (including anonymous labels) start in the first column. Nothing
+- Labels (including anonymous labels) start in the first column. Nothing
   else (execpt comments) may be there
 - Spaces are used for indentation, not tabs
-- The default "indentation unit" is eight characters
-- Directives are indented by one unit (a tab's worth of spaces; but see blocks)
-- Code is indented by two units (two tab's worth of spaces; but see blocks)
+- The default indentation is eight characters
+- Directives are indented once (a tab's worth of spaces; but see blocks)
+- Code is indented twice (two tab's worth of spaces; but see blocks)
 - There is only one space between terms of .byte, .word, and .long
 - Blocks of code are formatted together (see below).
 
 Tinkfmt requires a filename at start. The resulting, reformated file takes the
 name of this file, while the original version is given the extension `.orig`. 
+
+Labels are put before code and directives if there room, otherwise they go in
+their own line.
+```
+alpha   .a16  ; fits before directive
+alphalpha
+        .a8  ; doesn't fit before directive, own line
+```
+Same holds true for instructions.
+
 
 ## Definition and Data Blocks
 
@@ -83,8 +95,6 @@ Definitions that follow each other are coded as blocks. For instance:
 
 Note the parameter is in one column. Definition blocks are separated by at
 least one empty line.
-
-DEFINTION BLOCKS ARE CURRENTLY NOT IMPLEMENTED
 
 As definition blocks, data blocks are formatted in columns. They also break with
 the normal indentation rules.
