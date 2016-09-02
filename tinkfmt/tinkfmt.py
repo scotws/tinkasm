@@ -1,7 +1,7 @@
 # A Formatter for the Tinkerer's Assembler 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 27. Aug 2016
-# This version: 01. Sep 2016
+# This version: 02. Sep 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ if sys.version_info.major != 3:
 
 TITLE_STRING = \
 """A Formatter for the Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  31. August 2016
+Version BETA  02. September 2016
 Copyright 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -145,11 +145,13 @@ def flush_data(bl, l):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', dest='source', required=True,\
-                help='Assembler source code file (required)')
+        help='Assembler source code file (required)')
 parser.add_argument('-t', '--test',\
-                help="Test run, don't change files, just print", action='store_true')
+        help="Test run, don't change files, just print", action='store_true')
 parser.add_argument('-v', '--verbose',\
-                help='Display additional information', action='store_true')
+        help='Display additional information', action='store_true')
+parser.add_argument('-m', '--mpu', dest='mpu',\
+        help='Override target MPU: 6502, 65c02, or 65816')
 args = parser.parse_args()
 
 
@@ -167,12 +169,17 @@ verbose('Read {0} lines from {1}'.format(len(sc_in), args.source))
 
 MPU = ""
 
-for num, line in sc_in:
-    if '.mpu' in line.lower():
-        MPU = line.split()[1].strip()
+# Argument passed by user comes first
+if args.mpu:
+    MPU = args.mpu
+else:
+    for num, line in sc_in:
+
+        if '.mpu' in line.lower():
+            MPU = line.split()[1].strip()
 
 if not MPU:
-    fatal(num, 'No .mpu directive found, target CPU unknown.')
+    fatal(num, 'No MPU found as directive or given, target MPU unknown.')
 
 if MPU not in SUPPORTED_MPUS:
     fatal(num, 'MPU "{0}" not supported'.format(MPU))
@@ -307,7 +314,7 @@ for num, line in sc_in:
         continue
 
     else:
-        fatal(num, '"{0}" is neither label, directive, of mnemonic'.format(w[0]))
+        fatal(num, '"{0}" is neither label, directive, or mnemonic'.format(w[0]))
 
 
 ### DEFINITION BLOCKS
@@ -473,6 +480,13 @@ for num, line in sc_labels:
         d = line
 
     block.append((l, d.lstrip()))
+
+
+# If we ended still inside a block, we have to flush it one last time or else we
+# cut off the last lines. This doesn't happen with the main source code file,
+# because it ends with the .end directive
+if in_block:
+    sc_data = flush_data(block, sc_data)
 
 
 ### OUTPUT
