@@ -140,6 +140,21 @@ def flush_data(bl, l):
     return l
 
 
+def flush_definitions(bl, l, i=INDENT):
+    """When a defintion block is complete, take it and the list of lines we have 
+    so far. Add the correctly formatted data block to the list, returnign the list.
+    It is the caller's responsibility to handle any flags.
+    """
+    # Get the maximal width of the second word (the name of the symbol)
+    max_width = max([len(row[1]) for row in bl])
+
+    for row in bl:
+        l.append((num, '{0}{1} {2:<{mw}} {3}'\
+                .format(i, row[0], row[1], row[2], mw=max_width)))
+
+    return l
+
+ 
 
 ### PARSE INPUT
 
@@ -359,16 +374,18 @@ for num, line in sc_out:
     # done and we need to format and save it
     if in_block:
 
-        # Get the maximal width of the second word (the name of the symbol)
-        max_width = max([len(row[1]) for row in block])
-
-        for row in block:
-            sc_defs.append((num, '{0}{1} {2:<{mw}} {3}'\
-                    .format(INDENT, row[0], row[1], row[2], mw=max_width)))
-
+        sc_defs = flush_definitions(block, sc_defs)
         in_block = False
 
     sc_defs.append((num, line))
+
+
+# If we ended the file in a definition block, flush it or else we'll cut off the
+# last lines. This doesn't happen in the main routines because of the .end
+# directive, but can in included code
+if in_block:
+        sc_defs = flush_definitions(block, sc_defs)
+
 
 
 ### LABELS
