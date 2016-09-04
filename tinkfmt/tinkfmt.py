@@ -58,7 +58,7 @@ DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
         '.native', '.emulated', '.!xy8', '.!xy16', '.xy8', '.xy16', ';',\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert', '.and',\
         '.or', '.xor', '.*', '.macro', '.endmacro', '.invoke', '.mpu',\
-        '.include', '.!native', '.!emulated', '{', '}']
+        '.include', '.!native', '.!emulated', '{', '}', '.save']
 
 sc_out = []
 

@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 27. Aug 2016
+# This version: 03. Sep 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -111,7 +111,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  28. August 2016
+Version BETA  03. September 2016
 Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -161,7 +161,7 @@ MODIFIED = 'MODIFIED   '   # Entry that has been partially processed
 
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
         '.end', ASSIGNMENT, '.byte', '.word', '.long', '.advance', '.skip',\
-        '.native', '.emulated', '.mpu',\
+        '.native', '.emulated', '.mpu', '.save',\
         '.!xy8', '.!xy16', '.xy8', '.xy16', COMMENT,\
         '.lsb', '.msb', '.bank', '.lshift', '.rshift', '.invert',\
         '.and', '.or', '.xor', CURRENT, '.macro', '.endmacro', '.invoke',\
@@ -1011,6 +1011,12 @@ for num, pay, sta in sc_invoke:
             sc_strings.append((num, pay, sta))
             continue 
 
+        # The save directive may not have a string as a parameter
+        w = pay.split()
+        
+        if w[0] == '.save':
+            fatal(num, 'Illegal string in save directive, should be number.')
+
         ma = p.findall(pay)
         new_pay = pay
 
@@ -1259,6 +1265,29 @@ for num, pay, sta in sc_splitmove:
 
         sc_labels.append((num, pay, sta))
         continue
+
+    # --- SUBSTEP SAVE: Handle the .save directive ---
+    if w[0] == '.save':
+
+        # Add the symbol to the symbol list
+        vet_newsymbol(w[1])
+        symbol_table[w[0]] = LC0+LCi
+
+        # We've already taken care of any strings, which we couldn't use anyway,
+        # and characters, which is weird but legal.
+        wt = pay.strip().split(' ', 2)[2]
+        r = convert_term(num, wt)
+
+        # We save r zeros (initialize reserved space)
+        zl = ' '.join(['00']*r)
+        new_pay = INDENT+'.byte '+zl
+        sc_labels.append((num, new_pay, DATA_DONE))
+        
+        verbose('Saved {0} bytes at address {1:06x} per directive in line {2}'.\
+                    format(r, LC0+LCi, num))
+ 
+        LCi += r
+        continue 
 
 
     # --- SUBSTEP LABELS: Figure out where our labels are ---

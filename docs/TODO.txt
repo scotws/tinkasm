@@ -1,13 +1,12 @@
 TODO List for A Tinkerer's Assember for the 6502/65c02/65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 27. Aug 2016
+This version: 03. Sep 2015
 
 
 AFTER BETA RELEASE:
 
 - Move verbose messages to start of each pass to make errors easier to spot
-- Create formatter to make sure all source code is formatted the same
 - Create conversion program for TAN to other 65816 notations
 - Support conversion of UTF-8 Unicode strings to bytes
 - Add parameters to macros

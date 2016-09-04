@@ -42,9 +42,9 @@ notation for these MPUs.
 
 ### State of Development
 
-TinkAsm, though very much functional, is in an early stage of development. See
-the `docs/TODO.txt` file for features that are to be added soon and those that
-will come later. Suggestions are welcome. 
+TinkAsm, though very much functional, is not fully tested. See the
+`docs/TODO.txt` file for features that are to be added soon and those that will
+come later. Suggestions are welcome. 
 
 
 ## Requirements 
@@ -294,10 +294,14 @@ modifier.
 `6502`, `65c02`, or `65816`. 
 
 `.origin` - Start assembly at the address provided as a parameter.
-Required for the program to run.
+Required for the program to run. Example: `.origin 8000`
+
+`.save` - Given a symbol and a number, save the current address during assembly 
+as the symbol and skip over the number of bytes. Used to reserve a certain
+number of bytes at a certain location. Example: `.save counter 2`
 
 `.skip` - Jump head by the number of bytes given as a parameter, filling the
-space in between with zeros.
+space in between with zeros. Example: `.skip 100`
 
 `.word` - Store the following list of comma-delimited 16-bit words as
 bytes. The assembler handles the conversion to little-endian format. Parameters
@@ -442,6 +446,14 @@ line to the new list.
 There is currently no way to load the single quotation mark character directly
 without having to enter the hex value by hand (`lda.# "'"` or such will not
 work).
+
+## TOOLS
+
+### Tinkfmt Source Code Formatter
+
+TinkAsm is currently shipped with one tool, the formatter Tinkfmt. See the
+README file in the directory `tinkfmt` for details. 
+
 
 ## SOURCES AND THANKS 
 
