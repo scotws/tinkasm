@@ -130,7 +130,7 @@ opcode_table = (
     (0x76, 'ror.zx', 2),
     (0x77, 'UNUSED', 0),
     (0x78, 'sei', 1),
-    (0x79, 'acd.y', 3),
+    (0x79, 'adc.y', 3),
     (0x7a, 'UNUSED', 0),
     (0x7b, 'UNUSED', 0),
     (0x7c, 'UNUSED', 0),
