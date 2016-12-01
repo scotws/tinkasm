@@ -129,7 +129,7 @@ opcode_table = (
     (0x76, 'ror.dx', 2),
     (0x77, 'adc.dily', 2),
     (0x78, 'sei', 1),
-    (0x79, 'acd.y', 3),
+    (0x79, 'adc.y', 3),
     (0x7a, 'ply', 1),
     (0x7b, 'tdc', 1),
     (0x7c, 'jmp.xi', 3),
