@@ -1,0 +1,16 @@
+; A Tinkerer's Assembler for the 6502/65c02/65816
+; Test of mode switches for the crude65816.fs emulator
+;
+
+        .mpu 65816
+        .origin e000
+
+        .native
+        .axy16
+                lda.# 0ffff
+                tay
+                tax
+        .a8
+                stp
+
+        .end
