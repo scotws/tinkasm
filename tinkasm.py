@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 03. Sep 2016
+# This version: 24. Dec 2016
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -111,7 +111,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  03. September 2016
+Version BETA  24. December 2016
 Copyright 2015, 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -449,8 +449,13 @@ def convert_term(n, s):
 
     s = s.strip()
 
+    # We store all symbols in lower case, humans be damned. If the following
+    # step is omitted, upper- and mixed-case symbols will not be converted
+    # correctly when inside .BYTE directives
+    lcs = s.lower()
+    
     try:
-        r = symbol_table[s]
+        r = symbol_table[lcs]
     except KeyError:
         pass
     else:
