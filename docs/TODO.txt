@@ -1,11 +1,12 @@
 TODO List for A Tinkerer's Assember for the 6502/65c02/65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 24. Dec 2016
+This version: 25. Dec 2016
 
 
 AFTER BETA RELEASE:
 
+- Add ability to generate and output S28 format srecords 
 - Show complete .byte data in listing
 - Move verbose messages to start of each pass to make errors easier to spot
 - Support conversion of UTF-8 Unicode strings to bytes
