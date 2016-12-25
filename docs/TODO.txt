@@ -1,7 +1,7 @@
 TODO List for A Tinkerer's Assember for the 6502/65c02/65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 22. Dec 2016
+This version: 24. Dec 2016
 
 
 AFTER BETA RELEASE:
@@ -12,7 +12,6 @@ AFTER BETA RELEASE:
 - Add parameters to macros
 - Allow modify & math to work with branch instructions
 - Add comments to listing file
-- List file should show complete bytes from .byte
 - Add empty lines to listing file
 - Add advanced system macros (if/then/else, loops)
 - Analysis step: Suggest JSR, RTS --> JMP; catch TAY TYA; 2 x NOP
