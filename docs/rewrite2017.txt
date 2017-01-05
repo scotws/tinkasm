@@ -1,0 +1,51 @@
+The Great Rewrite of 2017
+Scot W. Stevenson <scot.stevenson@gmail.com>
+First version: 05. Jan 2017
+This version: 05. Jan 2017
+
+Early 2017, Tinkasm was completely rewritten based on the experiences using it
+to code Liara Forth. Where the first version of the assembler was focused on
+speed and destructively transfored the code, that experience had shown that on
+modern machines, translation is fast enough that the code could be far more expansive. 
+
+The Great Rewrite of 2017 therefore takes a different approach. Assembly is
+divided into different stages with the aim to first produce an "Intermediate
+Representation" (IR) that contains all lines, and then works on those lines in place. 
+The information is not destroyed, but accumulates and is available for later use
+
+Internally, the representation of lines was moved to objects. 
+
+line
+        .is_done        (bool) marks if line needs further processing
+        .raw            (string) unchanged original line
+        .type           (int) one of LABEL, WHITESPACE, DIRECTIVE, INSTRUCTION,
+                        COMMENT, STATUS, UNKNOWN, some changed to DATA during
+                        processing
+        .action         (string) opcode (INSTRUCTION) or directive (DIRECTIVE)
+        .parameters     (string) operand (INSTRUCTION) or parameters
+        .bytes          (list of bytes) finished sequence of bytes
+                        
+
+New flags:
+        -ir     save Intermediate Representation (tink.ir)
+        -s28    save as Motorola S28 format (tink.s28)
+
+
+COLLECTION PHASE: Gather all files
+
+- Load original source file
+- Load all INCLUDEs
+
+EXPANSION PHASE: Add extra lines
+
+- Expand all MACROs
+- Insert STATUS lines for register size switches
+- Break up lines: Labels, instructions and directives on own lines
+
+IR complete (offer to save)
+
+- Classify each line as whitespace, comment, directive, label, instruction or status
+- Mark whitespace and comment as done
+
+
+
