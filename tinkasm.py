@@ -23,7 +23,6 @@ intentionally written in a "primitive" style of Python. See doc/MANUAL.md for
 details.
 """
 
-
 ### SETUP ###
 
 import argparse
@@ -160,7 +159,8 @@ symbol_table = {}
 anon_labels = []
 
 # Line types. Start off with UNKNOWN, then are later replaced by real type as
-# discovered or added
+# discovered or added. STATUS is added internally by the assembler for various
+# control structures
 UNKNOWN = 'UNKNOWN'       # Pre-processing default
 COMMENT = 'comment'         # Whole-line comments, not inline 
 DIRECTIVE = 'directive'     
@@ -169,9 +169,11 @@ LABEL = 'label'
 STATUS = 'status'           # Used for lines added by the assembler
 WHITESPACE = 'whitespace'   # Used for whole-line whitespace
 
-# Line status. Starts with NOT_DONE, then replaced by DONE.
+# Line status. Starts with UNTOUCHED, then MODIFIED if changes are made, and
+# then DONE if line does not need any more work. 
+UNTOUCHED = '    ' 
+MODIFIED = 'work'
 DONE = 'DONE'
-NOT_DONE = '    ' 
 
 # CLASSES
 
@@ -180,7 +182,7 @@ class CodeLine:
         self.raw = rawstring     # Original line as a string
         self.ln = ln             # Primary line number (in source file)
         self.sec_ln = sec_ln     # Secondary line number for expanded lines
-        self.status = NOT_DONE   # Flag if line has been processed
+        self.status = UNTOUCHED  # Flag if line has been processed
         self.type = UNKNOWN      # Type of line, starts UNKNOWN, ends DATA
         self.inline_comment = '' # Storage area for any inline comments
         self.action = ''         # First word of instruction or directive
