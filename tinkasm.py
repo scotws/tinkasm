@@ -43,6 +43,7 @@ if sys.version_info.major != 3:
 n_comment_lines = 0     # How many full-line comments
 n_empty_lines = 0       # How many lines where only whitespace
 n_external_files = 0    # How many external files were loaded
+n_instructions = 0      # How many instruction lines
 n_invocations = 0       # How many macros were expanded
 n_passes = 0            # Number of passes during processing
 n_steps = 0             # Number of steps during processing
@@ -63,9 +64,15 @@ parser.add_argument('-v', '--verbose',\
 parser.add_argument('-d', '--dump',\
         help='Print intermediate steps as (long) lists', action='store_true')
 parser.add_argument('-l', '--listing', action='store_true',\
-        help='Create listing file TINK.LST')
+        help='Create listing file (default TINK.LST)')
 parser.add_argument('-x', '--hexdump', action='store_true',\
-        help='Create ASCII hexdump listing file TINK.HEX')
+        help='Create ASCII hexdump listing file (default TINK.HEX)')
+parser.add_argument('-f', '--format', action='store_true',\
+        help='Create clean formated source file (default TINK.FMT)')
+parser.add_argument('-s28', action='store_true',\
+        help='Create S28 format file from binary (default TINK.S28)')
+parser.add_argument('-p', '--partial', action='store_true',\
+        help='Save partial listing file on fatal error (default TINK.PRT)')
 parser.add_argument('-w', '--warnings', default=True,\
         help='Disable warnings (default: print them)', action='store_false')
 args = parser.parse_args()
