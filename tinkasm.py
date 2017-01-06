@@ -91,10 +91,13 @@ def hexstr(n, i):
     except TypeError as err:
         fatal(num, 'TypeError in hexstr for "{0}": {1}'.format(i, err)) 
 
-def fatal(n, s):
+def fatal(line, s):
     """Abort program because of fatal error during assembly.
     """
-    print('FATAL ERROR in line {0}: {1}'.format(n, s))
+    if line.sec_ln == 0: 
+        print('FATAL ERROR line {0} - {1}'.format(line.ln, s))
+    else: 
+        print('FATAL ERROR line {0}:{1} - {2}'.format(line.ln, line.sec_ln, s))
     sys.exit(1)
 
 def verbose(s):
@@ -144,10 +147,18 @@ INDENT = ' '*8       # Indent in whitespace for formatting
 LC0 = 0              # Start address of code ("location counter")
 LCi = 0              # Index to where we are in code from the LC0
 
-HEX_FILE = 'tink.hex'   # Default name of hexdump file
-LIST_FILE = 'tink.lst'  # Default name of listing file
-IR_FILE = 'tink.ir'     # Default name of IR file 
-S28_FILE = 'tink.s28'   # Default name of S28 file
+HEX_FILE = 'tink.hex'     # Default name of hexdump file
+LIST_FILE = 'tink.lst'    # Default name of listing file
+IR_FILE = 'tink.ir'       # Default name of IR file 
+S28_FILE = 'tink.s28'     # Default name of S28 file
+PARTIAL_FILE = 'tink.prt' # Default name of partial listing
+FORMAT_FILE = 'tink.fmt'  # Default name of formatted file
+
+# The user can request a correctly formatted source file as a goody while
+# running the program. We call a separate program for this, which has the
+# following command line 
+# TODO make this work 
+formatter = './tinkfmt/tinkfmt.py'
 
 xy_width = 8    # For 65816, assumed width of XY registers at this point
 a_width = 8     # For 65816, assumed width of A register at this point
@@ -268,7 +279,7 @@ def convert_number(s):
         BASE = 16
         s2 = s1[1:]
     else:
-        BASE = 16
+        BASE = 16 # Default numbers are hex, not decimal
         s2 = s1
 
     # If we can convert this to a number, it's a number, otherweise we claim
@@ -548,6 +559,8 @@ verbose('Beginning assembly. Timer started.')
 
 # -------------------------------------------------------------------
 # STEP LOAD: Load original source code and add line numbers
+#
+# REQUIREMENTS: none
 
 # Line numbers start with 1 because this is for humans. 
 
@@ -565,17 +578,23 @@ verbose('STEP LOAD: Read {0} lines from {1}'.\
 
 # -------------------------------------------------------------------
 # PASS INCLUDE: Add content from external files specified by the INCLUDE
-# directive
+# directive. 
+#
+# REQUIRED as first step of processing
 
 # The .include directive must be alone in the line and the second string must
-# be the name of the file without any spaces or quotation marks
+# be the name of the file without any spaces or quotation marks. Note that this
+# means there will be no .include directives visible in the code listings, since
+# everything will be one big file
 
 expanded_source = []
 
 for line in raw_source: 
 
     # We haven't converted everything to lower case yet so we have to do it the
-    # hard way here
+    # hard way here. It is not legal to have a label in the same line as a
+    # .include directive. Any inline comment after .include is silently
+    # discarded
     w = line.raw.split()
 
     if len(w) > 1 and w[0].lower() == '.include':
@@ -599,6 +618,9 @@ verbose('STEP INCLUDE: Added {0} external file(s)'.format(n_external_files))
 
 # -------------------------------------------------------------------
 # PASS EMPTY: Process empty lines 
+#
+# REQUIRES inclusion of all lines from all includes
+# REQUIRED for search for MPU type
 
 # We want to cut down the number of lines we have to process as early as
 # possible, so we handle empty lines right now 
@@ -616,6 +638,8 @@ verbose('STEP EMPTY: Found {0} empty line(s)'.format(n_empty_lines))
 
 # -------------------------------------------------------------------
 # PASS COMMENTS: Remove comments that span whole lines
+#
+# REQUIRES inclusion of all lines from all includes
 
 for line in expanded_source: 
 
@@ -632,16 +656,108 @@ n_passes += 1
 verbose('STEP COMMENTS: Found {0} full-line comments'.format(n_comment_lines))
 # dump(expanded_source)
 
+# -------------------------------------------------------------------
+# PASS MPU: Find MPU type
+#
+# REQUIRES inclusion of all lines from all includes
+# REQUIRES that empty lines have been identified
+# ASSUMES that no directives have been processed yet
+# REQUIRED for loading mnemonics list 
+
+for line in expanded_source: 
+
+    if line.status == DONE:
+        continue
+
+    # We haven't converted to lower case yet so we have to do this by hand 
+    # It is not legal to have a label in the same line as the .mpu
+    # directive. Any inline comment after .mpu is silently discarded
+    s = line.raw.lstrip()
+    w = s.split()
+    w1 = w[0]       # get first word in line 
+
+    if w1.lower() != '.mpu': 
+        continue
+
+    try: 
+        MPU = w[1]      # get second word in line
+    except IndexError:
+        fatal(line, 'No MPU given with ".mpu" directive')
+    else:
+        line.status = DONE 
+        break
+
+if MPU not in SUPPORTED_MPUS:
+    fatal(line, 'MPU "{0}" not supported'.format(MPU))
+
+if not MPU:
+    fatal(line, 'No ".mpu" directive found')
+
+n_passes += 1
+verbose('PASS MPU: Found MPU "{0}", is supported'.format(MPU))
+# dump(expanded_source)
 
 
-# PRIMITIVE PRINTOUT FOR TESTING
+# -------------------------------------------------------------------
+# PASS IDENTIFY: Figure out type of line. Puts labels in own line. 
+# REQUIRES inclusion of all lines from all includes
+# REQUIRES list of legal mnemonics to be available
+
+# Though Typist's Assembler Notation requires labels to be in a separate line,
+# we should be able to assemble code that hasn't been correctly formatted.
+# Since we have gotten rid of the full-line comments, anything that is in the
+# first column and is not whitespace is then considered a label. We don't
+# distinguish between global and anonymous labels at this point
+
+labels_source = []
+
+for line in expanded_source: 
+
+    if line.status == DONE:
+        labels_source.append(line) 
+        continue
+
+    # In theory, labels should be the only thing that is in the first column,
+    # but again, we want the assembly routine to be as robust as possible. We
+    # therefore strip away left whitespace and try to figure out if we have an
+    # instruction or 
+
+    # HERE 
+
+    # Most of the lines will not be labels, which means the first character in
+    # the line will be whitespace
+    if line.raw[0] in string.whitespace:
+        labels_source.append(line)
+        continue
+
+    # We now know we have a label, we just don't know if it is alone in its
+    # line
+    w = pay.split()
+
+    # .... but if yes, we're done already
+    if len(w) == 1:
+        line.status = MODIFIED
+        labels_source.append(line)
+        continue
+
+    # Nope, there is something after the label
+
+    
+    sc_breakup.append((num, w[0].strip(), MODIFIED))
+    rest = pay.replace(w[0], '').strip()  # Delete label from string
+    sc_breakup.append((num, INDENT+rest, sta))
+
+n_passes += 1
+verbose('PASS ISOLATE LABELS: All labels now have a line to themselves')
+# dump(labels_source)
+
+
+ # PRIMITIVE PRINTOUT FOR TESTING
 for e in expanded_source:
     print('{0:04}:{1:03} {2} {3:11}'.format(e.ln, e.sec_ln, e.status, e.type), e.raw)
-
-
 # TODO HIER HIER TODO
 
- 
+
 # # -------------------------------------------------------------------
 # # PASS INLINES: Remove comments that are inline
 # 
@@ -664,30 +780,7 @@ for e in expanded_source:
 # dump(sc_inlines, 'np')
 # 
 # 
-# -------------------------------------------------------------------
-# PASS MPU: Find MPU type
-# 
-# sc_mpu = []
-# MPU = ''
-# 
-# for num, pay in sc_inlines:
-# 
-#     # We haven't converted to lower case yet so we have to do this by hand 
-#     if '.mpu' in pay.lower():
-#         MPU = pay.split()[1].strip()
-#     else:
-#         sc_mpu.append((num, pay))
-# 
-# if not MPU:
-#     fatal(num, 'No ".mpu" directive found')
-# 
-# if MPU not in SUPPORTED_MPUS:
-#     fatal(num, 'MPU "{0}" not supported'.format(MPU))
-# 
-# n_passes += 1
-# verbose('PASS MPU: Found MPU "{0}", is supported'.format(MPU))
-# dump(sc_mpu, 'np')
-# 
+ 
 # # # -------------------------------------------------------------------
 # # # STEP OPCODES: Load opcodes depending on MPU type
 # # 
@@ -732,50 +825,7 @@ for e in expanded_source:
 # 
 # 
 # 
-# # -------------------------------------------------------------------
-# # PASS BREAKUP: Split labels into their own lines, reformat others
-# 
-# # It's legal to have a label and either an opcode or a directive in the same
-# # line. To make life easier for the following routines, here we make sure each
-# # label has it's own line. Since we have gotten rid of the full-line comments,
-# # anything that is in the first column and is not whitespace is then considered
-# # a label. We don't distinguish between global and anonymous labels at this point
-# 
-# # This step also cleans up the formating in the source codes for the user
-# # by standardizing the indent
-# 
-# # It is tempting to already start filling the symbol table here because we're
-# # touching all the labels and that would be far more efficient. However, 
-# # we keep these steps separate for ideological reasons.
-# 
-# sc_breakup = []
-# 
-# for num, pay, sta in sc_status:
-# 
-#     # Most of the lines will not be labels, which means the first character in
-#     # the line will be whitespace
-#     if pay[0] in string.whitespace:
-#         sc_breakup.append((num, INDENT+pay.strip(), sta))
-#         continue
-# 
-#     # We now know we have a label, we just don't know if it is alone in its
-#     # line ...
-#     w = pay.split()
-# 
-#     # .... but if yes, we're done already
-#     if len(w) == 1:
-#         sc_breakup.append((num, pay.strip(), MODIFIED))
-#         continue
-# 
-#     # Nope, there is something after the label
-#     sc_breakup.append((num, w[0].strip(), MODIFIED))
-#     rest = pay.replace(w[0], '').strip()  # Delete label from string
-#     sc_breakup.append((num, INDENT+rest, sta))
-# 
-# n_passes += 1
-# verbose('PASS BREAKUP: All labels now have a line to themselves')
-# dump(sc_breakup, "nps")
-# 
+ 
 # 
 # # -------------------------------------------------------------------
 # # PASS LOWER: Convert source to lower case

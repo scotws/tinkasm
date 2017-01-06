@@ -1,7 +1,7 @@
 The Great Rewrite of 2017
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 05. Jan 2017
-This version: 05. Jan 2017
+This version: 06. Jan 2017
 
 Early 2017, Tinkasm was completely rewritten based on the experiences using it
 to code Liara Forth. Where the first version of the assembler was focused on
@@ -29,23 +29,15 @@ line
 New flags:
         -ir     save Intermediate Representation (tink.ir)
         -s28    save as Motorola S28 format (tink.s28)
+        -f      save formatted source code (tink.fmt, calls tinkfmt)
+        -p      save partial assembly if fatal error (tink.prt)
 
 
-COLLECTION PHASE: Gather all files
 
-- Load original source file
-- Load all INCLUDEs
+- Listing includes size of A and XY registers for 65816
+- Renumber secondary line numbers (new pass)
+- Create routines for formatting lines (fmt_listing_instruction, etc)
 
-EXPANSION PHASE: Add extra lines
-
-- Expand all MACROs
-- Insert STATUS lines for register size switches
-- Break up lines: Labels, instructions and directives on own lines
-
-IR complete (offer to save)
-
-- Classify each line as whitespace, comment, directive, label, instruction or status
-- Mark whitespace and comment as done
-
+- .mpu, .origin, and .include mnemonics may not have a label in their line
 
 
