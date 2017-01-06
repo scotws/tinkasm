@@ -2,17 +2,36 @@
 ; Syntax demonstration for the 65816
 
         .mpu 65816
-        .origin e000
+        .ORIGIN e000
 
+        .equ frog 0000
+        .equ pig { frog + 1 }
+        .equ fish .lsb frog
+        .equ goat .msb { pig + 2 }
+
+solo_label
+                lda.# 00        ; my inline-comment
+                lda.# { 0 + 0 }
+                iny
+                lda.l 00:1000
+                BRA solo_label  ; upper case!
+                jmp full
+
+                mvp 00,01
+        
+        ; another comment, indented
+
+lbl+comment ; I'm the comment
+
+        .EMULATED  ; upper case!
+        .native    
+        .a16       ; another inline-comment
                 lda.# 00
                 lda.# { 0 + 0 }
-        .native
-        .a16
-                lda.# 00
-                lda.# { 0 + 0 }
 
-        .a8
-                lda.# 00
+full    .a8     ; label with directive and comment
+        .!a8
+fuller          lda.# 00  ; label with instruction and comment
                 lda.# { 0 + 0 }
 
         .include includeme.tasm

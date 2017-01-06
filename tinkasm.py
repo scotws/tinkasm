@@ -170,14 +170,14 @@ symbol_table = {}
 anon_labels = []
 
 # Line types. Start off with UNKNOWN, then are later replaced by real type as
-# discovered or added. STATUS is added internally by the assembler for various
+# discovered or added. CONTROL is added internally by the assembler for various
 # control structures
-UNKNOWN = 'UNKNOWN'       # Pre-processing default
+UNKNOWN = 'UNKNOWN'         # Pre-processing default
 COMMENT = 'comment'         # Whole-line comments, not inline 
 DIRECTIVE = 'directive'     
 INSTRUCTION = 'instruction'
 LABEL = 'label'
-STATUS = 'status'           # Used for lines added by the assembler
+CONTROL = 'control'         # Used for lines added by the assembler
 WHITESPACE = 'whitespace'   # Used for whole-line whitespace
 
 # Line status. Starts with UNTOUCHED, then MODIFIED if changes are made, and
@@ -190,18 +190,18 @@ DONE = 'DONE'
 
 class CodeLine:
     def __init__(self, rawstring, ln, sec_ln=0):
-        self.raw = rawstring     # Original line as a string
-        self.ln = ln             # Primary line number (in source file)
-        self.sec_ln = sec_ln     # Secondary line number for expanded lines
-        self.status = UNTOUCHED  # Flag if line has been processed
-        self.type = UNKNOWN      # Type of line, starts UNKNOWN, ends DATA
-        self.inline_comment = '' # Storage area for any inline comments
-        self.action = ''         # First word of instruction or directive
-        self.parameters = ''     # Parameter(s) of instruction or directive
-        self.xy_width = 8        # For 65816 REP and SEP instructions
-        self.a_width = 8         # For 65816 REP and SEP instructions
-        self.address = 0         # Address where line data begins (16/24 bit)
-        self.bytes = []          # List of bytes after assembly
+        self.raw = rawstring    # Original line as a string
+        self.ln = ln            # Primary line number (in source file)
+        self.sec_ln = sec_ln    # Secondary line number for expanded lines
+        self.status = UNTOUCHED # Flag if line has been processed
+        self.type = UNKNOWN     # Type of line, starts UNKNOWN, ends DATA
+        self.il_comment = ''    # Storage area for any inline comments
+        self.action = ''        # First word of instruction or directive
+        self.parameters = ''    # Parameter(s) of instruction or directive
+        self.xy_width = 8       # For 65816 REP and SEP instructions
+        self.a_width = 8        # For 65816 REP and SEP instructions
+        self.address = 0        # Address where line data begins (16/24 bit)
+        self.bytes = []         # List of bytes after assembly
 
 
 # List of all directives. Note the anonymous label character is not included
@@ -554,9 +554,6 @@ verbose(TITLE_STRING)
 time_start = timeit.default_timer()
 verbose('Beginning assembly. Timer started.')
  
- 
-### COLLECTION PHASE: Include all information ###
-
 # -------------------------------------------------------------------
 # STEP LOAD: Load original source code and add line numbers
 #
@@ -575,6 +572,7 @@ n_steps += 1
 verbose('STEP LOAD: Read {0} lines from {1}'.\
         format(len(raw_source), args.source))
 # dump(raw_source) 
+
 
 # -------------------------------------------------------------------
 # PASS INCLUDE: Add content from external files specified by the INCLUDE
@@ -607,14 +605,15 @@ for line in raw_source:
                 expanded_source.append(nl)
 
         n_external_files += 1
-        verbose('Included code from file "{0}"'.format(w[1]))
+        verbose('- Included code from file "{0}"'.format(w[1]))
 
     else:
         expanded_source.append(line)
 
 n_passes += 1
-verbose('STEP INCLUDE: Added {0} external file(s)'.format(n_external_files))
+verbose('PASS INCLUDE: Added {0} external file(s)'.format(n_external_files))
 # dump(expanded_source) 
+
 
 # -------------------------------------------------------------------
 # PASS EMPTY: Process empty lines 
@@ -633,8 +632,9 @@ for line in expanded_source:
         n_empty_lines += 1
 
 n_passes += 1
-verbose('STEP EMPTY: Found {0} empty line(s)'.format(n_empty_lines))
+verbose('PASS EMPTY: Found {0} empty line(s)'.format(n_empty_lines))
 # dump(expanded_source)
+
 
 # -------------------------------------------------------------------
 # PASS COMMENTS: Remove comments that span whole lines
@@ -653,8 +653,9 @@ for line in expanded_source:
         n_comment_lines +=1
 
 n_passes += 1
-verbose('STEP COMMENTS: Found {0} full-line comments'.format(n_comment_lines))
+verbose('PASS COMMENTS: Found {0} full-line comments'.format(n_comment_lines))
 # dump(expanded_source)
+
 
 # -------------------------------------------------------------------
 # PASS MPU: Find MPU type
@@ -684,7 +685,10 @@ for line in expanded_source:
     except IndexError:
         fatal(line, 'No MPU given with ".mpu" directive')
     else:
+        line.type = DIRECTIVE
         line.status = DONE 
+        line.action = '.mpu'
+        line.parameters = MPU
         break
 
 if MPU not in SUPPORTED_MPUS:
@@ -699,9 +703,60 @@ verbose('PASS MPU: Found MPU "{0}", is supported'.format(MPU))
 
 
 # -------------------------------------------------------------------
-# PASS IDENTIFY: Figure out type of line. Puts labels in own line. 
+# STEP OPCODES: Load opcodes depending on MPU type
+#
+# REQUIRES MPU type is known
+# REQUIRED to generate mnemonic list
+
+# We use 65816 as the default. This step does not change the source code.
+# Rewrite this for more than three MPU types.
+
+if MPU == '6502':
+    from opcodes6502 import opcode_table
+elif MPU.lower() == '65c02':
+    from opcodes65c02 import opcode_table
+else:
+    from opcodes65816 import opcode_table
+
+# Paranoid: Make sure we were given the right number of opcodes
+# Fatal error returns first line of code 
+if len(opcode_table) != 256:
+    fatal(expanded_source[0], 'Opcode table contains {0} entries, not 256'.\
+        format(len(opcode_table)))
+
+n_steps += 1
+verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
+
+
+# -------------------------------------------------------------------
+# STEP MNEMONICS: Generate mnemonic list from opcode table
+#
+# REQUIRES opcodes loaded depending on CPU type
+
+# This step does not change the source code
+
+mnemonics = {opcode_table[n][1]:n for n, e in enumerate(opcode_table)}
+
+# For the 6502 and 65c02, we have 'UNUSED' for the entries in the opcode table
+# that are, well, not used. We get rid of them here. The 65816 does not have 
+# any unused opcodes.
+if MPU != '65816':
+    del mnemonics['UNUSED']
+
+n_steps += 1
+verbose('STEP MNEMONICS: Generated mnemonics list')
+verbose('- Number of mnemonics found: {0}'.format(len(mnemonics.keys())))
+if args.dump:
+    print('Mnemonics found: {0}'.format(mnemonics.keys()))
+    print()
+
+
+# -------------------------------------------------------------------
+# PASS SPLIT LABEL: Move labels to their own line
+#
 # REQUIRES inclusion of all lines from all includes
-# REQUIRES list of legal mnemonics to be available
+# REQUIRES list of legal mnemonics available
+# ASSUMES all empty lines have been taken care of 
 
 # Though Typist's Assembler Notation requires labels to be in a separate line,
 # we should be able to assemble code that hasn't been correctly formatted.
@@ -709,153 +764,372 @@ verbose('PASS MPU: Found MPU "{0}", is supported'.format(MPU))
 # first column and is not whitespace is then considered a label. We don't
 # distinguish between global and anonymous labels at this point
 
-labels_source = []
+relabeled_source = []
 
 for line in expanded_source: 
 
     if line.status == DONE:
-        labels_source.append(line) 
+        relabeled_source.append(line) 
         continue
 
     # In theory, labels should be the only thing that is in the first column,
-    # but again, we want the assembly routine to be as robust as possible. We
+    # but again, we want the assembly process be as robust as possible. We
     # therefore strip away left whitespace and try to figure out if we have an
-    # instruction or 
+    # instruction or a directive. If not, it's a label because we don't allow
+    # anything else. While we're at it, we save information about the other
+    # lines that we get as a side effect
 
-    # HERE 
+    # w has to have at least one word because we've gotten rid of all empty
+    # lines
+    w = line.raw.split()
+    w1 = w[0]
 
-    # Most of the lines will not be labels, which means the first character in
-    # the line will be whitespace
-    if line.raw[0] in string.whitespace:
-        labels_source.append(line)
-        continue
+    # Directives start with a dot. We just remember that we've found one, but
+    # don't process it yet
+    if w1[0] == '.':
+        line.type = DIRECTIVE
+        relabeled_source.append(line) 
+        continue 
+        
+    # We know all our mnemonics. We just remember that we've found one, but
+    # don't process it yet. Silly user might have given us uppercase mnemonics,
+    # but we accept this gracefully for the moment and stick itto him later
+    if w1.lower() in mnemonics:
+        line.type = INSTRUCTION
+        relabeled_source.append(line) 
+        continue 
 
-    # We now know we have a label, we just don't know if it is alone in its
-    # line
-    w = pay.split()
+    # We know now that we have a label. We put the label in the action field of
+    # the line for later processing
+    line.type = LABEL
+    line.status = MODIFIED
+    line.action = w1.strip() 
 
-    # .... but if yes, we're done already
+    # If there was only one word in the line, it has to be the label and
+    # we can go on to the next line as quickly as possible
     if len(w) == 1:
-        line.status = MODIFIED
-        labels_source.append(line)
+        relabeled_source.append(line) 
+        continue 
+
+    # Nope, there is more on the line. We create a new line and come back and
+    # figure it out what it was. We delete the label from the string. Note this
+    # can lead to weird effects if the label string appears again in the rest of
+    # the line - say, an inline comment - but we'll live with that risk for now
+    rest_of_line = line.raw.replace(w1, '').strip()
+
+    # We check again if this is an instruction or a directive. The duplication
+    # of code is annoying, but makes processing faster because we bug out of
+    # simple directive lines earlier
+    rw = rest_of_line.split()
+    rw1 = rw[0]
+
+    # The simple case is that we have a comment after the label, and can just
+    # put it in the inline comment field without adding another line
+    if rw1[0] == ';':
+        line.il_comment = rest_of_line
+        relabeled_source.append(line) 
         continue
 
-    # Nope, there is something after the label
+    # Whatever happens now, the label itself is safe
+    relabeled_source.append(line) 
 
-    
-    sc_breakup.append((num, w[0].strip(), MODIFIED))
-    rest = pay.replace(w[0], '').strip()  # Delete label from string
-    sc_breakup.append((num, INDENT+rest, sta))
+    if rw1[0] == '.':
+        newline = CodeLine(rest_of_line, line.ln, 1)
+        newline.type = DIRECTIVE
+        relabeled_source.append(newline) 
+        continue
+
+    if rw1.lower() in mnemonics:
+        newline = CodeLine(rest_of_line, line.ln, 1)
+        newline.type = INSTRUCTION
+        relabeled_source.append(newline) 
+        continue
+
+    # If we reach this point, we have something weird on the new line and give
+    # up with a fatal error
+    fatal(line, 'Unidentified characters "{0}" after label'.\
+            format(rest_of_line))
 
 n_passes += 1
-verbose('PASS ISOLATE LABELS: All labels now have a line to themselves')
-# dump(labels_source)
+verbose('PASS SPLIT LABELS: Split lines that have code following their labels')
+# dump(relabeled_source)
 
 
- # PRIMITIVE PRINTOUT FOR TESTING
-for e in expanded_source:
-    print('{0:04}:{1:03} {2} {3:11}'.format(e.ln, e.sec_ln, e.status, e.type), e.raw)
+# -------------------------------------------------------------------
+# CLAIM: All labels should now be in a line of their own. Also, all directives
+# and instruction lines should be identified 
+
+verbose('CLAMING all labels should be in a line of their own')
+
+
+# -------------------------------------------------------------------
+# PASS VALIDATE TYPE: Confirm the type of every single line is known
+#
+# REQUIRES labels to be in own lines
+# REQUIRES all types to have been identified
+
+# This step does not change the source
+
+for line in relabeled_source:
+
+    if line.type == UNKNOWN:
+        fatal(line, 'Line of unknown type remaining after processing')
+
+n_passes += 1
+verbose('PASS VALIDATE TYPE: All lines are of known type')
+
+# -------------------------------------------------------------------
+# PASS INLINE COMMENTS: Isolate inline comments
+#
+# REQUIRES all types to have been identified
+# REQUIRES all types to be in a line of their own 
+
+# Keep this definition with its pass
+def remove_inlines(s):
+    """Given a string, remove any inline comment, defined by the comment char.
+    We only strip the right side because we need the whitespace on the left
+    later.  
+    """
+    non_comment = s.split(COMMENT_MARKER)[0].rstrip()
+    comment = s.replace(non_comment, '')
+    return non_comment, comment
+
+
+for line in relabeled_source:
+
+    if line.status == DONE:
+        continue
+
+    # For the moment, we put "non_comment" (the actual directive or instructions
+    # with any operands etc) in the parameters field
+    if line.type == DIRECTIVE or line.type == INSTRUCTION:
+        line.parameters, line.il_comment = remove_inlines(line.raw)
+    
+n_passes += 1
+verbose('PASS INLINE COMMENTS: Isolated all inline comments')
+# dump(relabeled_source)
+
+
+# -------------------------------------------------------------------
+# PASS SPLIT OPERATIONS: For directives and instructions, split into
+# directive/parameter or opcode/operand pairs. Convert directives and opcodes to
+# lower case. After this pass, we don't access the raw line string anymore
+#
+# REQUIRES all types to be in a line of their own
+# REQUIRES all lines to have been identified by type
+# REQUIRES all inline comments to have been removed
+# ASSUMES that the directives and instructions are in the parameter field
+
+for line in relabeled_source:
+
+    if line.status == DONE:
+        continue
+
+    if line.type == DIRECTIVE or line.type == INSTRUCTION:
+        w = line.parameters.split() 
+        w1 = w[0]
+        line.action = w[0].lower()
+        line_rest = line.parameters.replace(w1, '').strip()
+        line.parameters = line_rest
+
+n_passes += 1
+verbose('PASS SPLIT OPERATIONS: Isolated active word/parameters')
+
+
+# -------------------------------------------------------------------
+# PASS MODES: Handle '.native' and '.emulated' directives on the 65816
+#
+# REQUIRES all directives to be in action field of their line
+
+# TODO refactor this mess once we're sure it works
+
+modes_source = []
+
+if MPU == '65816':
+
+    for line in relabeled_source:
+
+        if line.status == DONE or line.type != DIRECTIVE:
+            modes_source.append(line)
+            continue
+
+        if line.action == '.native':
+
+            clc_line = CodeLine(INDENT+line.action, line.ln, 1)
+            clc_line.action = 'clc'
+            clc_line.type = INSTRUCTION
+            clc_line.status = MODIFIED
+            modes_source.append(clc_line)
+
+            xce_line = CodeLine(INDENT+line.action, line.ln, 2)
+            xce_line.action = 'xce'
+            xce_line.type = INSTRUCTION
+            xce_line.status = MODIFIED
+            modes_source.append(xce_line)
+
+            bang_line = CodeLine(INDENT+line.action, line.ln, 3)
+            bang_line.action = '.!native'
+            bang_line.type = CONTROL
+            bang_line.status = MODIFIED
+            modes_source.append(bang_line)
+
+            continue
+
+        if line.action == '.emulated':
+
+            sec_line = CodeLine(INDENT+line.action, line.ln, 1)
+            sec_line.action = 'sec'
+            sec_line.type = INSTRUCTION
+            sec_line.status = MODIFIED
+            modes_source.append(sec_line)
+
+            xce_line = CodeLine(INDENT+line.action, line.ln, 2)
+            xce_line.action = 'xce'
+            xce_line.type = INSTRUCTION
+            xce_line.status = MODIFIED
+            modes_source.append(xce_line)
+
+            bang_line = CodeLine(INDENT+line.action, line.ln, 3)
+            bang_line.action = '.!emulated'
+            bang_line.type = CONTROL
+            bang_line.status = MODIFIED
+            modes_source.append(bang_line)
+
+            # Emulation drops us into 8-bit modes for A, X, and Y
+            # automatically, no REP or SEP commands needed
+            bang_line = CodeLine(INDENT+line.action, line.ln, 4)
+            bang_line.action = '.!a8'
+            bang_line.type = CONTROL
+            bang_line.status = MODIFIED
+            modes_source.append(bang_line)
+
+            bang_line = CodeLine(INDENT+line.action, line.ln, 5)
+            bang_line.action = '.!xy8'
+            bang_line.type = CONTROL
+            bang_line.status = MODIFIED
+            modes_source.append(bang_line)
+
+            continue
+
+        # If we get here, just save the line, like, whatever
+        modes_source.append(line)
+
+    n_passes += 1
+    verbose('PASS MODES: Handled 65816 native/emulated mode switches')
+#   dump(modes_source)
+
+else:
+    modes_source = relabeled_source
+
+# -------------------------------------------------------------------
+# PASS AXY: Handle register size switches on the 65816
+
+# We add the actual REP/SEP instructions as well as internal directives for the
+# following steps.
+
+axy_source = []
+
+# We don't need to define these if we're not using a 65816
+if MPU == '65816':
+
+    AXY_INS = {'.a8': (('sep', '20', INSTRUCTION),\
+                      ('.!a8', '', CONTROL)),\
+               '.a16': (('rep', '20', INSTRUCTION),\
+                       ('.!a16', '', CONTROL)),\
+               '.xy8': (('sep' '10', INSTRUCTION),\
+                       ('.!xy8', '', CONTROL)),\
+               '.xy16': (('rep' '10', INSTRUCTION),\
+                        ('.!xy16', '', CONTROL)),\
+               '.axy8': (('sep' '30', INSTRUCTION),\
+                        ('.!a8', '', CONTROL),\
+                        ('.!xy8', '', CONTROL)),\
+               '.axy16': (('rep' '30', INSTRUCTION),\
+                         ('.!a16', '', CONTROL),\
+                         ('.!xy16', '', CONTROL))}
+
+    for line in modes_source: 
+
+        have_found = False
+
+        # Walk through every control directive for every line
+        for ins in AXY_INS:
+
+            # Because we moved labels to their own lines, we can assume that
+            # register switches are alone in the line
+            if ins in line.action:
+
+                for e in AXY_INS[ins]:
+                    nl = CodeLine(INDENT+line.action, line.ln, 1)
+                    nl.action = e[0]
+                    nl.parameters = e[1]
+                    nl.type = e[2]
+                    nl.status = MODIFIED
+
+                    axy_source.append(nl)
+                    have_found = True
+
+        if not have_found:
+            axy_source.append(line)
+
+    n_passes += 1
+    verbose('PASS AXY: Registered 8/16 bit switches for A, X, and Y')
+#   dump(axy_source)
+
+else:
+    axy_source = modes_source 
+
+ 
+# -------------------------------------------------------------------
+# PRIMITIVE PRINTOUT FOR TESTING
+# Replace by formated templates later
+for e in axy_source:
+    print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
+            .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
+            e.il_comment), e.raw)
+
 # TODO HIER HIER TODO
 
-
-# # -------------------------------------------------------------------
-# # PASS INLINES: Remove comments that are inline
-# 
-# # TODO keep inline comments in a separate list to reconstruct file listing
-# 
-# # Keep this function in this pass 
-# def remove_inlines(p):
-#     """Remove any inlines, defined by COMMENT char. We only strip the
-#     right side because we need the whitespace on the left later.
-#     """
-#     return p.split(COMMENT)[0].rstrip()
-# 
-# sc_inlines = []
-# 
-# for num, pay in sc_comments:
-#     sc_inlines.append((num, remove_inlines(pay)))
-# 
-# n_passes += 1
-# verbose('STEP INLINES: Removed all inline comments and terminating linefeeds')
-# dump(sc_inlines, 'np')
-# 
-# 
  
-# # # -------------------------------------------------------------------
-# # # STEP OPCODES: Load opcodes depending on MPU type
-# # 
-# # # We use 65816 as the default. This step does not change the source code
-# # 
-# # # If we ever have have more than these three types, rewrite
-# # if MPU == '6502':
-#     from opcodes6502 import opcode_table
-# elif MPU.lower() == '65c02':
-#     from opcodes65c02 import opcode_table
-# else:
-#     from opcodes65816 import opcode_table
-# 
-# # Paranoid: Make sure we were given the right number of opcodes
-# if len(opcode_table) != 256:
-#     fatal(0, 'Opcode table contains {0} entries, not 256'.\
-#         format(len(opcode_table)))
-# 
-# n_steps += 1
-# verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
-# 
-# 
 # # -------------------------------------------------------------------
-# # STEP MNEMONICS: Generate mnemonic list from opcode table
+# # PASS SPLIT MOVES - Split up Move instructions on the 65816
 # 
-# # This step does not change the source code
+# # The MVP and MVN instructions are really, really annoying because they have two
+# # operands where every other instruction has one. We deal with this by splitting
+# # the instructions into two lines, dealing with the operands, and then later
+# # putting them back together again. We assume that the operands are separated by
+# # a comma ('mvp 00,01')
 # 
-# mnemonics = {opcode_table[n][1]:n for n, e in enumerate(opcode_table)}
+# sc_splitmove = []
 # 
-# # For the 6502 and 65c02, we have 'UNUSED' for the entries in the opcode table
-# # that are, well, not used. We get rid of them here. The 65816 does not have 
-# # any unused opcodes.
-# if MPU != '65816':
-#     del mnemonics['UNUSED']
+# if MPU == '65816':
 # 
-# n_steps += 1
-# verbose('STEP MNEMONICS: Generated mnemonics list')
-# verbose('Number of mnemonics found: {0}'.format(len(mnemonics.keys())))
-# if args.dump:
-#     print('Mnemonics found: {0}'.format(mnemonics.keys()))
-#     print()
+#     for num, pay, sta in sc_axy:
 # 
-# 
-# 
- 
-# 
-# # -------------------------------------------------------------------
-# # PASS LOWER: Convert source to lower case
-# 
-# # We can't just lowercase everything in one list comprehension because the
-# # strings might contain upper cases we want to keep
-# 
-# # This pass must come after splitting the labels into their own lines or else we
-# # have problem with lines that have both a label and an string directive 
-# 
-# # TODO test this more extensively, possibly string and character conversion must
-# # be moved up
-# 
-# sc_lower = []
-# 
-# for num, pay, sta in sc_breakup:
-# 
-#     if '"' not in pay:
-#         sc_lower.append((num, pay.lower(), sta))
-#     else:
 #         w = pay.split()
-#         new_inst = w[0].lower()    # only convert the directive 
-#         new_pay = INDENT+new_inst+' '+' '.join(w[1:])
-#         sc_lower.append((num, new_pay, sta))
 # 
-# n_passes += 1
-# verbose('STEP LOWER: Converted all lines to lower case')
-# dump(sc_lower, "nps")
+#         if w[0] == 'mvp' or w[0] == 'mvn':
 # 
+#             # Catch malformed move instructions
+#             try:
+#                 l_pay, r_pay = pay.split(',') 
+#             except ValueError:
+#                 fatal(num, 'Malformed move instruction')
 # 
+#             sc_splitmove.append((num, INDENT+l_pay.strip(), MODIFIED))
+#             sc_splitmove.append((num, INDENT+'DUMMY '+r_pay.strip(), ADDED)) 
+# 
+#         else:
+#             sc_splitmove.append((num, pay, sta))
+# 
+#     n_passes += 1
+#     verbose('PASS SPLIT MOVES: Split mvn/mvp instructions on the 65816')
+#     dump(sc_splitmove, "nps")
+# 
+# else:
+#     sc_splitmove = sc_axy
+# 
+#
+
 # # -------------------------------------------------------------------
 # # PASS MACROS: Define macros
 # 
@@ -905,6 +1179,52 @@ for e in expanded_source:
 #             print('    {0}'.format(repr(ml)))
 # 
 #     print()
+
+## # -------------------------------------------------------------------
+# # PASS INVOKE: Insert macro definitions
+# 
+# # Macros must be expanded before we touch the .NATIVE and .AXY directives
+# # because those might be present in the macros
+# # TODO add parameters, which might force us to move this to a later point
+# 
+# sc_invoke = []
+# pre_len = len(sc_replaced01)
+# 
+# for num, pay, sta in sc_replaced01:
+# 
+#     w = pay.split()
+# 
+#     # Usually the line will not be a macro, so get it out of the way
+#     if w[0] != '.invoke':
+#         sc_invoke.append((num, pay, sta))
+#         continue
+# 
+#     # Name of macro to invoke must be second word in line
+#     try:
+#         m = macros[w[1]]
+#     except KeyError:
+#         fatal(num, 'Attempt to invoke non-existing macro "{0}"'.format(w[1]))
+# 
+#     for ml in m:
+#         sc_invoke.append(ml)
+# 
+#     n_invocations += 1
+#     verbose('Expanding macro "{0}" into line {1}'.format(w[1], num))
+# 
+# post_len = len(sc_invoke)
+# n_passes += 1
+# 
+# # We give the "net" number of lines added because we also remove the invocation
+# # line itself
+# verbose('PASS INVOKE: {0} macro expansions, net {1} lines added'.\
+#         format(n_invocations, post_len - pre_len))
+# dump(sc_invoke, "nps")
+#
+
+# PASS RENUMBER SECONDARY LINE NUMBERS
+
+#### IR #### 
+
 # 
 # 
 # # -------------------------------------------------------------------
@@ -1012,48 +1332,9 @@ for e in expanded_source:
 # # -------------------------------------------------------------------
 # # PASS REPLACE (1): Handle known assignments
 # sc_replaced01 = replace_symbols(sc_simpleassign)
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS INVOKE: Insert macro definitions
-# 
-# # Macros must be expanded before we touch the .NATIVE and .AXY directives
-# # because those might be present in the macros
-# # TODO add parameters, which might force us to move this to a later point
-# 
-# sc_invoke = []
-# pre_len = len(sc_replaced01)
-# 
-# for num, pay, sta in sc_replaced01:
-# 
-#     w = pay.split()
-# 
-#     # Usually the line will not be a macro, so get it out of the way
-#     if w[0] != '.invoke':
-#         sc_invoke.append((num, pay, sta))
-#         continue
-# 
-#     # Name of macro to invoke must be second word in line
-#     try:
-#         m = macros[w[1]]
-#     except KeyError:
-#         fatal(num, 'Attempt to invoke non-existing macro "{0}"'.format(w[1]))
-# 
-#     for ml in m:
-#         sc_invoke.append(ml)
-# 
-#     n_invocations += 1
-#     verbose('Expanding macro "{0}" into line {1}'.format(w[1], num))
-# 
-# post_len = len(sc_invoke)
-# n_passes += 1
-# 
-# # We give the "net" number of lines added because we also remove the invocation
-# # line itself
-# verbose('PASS INVOKE: {0} macro expansions, net {1} lines added'.\
-#         format(n_invocations, post_len - pre_len))
-# dump(sc_invoke, "nps")
-# 
+
+
+ 
 # 
 # # -------------------------------------------------------------------
 # # PASS STRINGS: Convert strings to bytes and byte lists
@@ -1142,127 +1423,7 @@ for e in expanded_source:
 # verbose('PASS CHARS: Converted all single characters to bytes')
 # dump(sc_chars, "nps")
 # 
-# # -------------------------------------------------------------------
-# # PASS MODES: Handle '.native' and '.emulated' directives on the 65816
-# 
-# # Since we have moved labels to their own lines, we assume that both .native
-# # and .emulated alone in their respective lines.
-# 
-# sc_modes = []
-# 
-# if MPU == '65816':
-# 
-#     for num, pay, sta in sc_chars:
-# 
-#         if '.native' in pay:
-#             sc_modes.append((num, INDENT+'clc', ADDED))
-#             sc_modes.append((num, INDENT+'xce', ADDED))
-#             sc_modes.append((num, INDENT+'.!native', CONTROL))
-#             continue
-# 
-#         if '.emulated' in pay:
-#             sc_modes.append((num, INDENT+'sec', ADDED))
-#             sc_modes.append((num, INDENT+'xce', ADDED))
-#             sc_modes.append((num, INDENT+'.!emulated', CONTROL))
-# 
-#             # Emulation drops us into 8-bit modes for A, X, and Y
-#             # automatically, no REP or SEP commands needed
-#             sc_modes.append((num, INDENT+'.!a8', CONTROL))
-#             sc_modes.append((num, INDENT+'.!xy8', CONTROL))
-#             continue
-# 
-#         sc_modes.append((num, pay, sta))
-# 
-#     n_passes += 1
-#     verbose('PASS MODES: Handled 65816 native/emulated mode switches')
-#     dump(sc_modes, "nps")
-# 
-# else:
-#     sc_modes = sc_strings # Keep the chain going
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS AXY: Handle register size switches on the 65816
-# 
-# # We add the actual REP/SEP instructions as well as internal directives for the
-# # following steps.
-# 
-# sc_axy = []
-# 
-# # We don't need to define these if we're not using a 65816
-# if MPU == '65816':
-# 
-#     AXY_INS = {'.a8':    (('sep 20', ADDED), ('.!a8', CONTROL)),\
-#     '.a16': (('rep 20', ADDED), ('.!a16', CONTROL)),\
-#     '.xy8': (('sep 10', ADDED), ('.!xy8', CONTROL)),\
-#     '.xy16': (('rep 10', ADDED), ('.!xy16', CONTROL)),\
-#     '.axy8': (('sep 30', ADDED), ('.!a8', CONTROL), ('.!xy8', CONTROL)),\
-#     '.axy16': (('rep 30', ADDED), ('.!a16', CONTROL), ('.!xy16', CONTROL))}
-# 
-#     for num, pay, sta in sc_modes:
-#         have_found = False
-# 
-#         # Walk through every control directive for every line
-#         for ins in AXY_INS:
-# 
-#             # Because we moved labels to their own lines, we can assume that
-#             # register switches are alone in the line
-#             if ins in pay:
-# 
-#                 for e in AXY_INS[ins]:
-#                     sc_axy.append((num, INDENT+e[0], e[1]))
-#                     have_found = True
-# 
-#         if not have_found:
-#             sc_axy.append((num, pay, sta))
-# 
-#     n_passes += 1
-#     verbose('PASS AXY: Registered 8/16 bit switches for A, X, and Y')
-#     dump(sc_axy, "nps")
-# 
-# else:
-#     sc_axy = sc_modes    # Keep the chain going
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS SPLIT MOVES - Split up Move instructions on the 65816
-# 
-# # The MVP and MVN instructions are really, really annoying because they have two
-# # operands where every other instruction has one. We deal with this by splitting
-# # the instructions into two lines, dealing with the operands, and then later
-# # putting them back together again. We assume that the operands are separated by
-# # a comma ('mvp 00,01')
-# 
-# sc_splitmove = []
-# 
-# if MPU == '65816':
-# 
-#     for num, pay, sta in sc_axy:
-# 
-#         w = pay.split()
-# 
-#         if w[0] == 'mvp' or w[0] == 'mvn':
-# 
-#             # Catch malformed move instructions
-#             try:
-#                 l_pay, r_pay = pay.split(',') 
-#             except ValueError:
-#                 fatal(num, 'Malformed move instruction')
-# 
-#             sc_splitmove.append((num, INDENT+l_pay.strip(), MODIFIED))
-#             sc_splitmove.append((num, INDENT+'DUMMY '+r_pay.strip(), ADDED)) 
-# 
-#         else:
-#             sc_splitmove.append((num, pay, sta))
-# 
-#     n_passes += 1
-#     verbose('PASS SPLIT MOVES: Split mvn/mvp instructions on the 65816')
-#     dump(sc_splitmove, "nps")
-# 
-# else:
-#     sc_splitmove = sc_axy
-# 
-# 
+ 
 # # -------------------------------------------------------------------
 # # PASS LABELS - Construct symbol table by finding all labels
 # 
