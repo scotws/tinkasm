@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 06. Jan 2017
+# This version: 07. Jan 2017
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1078,57 +1078,60 @@ if MPU == '65816':
 else:
     axy_source = modes_source 
 
- 
+# -------------------------------------------------------------------
+# PASS SPLIT MOVES - Split up Move instructions on the 65816
+
+# The MVP and MVN instructions are really, really annoying because they have two
+# operands where every other instruction has one. We deal with this by splitting
+# the instructions into two lines, dealing with the operands, and then later
+# putting them back together again. We assume that the operands are separated by
+# a comma ('mvp 00,01')
+
+move_source = []
+
+if MPU == '65816':
+
+    for line in axy_source: 
+
+        if line.action != 'mvp' and line.action != 'mvn': 
+            move_source.append(line)
+            continue 
+
+        # Catch malformed move instructions
+        try:
+            l_bank, r_bank = line.parameters.split(',')
+        except ValueError:
+            fatal(num, 'Malformed "{0}" instruction ("{1}")'.\
+                    format(line.action, line.parameters))
+
+        line.parameters = l_bank
+        line.status = MODIFIED
+        move_source.append(line)
+
+        nl = CodeLine(INDENT+INDENT+'(dummy)', line.ln, 1)
+        nl.parameters = r_bank
+        nl.status = MODIFIED
+        nl.type = CONTROL
+        move_source.append(nl)
+
+    n_passes += 1
+    verbose('PASS SPLIT MOVES: Split mvn/mvp instructions on the 65816')
+#     dump(sc_splitmove, "nps")
+
+else:
+    move_source = axy_source
+
+
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
 # Replace by formated templates later
-for e in axy_source:
+for e in move_source:
     print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
             .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
             e.il_comment), e.raw)
 
 # TODO HIER HIER TODO
 
- 
-# # -------------------------------------------------------------------
-# # PASS SPLIT MOVES - Split up Move instructions on the 65816
-# 
-# # The MVP and MVN instructions are really, really annoying because they have two
-# # operands where every other instruction has one. We deal with this by splitting
-# # the instructions into two lines, dealing with the operands, and then later
-# # putting them back together again. We assume that the operands are separated by
-# # a comma ('mvp 00,01')
-# 
-# sc_splitmove = []
-# 
-# if MPU == '65816':
-# 
-#     for num, pay, sta in sc_axy:
-# 
-#         w = pay.split()
-# 
-#         if w[0] == 'mvp' or w[0] == 'mvn':
-# 
-#             # Catch malformed move instructions
-#             try:
-#                 l_pay, r_pay = pay.split(',') 
-#             except ValueError:
-#                 fatal(num, 'Malformed move instruction')
-# 
-#             sc_splitmove.append((num, INDENT+l_pay.strip(), MODIFIED))
-#             sc_splitmove.append((num, INDENT+'DUMMY '+r_pay.strip(), ADDED)) 
-# 
-#         else:
-#             sc_splitmove.append((num, pay, sta))
-# 
-#     n_passes += 1
-#     verbose('PASS SPLIT MOVES: Split mvn/mvp instructions on the 65816')
-#     dump(sc_splitmove, "nps")
-# 
-# else:
-#     sc_splitmove = sc_axy
-# 
-#
 
 # # -------------------------------------------------------------------
 # # PASS MACROS: Define macros
@@ -1225,8 +1228,6 @@ for e in axy_source:
 
 #### IR #### 
 
-# 
-# 
 # # -------------------------------------------------------------------
 # # STEP ORIGIN: Find .ORIGIN directive
 # 
