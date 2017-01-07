@@ -4,6 +4,12 @@
         .mpu 65816
         .ORIGIN e000
 
+        .macro frog
+                nop
+                nop
+        .endmacro
+
+
         .equ frog 0000
         .equ pig { frog + 1 }
         .equ fish .lsb frog

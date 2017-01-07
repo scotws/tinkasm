@@ -1122,66 +1122,50 @@ else:
     move_source = axy_source
 
 
+
 # -------------------------------------------------------------------
-# PRIMITIVE PRINTOUT FOR TESTING
-# Replace by formated templates later
-for e in move_source:
-    print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
-            .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
-            e.il_comment), e.raw)
+# PASS MACROS: Define macros
+#
+# REQUIRES all labels to be in their own lines
 
-# TODO HIER HIER TODO
+macros = {}
+macro_name = ''
+are_defining = False
 
+for line in move_source: 
 
-# # -------------------------------------------------------------------
-# # PASS MACROS: Define macros
-# 
-# # This step assumes all labels are now in their own lines
-# 
-# sc_macros = []
-# 
-# macros = {}
-# macro_name = ''
-# are_defining = False
-# 
-# for num, pay, sta in sc_lower:
-# 
-#     w = pay.split()
-# 
-#     if not are_defining:
-# 
-#         # MACRO directive must be first in the line, no labels allowed
-#         if w[0] != '.macro':
-#             sc_macros.append((num, pay, sta))
-#             continue
-#         else:
-#             macro_name = w[1]
-#             macros[macro_name] = []
-#             are_defining = True
-#             verbose('Found macro "{0}" in line {1}'.format(w[1], num))
-# 
-#     else:
-# 
-#         if w[0] != ".endmacro":
-#             macros[macro_name].append((num, pay, MACRO))
-#         else:
-#             are_defining = False
-#             continue
-# 
-# n_passes += 1
-# verbose('STEP MACROS: Defined {0} macros'.format(len(macros)))
+    if not are_defining:
+
+        if line.action != '.macro':
+            continue 
+        else:
+            macro_name = line.parameters.strip() 
+            macros[macro_name] = []
+            are_defining = True
+            verbose('- Found macro "{0}" in line {1}'.format(macro_name, line.ln))
+    else:
+
+        if line.action != ".endmacro":
+            ml = line
+            ml.status = MODIFIED
+            macros[macro_name].append(ml)
+        else:
+            are_defining = False
+            continue
+
+n_passes += 1
+verbose('STEP MACROS: Defined {0} macros'.format(len(macros)))
 # dump(sc_macros, "nps")
-# 
-# # TODO pretty format this
-# if args.dump:
-# 
-#     for m in macros.keys():
-#         print('Macro {0}:'.format(m))
-# 
-#         for ml in macros[m]:
-#             print('    {0}'.format(repr(ml)))
-# 
-#     print()
+
+# TODO pretty format this
+# TODO only print if dump requested
+for m in macros.keys():
+    print('Macro {0}:'.format(m))
+
+    for ml in macros[m]:
+        print('    {0}'.format(repr(ml.raw)))
+
+print()
 
 ## # -------------------------------------------------------------------
 # # PASS INVOKE: Insert macro definitions
@@ -1223,6 +1207,17 @@ for e in move_source:
 #         format(n_invocations, post_len - pre_len))
 # dump(sc_invoke, "nps")
 #
+
+# -------------------------------------------------------------------
+# PRIMITIVE PRINTOUT FOR TESTING
+# Replace by formated templates later
+for e in move_source:
+    print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
+            .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
+            e.il_comment), e.raw)
+
+# TODO HIER HIER TODO
+
 
 # PASS RENUMBER SECONDARY LINE NUMBERS
 
