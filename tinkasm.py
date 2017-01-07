@@ -1143,14 +1143,17 @@ for line in move_source:
             macros[macro_name] = []
             are_defining = True
             verbose('- Found macro "{0}" in line {1}'.format(macro_name, line.ln))
+            line.status = DONE
     else:
 
         if line.action != ".endmacro":
             ml = line
-            ml.status = MODIFIED
+            line.status = DONE
+            ml.status = WORK
             macros[macro_name].append(ml)
         else:
             are_defining = False
+            line.status = DONE
             continue
 
 n_passes += 1
@@ -1167,51 +1170,51 @@ for m in macros.keys():
 
 print()
 
-## # -------------------------------------------------------------------
-# # PASS INVOKE: Insert macro definitions
+# -------------------------------------------------------------------
+# PASS INVOKE: Insert macro definitions
 # 
-# # Macros must be expanded before we touch the .NATIVE and .AXY directives
-# # because those might be present in the macros
-# # TODO add parameters, which might force us to move this to a later point
-# 
-# sc_invoke = []
-# pre_len = len(sc_replaced01)
-# 
-# for num, pay, sta in sc_replaced01:
-# 
-#     w = pay.split()
-# 
-#     # Usually the line will not be a macro, so get it out of the way
-#     if w[0] != '.invoke':
-#         sc_invoke.append((num, pay, sta))
-#         continue
-# 
-#     # Name of macro to invoke must be second word in line
-#     try:
-#         m = macros[w[1]]
-#     except KeyError:
-#         fatal(num, 'Attempt to invoke non-existing macro "{0}"'.format(w[1]))
-# 
-#     for ml in m:
-#         sc_invoke.append(ml)
-# 
-#     n_invocations += 1
-#     verbose('Expanding macro "{0}" into line {1}'.format(w[1], num))
-# 
-# post_len = len(sc_invoke)
-# n_passes += 1
-# 
-# # We give the "net" number of lines added because we also remove the invocation
-# # line itself
-# verbose('PASS INVOKE: {0} macro expansions, net {1} lines added'.\
-#         format(n_invocations, post_len - pre_len))
+# Macros must be expanded before we touch the .NATIVE and .AXY directives
+# because those might be present in the macros
+# TODO add parameters, which might force us to move this to a later point
+
+sc_invoke = []
+pre_len = len(sc_replaced01)
+
+for num, pay, sta in sc_replaced01:
+
+    w = pay.split()
+
+    # Usually the line will not be a macro, so get it out of the way
+    if w[0] != '.invoke':
+        sc_invoke.append((num, pay, sta))
+        continue
+
+    # Name of macro to invoke must be second word in line
+    try:
+        m = macros[w[1]]
+    except KeyError:
+        fatal(num, 'Attempt to invoke non-existing macro "{0}"'.format(w[1]))
+
+    for ml in m:
+        sc_invoke.append(ml)
+
+    n_invocations += 1
+    verbose('Expanding macro "{0}" into line {1}'.format(w[1], num))
+
+post_len = len(sc_invoke)
+n_passes += 1
+
+# We give the "net" number of lines added because we also remove the invocation
+# line itself
+verbose('PASS INVOKE: {0} macro expansions, net {1} lines added'.\
+        format(n_invocations, post_len - pre_len))
 # dump(sc_invoke, "nps")
-#
+
 
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
 # Replace by formated templates later
-for e in move_source:
+for e in macro_source:
     print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
             .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
             e.il_comment), e.raw)
