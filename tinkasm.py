@@ -26,6 +26,7 @@ details.
 ### SETUP ###
 
 import argparse
+import copy
 import operator
 import re
 import string
@@ -172,7 +173,7 @@ anon_labels = []
 # Line types. Start off with UNKNOWN, then are later replaced by real type as
 # discovered or added. CONTROL is added internally by the assembler for various
 # control structures
-UNKNOWN = 'UNKNOWN'         # Pre-processing default
+UNKNOWN = '       '         # Pre-processing default
 COMMENT = 'comment'         # Whole-line comments, not inline 
 DIRECTIVE = 'directive'     
 INSTRUCTION = 'instruction'
@@ -1136,8 +1137,10 @@ for line in move_source:
 
     if not are_defining:
 
+        # This line might not have anything to do with macros
         if line.action != '.macro':
             continue 
+        # If this is the start of a macro, create a line in the macro dictionary
         else:
             macro_name = line.parameters.strip() 
             macros[macro_name] = []
@@ -1146,11 +1149,25 @@ for line in move_source:
             line.status = DONE
     else:
 
+        # Currently, we don't allow nesting
+        if line.action == '.macro':
+            fatal(line, 'Illegal Attempt to nest macro "{0}"'\
+                    .format(line.parameters))
+
+        # Remember this line so we can invoke it later
         if line.action != ".endmacro":
-            ml = line
-            line.status = DONE
-            ml.status = WORK
+
+            # We need to create a copy of the line so it isn't just a reference
+            # For now, we use the line numbers of the macro definition. Later,
+            # the invokation will overwrite them
+            ml = copy.deepcopy(line) 
+            ml.status = MODIFIED
+            ml.sec_ln = 1
             macros[macro_name].append(ml)
+
+            line.status = DONE
+            
+        # We're done, so enough of this 
         else:
             are_defining = False
             line.status = DONE
@@ -1166,50 +1183,57 @@ for m in macros.keys():
     print('Macro {0}:'.format(m))
 
     for ml in macros[m]:
-        print('    {0}'.format(repr(ml.raw)))
+        print('- {0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
+                .format(ml.ln, ml.sec_ln, ml.status, ml.type, ml.action,\
+                ml.parameters, ml.il_comment), ml.raw)
 
 print()
+
 
 # -------------------------------------------------------------------
 # PASS INVOKE: Insert macro definitions
 # 
-# Macros must be expanded before we touch the .NATIVE and .AXY directives
-# because those might be present in the macros
+# REQUIRES macros to have been defined
+
 # TODO add parameters, which might force us to move this to a later point
 
-sc_invoke = []
-pre_len = len(sc_replaced01)
+macro_source = []
+pre_invok_len = len(move_source)
 
-for num, pay, sta in sc_replaced01:
+for line in move_source:
 
-    w = pay.split()
-
-    # Usually the line will not be a macro, so get it out of the way
-    if w[0] != '.invoke':
-        sc_invoke.append((num, pay, sta))
+    if line.action != '.invoke':
+        macro_source.append(line)
         continue
 
     # Name of macro to invoke must be second word in line
     try:
-        m = macros[w[1]]
+        m = macros[line.parameters.strip()]
     except KeyError:
-        fatal(num, 'Attempt to invoke non-existing macro "{0}"'.format(w[1]))
+        fatal(line, 'Attempt to invoke non-existing macro "{0}"'.format(line.action))
 
     for ml in m:
-        sc_invoke.append(ml)
+        macro_source.append(ml)
+        ml.status = MODIFIED
+        ml.ln = line.ln
+        ml.sec_ln = 1   
+        ml.raw = '; Invoked from macro "{0}" in line {1}'.\
+                format(line.action, line.ln)
 
     n_invocations += 1
-    verbose('Expanding macro "{0}" into line {1}'.format(w[1], num))
+    verbose('- Expanding macro "{0}" into line {1}'.\
+            format(line.parameters, line.ln))
 
-post_len = len(sc_invoke)
+post_invok_len = len(macro_source)
 n_passes += 1
 
 # We give the "net" number of lines added because we also remove the invocation
 # line itself
-verbose('PASS INVOKE: {0} macro expansions, net {1} lines added'.\
-        format(n_invocations, post_len - pre_len))
+verbose('PASS INVOKE: {0} macro expansions, net {1} line(s) added'.\
+        format(n_invocations, post_invok_len - pre_invok_len))
 # dump(sc_invoke, "nps")
 
+# HIER HIER
 
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING

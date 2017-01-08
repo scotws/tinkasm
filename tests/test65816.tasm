@@ -5,8 +5,8 @@
         .ORIGIN e000
 
         .macro frog
-                nop
-                nop
+                inx     ; first macro line
+                iny     ; second macro line 
         .endmacro
 
 
@@ -32,7 +32,6 @@ lbl+comment ; I'm the comment
         .EMULATED  ; upper case!
         .native    
         .a16       ; another inline-comment
-                lda.# 00
                 lda.# { 0 + 0 }
 
 full    .a8     ; label with directive and comment
@@ -40,6 +39,7 @@ full    .a8     ; label with directive and comment
 fuller          lda.# 00  ; label with instruction and comment
                 lda.# { 0 + 0 }
 
+        .invoke frog 
         .include includeme.tasm
 
         .byte 1, %00000010, &2, 'a', "aaa", .lsb { 8000 + 11 }
