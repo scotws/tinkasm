@@ -9,7 +9,6 @@
                 iny     ; second macro line 
         .endmacro
 
-
         .equ frog 0000
         .equ pig { frog + 1 }
         .equ fish .lsb frog
@@ -32,6 +31,7 @@ lbl+comment ; I'm the comment
         .EMULATED  ; upper case!
         .native    
         .a16       ; another inline-comment
+        .xy16
                 lda.# { 0 + 0 }
 
 full    .a8     ; label with directive and comment

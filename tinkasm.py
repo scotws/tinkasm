@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 07. Jan 2017
+# This version: 08. Jan 2017
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -55,7 +55,8 @@ n_warnings = 0          # How many warnings were generated
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', dest='source', required=True,\
         help='Assembler source code file (required)')
-parser.add_argument('-ir', '--intermediate-representation', action='store_false',\
+parser.add_argument('-ir', '--intermediate-representation',\
+        action='store_true', dest='ir', default=False,\
         help='Save Intermediate Representation of assembly data (default TINK.IR)')
 parser.add_argument('-o', '--output', dest='output',\
         help='Binary output file (default TINK.BIN)', default='tink.bin')
@@ -67,8 +68,6 @@ parser.add_argument('-l', '--listing', action='store_true',\
         help='Create listing file (default TINK.LST)')
 parser.add_argument('-x', '--hexdump', action='store_true',\
         help='Create ASCII hexdump listing file (default TINK.HEX)')
-parser.add_argument('-f', '--format', action='store_true',\
-        help='Create clean formated source file (default TINK.FMT)')
 parser.add_argument('-s28', action='store_true',\
         help='Create S28 format file from binary (default TINK.S28)')
 parser.add_argument('-p', '--partial', action='store_true',\
@@ -125,7 +124,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  05. January 2017
+Version BETA 08. January 2017
 Copyright 2015-2017 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -153,7 +152,6 @@ LIST_FILE = 'tink.lst'    # Default name of listing file
 IR_FILE = 'tink.ir'       # Default name of IR file 
 S28_FILE = 'tink.s28'     # Default name of S28 file
 PARTIAL_FILE = 'tink.prt' # Default name of partial listing
-FORMAT_FILE = 'tink.fmt'  # Default name of formatted file
 
 # The user can request a correctly formatted source file as a goody while
 # running the program. We call a separate program for this, which has the
@@ -173,13 +171,13 @@ anon_labels = []
 # Line types. Start off with UNKNOWN, then are later replaced by real type as
 # discovered or added. CONTROL is added internally by the assembler for various
 # control structures
-UNKNOWN = '       '         # Pre-processing default
-COMMENT = 'comment'         # Whole-line comments, not inline 
-DIRECTIVE = 'directive'     
-INSTRUCTION = 'instruction'
-LABEL = 'label'
-CONTROL = 'control'         # Used for lines added by the assembler
-WHITESPACE = 'whitespace'   # Used for whole-line whitespace
+UNKNOWN = '   '         # Pre-processing default
+COMMENT = 'cmt'         # Whole-line comments, not inline 
+DIRECTIVE = 'dir'     
+INSTRUCTION = 'ins'
+LABEL = 'lbl'
+CONTROL = 'ctl'         # Used for lines added by the assembler
+WHITESPACE = 'wsp'      # Used for whole-line whitespace
 
 # Line status. Starts with UNTOUCHED, then MODIFIED if changes are made, and
 # then DONE if line does not need any more work. 
@@ -1028,6 +1026,18 @@ else:
 # We add the actual REP/SEP instructions as well as internal directives for the
 # following steps.
 
+# -------------------------------------------------------------------
+# PRIMITIVE PRINTOUT FOR TESTING
+# Replace by formated templates later
+for e in modes_source:
+    print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
+            .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
+            e.il_comment), e.raw)
+
+# TODO HIER HIER TODO
+
+
+
 axy_source = []
 
 # We don't need to define these if we're not using a 65816
@@ -1037,14 +1047,14 @@ if MPU == '65816':
                       ('.!a8', '', CONTROL)),\
                '.a16': (('rep', '20', INSTRUCTION),\
                        ('.!a16', '', CONTROL)),\
-               '.xy8': (('sep' '10', INSTRUCTION),\
+               '.xy8': (('sep', '10', INSTRUCTION),\
                        ('.!xy8', '', CONTROL)),\
-               '.xy16': (('rep' '10', INSTRUCTION),\
+               '.xy16': (('rep', '10', INSTRUCTION),\
                         ('.!xy16', '', CONTROL)),\
-               '.axy8': (('sep' '30', INSTRUCTION),\
+               '.axy8': (('sep', '30', INSTRUCTION),\
                         ('.!a8', '', CONTROL),\
                         ('.!xy8', '', CONTROL)),\
-               '.axy16': (('rep' '30', INSTRUCTION),\
+               '.axy16': (('rep', '30', INSTRUCTION),\
                          ('.!a16', '', CONTROL),\
                          ('.!xy16', '', CONTROL))}
 
@@ -1187,8 +1197,6 @@ for m in macros.keys():
                 .format(ml.ln, ml.sec_ln, ml.status, ml.type, ml.action,\
                 ml.parameters, ml.il_comment), ml.raw)
 
-print()
-
 
 # -------------------------------------------------------------------
 # PASS INVOKE: Insert macro definitions
@@ -1233,7 +1241,143 @@ verbose('PASS INVOKE: {0} macro expansions, net {1} line(s) added'.\
         format(n_invocations, post_invok_len - pre_invok_len))
 # dump(sc_invoke, "nps")
 
-# HIER HIER
+
+# -------------------------------------------------------------------
+# PASS RENUMBER SECONDARY LINE NUMBERS
+# 
+# REQUIRES all includes to be finished
+# REQUIRES all macros to be expanded 
+
+# Different combinations of macros and includes can lead to strange secondary
+# line numbers. Instead of trying to figure them out in the previous steps, we
+# renumber them here before
+# TODO count of secondary lines currently starts with zero, change so it starts
+# with one as well
+
+prev_ln = 0
+sec_ln_count = 0 
+
+for line in macro_source:
+    
+    if line.ln == prev_ln: 
+        sec_ln_count += 1 
+        line.sec_ln = sec_ln_count
+    else: 
+        line.sec_ln = 0 
+        sec_ln_count = 0    # TODO unelegant, rewrite
+
+    prev_ln = line.ln
+
+n_passes += 1
+verbose('PASS RENAME SECONDARY LINES: Secondary lines now numbered in sequence.')
+# dump(macro_source)
+
+ir_source = macro_source
+   
+# -------------------------------------------------------------------
+# ASSERT INTERMEDIATE REPRESENTATION
+#
+# REQUIRES all lines to have been read, expanded and correctly numbered
+
+# The Intermediate Representation (IR) ends the phase of preprocessing (parsing
+# etc) and is the basis for the actually assembly. The source code has now
+# reached its maximal size.
+
+n_steps += 1
+verbose('ASSERT: Intermediate Representation (IR) created with {0} lines of code'.\
+        format(len(ir_source)))
+
+# -------------------------------------------------------------------
+# PASS: SAVE IR FILE 
+#
+# REQUIRES Intermediate Representation to have been generated
+
+if args.ir: 
+
+    # Keep these with the IR pass
+    # TODO rewrite this once we're happy with it
+    
+    def tmpl_ir_cmt(ir_line):
+        """Template for commentaries for the Intermediate Representation.
+        Takes a line object and returns a string for writing to the file.
+        """
+        s = '{0:5}:{1:3} | {2} | {3} | {4}\n'.format(ir_line.ln,\
+                ir_line.sec_ln, ir_line.status, ir_line.type,\
+                ir_line.raw)
+        return s
+
+    def tmpl_ir_ws(ir_line):
+        """Template for whitespace for the Intermediate Representation.
+        Takes a line object and returns a string for writing to the file.
+        """
+        s = '{0:5}:{1:3} | {2} | {3} |\n'.format(ir_line.ln,\
+                ir_line.sec_ln, ir_line.status, ir_line.type)
+        return s
+
+    def tmpl_ir_ins(ir_line):
+        """Template for instructions for the Intermediate Representation. 
+        Takes a line object and returns a string for writing to the file.
+        """
+        s = '{0:5}:{1:3} | {2} | {3} | {4:11} | {5:30} | {6}\n'.\
+            format(ir_line.ln, ir_line.sec_ln, ir_line.status, ir_line.type,\
+            ir_line.action, ir_line.parameters, ir_line.il_comment.strip())
+        return s 
+
+    def tmpl_ir_dir(ir_line):
+        """Template for directives for the Intermediate Representation. 
+        Takes a line object and returns a string for writing to the file.
+        """
+        s = '{0:5}:{1:3} | {2} | {3} | {4:11} | {5:30} | {6}\n'.\
+            format(ir_line.ln, ir_line.sec_ln, ir_line.status, ir_line.type,\
+            ir_line.action, ir_line.parameters, ir_line.il_comment.strip())
+        return s 
+
+    def tmpl_ir_lbl(ir_line):
+        """Template for labels for the Intermediate Representation.
+        Takes a line object and returns a string for writing to the file.
+        """
+        s = '{0:5}:{1:3} | {2} | {3} | {4:11}   {5:30} | {6}\n'.format(ir_line.ln,\
+                ir_line.sec_ln, ir_line.status, ir_line.type, ir_line.action,\
+                ir_line.parameters, ir_line.il_comment.strip())
+        return s
+
+    def tmpl_ir_ctl(ir_line):
+        """Template for control lines for the Intermediate Representation. 
+        Takes a line object and returns a string for writing to the file.
+        """
+        s = '{0:5}:{1:3} | {2} | {3} | {4:11} | {5:30} | {6}\n'.\
+            format(ir_line.ln, ir_line.sec_ln, ir_line.status, ir_line.type,\
+            ir_line.action, ir_line.parameters, ir_line.il_comment.strip())
+        return s 
+
+
+    with open(IR_FILE, 'w') as f:
+
+        f.write(TITLE_STRING)
+        f.write('\nIntermediate Representation (IR) file of {0}\n'.format(args.source))
+        f.write('Generated on {0}\n'.format(time.asctime(time.localtime())))
+        f.write('Saving {0} lines of code\n'.format(len(ir_source)))
+        f.write('\n') 
+        f.write('    LINE   STATUS  TYPE    ACTION             PARAMETERS                   IN-LINE COMMENT\n')
+        f.write('\n')
+
+        for line in ir_source:
+
+            if line.type == INSTRUCTION:
+                f.write(tmpl_ir_ins(line))
+            elif line.type == COMMENT:
+                f.write(tmpl_ir_cmt(line))
+            elif line.type == WHITESPACE:
+                f.write(tmpl_ir_ws(line))
+            elif line.type == CONTROL:
+                f.write(tmpl_ir_ctl(line))
+            elif line.type == DIRECTIVE:
+                f.write(tmpl_ir_dir(line))
+            elif line.type == LABEL:
+                f.write(tmpl_ir_lbl(line))
+            else:
+                fatal(line, 'ERROR: Unknown line type "{0}" in line {1}:{2}'.\
+                        format(line.type, line.ln, line.sec_ln))
 
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
