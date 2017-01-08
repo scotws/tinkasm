@@ -376,31 +376,27 @@ def vet_newsymbol(s):
     if s in symbol_table.keys():
         fatal(num, 'Symbol "{0}" already defined'.format(s))
 
-def replace_symbols(sc_tmp):
-    """Given the complete source code, replace all symbols we know so far. 
-    Called from various steps, assumes we have stripped out all commentary,
-    assumes that sc_tmp has three entries (no addresses yet). Will also 
-    replace symbols in math terms. Returns the modified source code, dumps
-    text if requested. 
+
+def replace_symbols(src):
+    """Given the list of CodeLine elements, replace the symbols we know.
+    Will find symbols in math terms, but not in .BYTE etc data 
+    directives.
     """
+    sr_count = 0 
 
-    sc_replaced = []
-    global n_passes
+    for line in src: 
+
+        if line.status == DONE or line.type == LABEL:
+            continue 
     
-    for num, pay, sta in sc_tmp:
-
-        # Skip this all if we have a label, which can't ever contain a symbol.
-        # This also takes care of any problems with indents
-        if pay[0] not in string.whitespace:
-            sc_replaced.append((num, pay, sta))
-            continue
-
         # We need to go word-by-word because somebody might be defining .byte 
         # data as symbols
         wc = []
-        ws = pay.split()
-        s_temp = sta
+        ws = line.parameters.split()
 
+        # Spliting the lines returns whatever is separated by whitespace. In
+        # data directives such as .BYTE, however, this will return the symbol
+        # with a comma tacked on. We take care of those cases separately
         for w in ws:
 
             try:
@@ -410,17 +406,15 @@ def replace_symbols(sc_tmp):
             except KeyError:
                 pass
             else:
-                s_temp = MODIFIED
+                sr_count += 1
+                line.status = MODIFIED
             finally:
                 wc.append(w)
 
-        sc_replaced.append((num, INDENT+' '.join(wc), s_temp))
+        line.parameters = ' '.join(wc)
 
-    n_passes += 1
-    verbose('PASS REPLACED: Replaced currently known symbols with their values')
-    dump(sc_replaced, "nps")
-
-    return sc_replaced
+    verbose('PASS REPLACED: Replaced {0} known symbol(s) with known values'.\
+            format(sr_count))
 
 
 # TODO 
@@ -466,14 +460,14 @@ def dump_symbol_table(st, s=""):
 
     print('Symbol Table', s)
 
-    if len(st) > 0:
+    if len(st) <= 0:
+        print(' - (symbol table is empty)\n')
 
-        for v in sorted(st):
-            print('{0} : {1:06x}'.format(v.rjust(ST_WIDTH), st[v]))
-        print()
+    # Find longest symbol name in table
+    max_sym_len = max([len(k) for k in st.keys()])
 
-    else:
-        print('    (empty)\n')
+    for v in sorted(st):
+        print('- {0:{width}} : {1:06x}'.format(v, st[v], width=max_sym_len))
 
 
 def convert_term(n, s): 
@@ -652,7 +646,7 @@ for line in expanded_source:
         n_comment_lines +=1
 
 n_passes += 1
-verbose('PASS COMMENTS: Found {0} full-line comments'.format(n_comment_lines))
+verbose('PASS COMMENTS: Found {0} full-line comment(s)'.format(n_comment_lines))
 # dump(expanded_source)
 
 
@@ -1180,7 +1174,7 @@ for m in macros.keys():
     print('Macro {0}:'.format(m))
 
     for ml in macros[m]:
-        print('- {0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
+        print('- {0:04}:{1:03} | {2} {3} | {4:11}|{5:11}|{6:11} ||'\
                 .format(ml.ln, ml.sec_ln, ml.status, ml.type, ml.action,\
                 ml.parameters, ml.il_comment), ml.raw)
 
@@ -1224,7 +1218,7 @@ n_passes += 1
 
 # We give the "net" number of lines added because we also remove the invocation
 # line itself
-verbose('PASS INVOKE: {0} macro expansions, net {1} line(s) added'.\
+verbose('PASS INVOKE: {0} macro expansion(s), net {1} line(s) added'.\
         format(n_invocations, post_invok_len - pre_invok_len))
 # dump(sc_invoke, "nps")
 
@@ -1400,188 +1394,180 @@ for line in ir_source:
 n_steps += 1
 verbose('STEP ORIGIN: Found ."origin" directive, starting code at {0:06x}'.\
         format(LC0))
-# dump(sc_origin, "nps")
 
 
-# # -------------------------------------------------------------------
-# # STEP END: Find .END directive
-# 
-# # End directive must be in the last line
-# 
-# endline = sc_origin[-1][1].strip().split()
-# 
-# if endline[0] != ".end":
-#     n = sc_origin[0][0]   # Fatal always needs a number line, fake it
-#     fatal(n, 'No END directive found, must be in last line')
-# 
-# sc_end = sc_origin[:-1]
-# 
-# n_steps += 1
-# verbose('STEP END: Found END directive in last line')
-# dump(sc_end, "nps")
+# -------------------------------------------------------------------
+# STEP END: Find .END directive
+
+# End directive must be in the last line
+
+s = ir_source[len(ir_source)-1]
+sa = s.action.strip().lower() 
+
+if sa != '.end':
+    fatal(s, "Can't find '.end' directive in last line, found '{0}'".\
+            format(s.raw))
+
+s.status = DONE
+
+n_steps += 1
+verbose('STEP END: Found ".end" directive in last line, very good')
+
+
+# -------------------------------------------------------------------
+# PASS SIMPLE ASSIGN: Handle first round of basic assigments
+
+# Handle the simplest form of assignments, those were a number is assigned to
+# a variable ('.equ jack 1') or a symbol we already know ('.equ jill jack')
+# without modifiers or math. We can't do full assignments until we've dealt with
+# labels, but we can do this now to cut down on the number of lines we have to
+# go through every time. 
+
+for line in ir_source:
+
+    if line.status == DONE or line.action != '.equ':
+        continue 
+
+    w = line.parameters.split()
+
+    # We need exactly two parameters, the new symbol and the number or old
+    # symbol it is to be assigned to
+    if len(w) != 2:
+        continue 
+
+    vet_newsymbol(w[0])
+
+    # In '.equ frog abc', 'abc' can either be a symbol or a number. We want it
+    # to be a symbol by default, so we check the symbol table first
+    try:
+        r = symbol_table[w[1]]
+    except KeyError:
+        pass
+    else:
+        symbol_table[w[0]] = r
+        line.status = DONE
+        continue
+
+    f_num, r = convert_number(w[1])
+
+    # If it's a number, add it to the symbol table, otherwise we'll have to wait
+    # until we've figured out more stuff
+    if f_num:
+        symbol_table[w[0]] = r
+        line.status = DONE
+
+n_passes += 1
+verbose('PASS SIMPLE ASSIGN: Assigned {0} new symbol(s) to symbol table'.\
+        format(len(symbol_table)))
+# dump(sc_simpleassign, "nps")
+
+# Print symbol table
+if args.verbose:
+    dump_symbol_table(symbol_table, "after SIMPLE ASSIGN (numbers in hex)")
+
+
+# -------------------------------------------------------------------
+# PASS REPLACE (1): Handle known assignments
+#
+
+replace_symbols(ir_source)
+
+n_passes += 1
+# dump(ir_source) 
+
+ 
+# -------------------------------------------------------------------
+# PASS STRINGS: Convert strings to bytes and byte lists
+
+# Strings are constants, so we can convert them very early on: Because we have
+# gotten rid of comments, every quotation mark must belong to a string. We
+# convert these strings to comma-separated byte lists 
+# Example: "aaa" -> 61, 61, 61
+
+# This method could also work for single-character strings in instructions such
+# as 'lda.# "a"'. However, this could be source of errors because the assembler
+# will happily also try to turn multi-character strings into byte lists in this
+# instance as well ('lda.# "ab"' would become 'lda.# 61, 62'). Use 
+# single-quotation marks for this, see next step.
+
+p = re.compile('\".*?\"')
+
+for line in ir_source:
+
+    if line.status == DONE:
+        continue 
+
+    # Most lines won't have a string, so we skip them first
+    if '"' not in line.parameters:
+        continue 
+
+    # The save directive may not have a string as a parameter
+    if line.action == '.save':
+        fatal(line, 'Found "{0}" in ".save" directive, may not be string'.\
+                format(line.parameters))
+
+    ma = p.findall(line.parameters)
+
+    # Replace the contents of the strings with a comma-separated list of 
+    # bytes
+    for m in ma:
+
+        # It is an error to use double quotation marks for a single
+        # character, use 'a' instead, see next step
+        if len(m) == 3:
+            fatal(line,\
+                    "Found single-character string {0}, use 'x' for chars".\
+                    format(m))
+
+        line.parameters = line.parameters.replace(m, string2bytestring(m))
+        line.status = MODIFIED
+
+verbose('PASS STRINGS: Converted all strings to byte lists')
+# dump(sc_strings, "nps")
+
+# -------------------------------------------------------------------
+# PASS CHARS: Convert single characters delimited by single quotes
+
+# Since characters are constants, we can convert them early on Single characters
+# are put in single quotes ('a'). This step must come after the conversion of
+# strings to make sure that we don't accidently find single characters that are
+# part of a string.
+
+p = re.compile("\'.\'")
+
+for line in ir_source: 
+    
+    # We usually don't have a single quote in a line so we get rid of that
+    # immediately
+    if "'" not in line.parameters:
+        continue
+
+    ma = p.findall(line.parameters)
+
+    # Replace each instance of a single-quoted string with the string of its
+    # hex number. Note that ord() returns unicode, but we currently slice off 
+    # anything that is not the last two hex digits
+    for m in ma:
+        line.parameters = line.parameters.replace(m, hexstr(2, ord(m[1])))
+        line.status = MODIFIED
+
+verbose('PASS CHARS: Converted all single characters to bytes')
+# dump(sc_chars, "nps")
+
 
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
 # Replace by formated templates later
+
 for e in macro_source:
-    print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
+    print('{0:04}:{1:03} | {2} {3} | {4:11}|{5:11}|{6:11} ||'\
             .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
             e.il_comment), e.raw)
 
 # TODO HIER HIER TODO
 
 
-
-
-# # -------------------------------------------------------------------
-# # PASS SIMPLE ASSIGN: Handle first round of basic assigments
-# 
-# # Handle the simplest form of assignments, those were a number is assigned to
-# # a variable ('.equ jack 1') or a symbol we already know ('.equ jill jack')
-# # without modifiers or math. We can't do full assignments until we've dealt with
-# # labels, but we can do this now to cut down on the number of lines we have to
-# # go through every time. 
-# 
-# sc_simpleassign = []
-# 
-# for num, pay, sta in sc_end:
-# 
-#     w = pay.split()
-#  
-#     if w[0] != ASSIGNMENT:
-#         sc_simpleassign.append((num, pay, sta))
-#         continue
-# 
-#     # We want the length to be exactly three words so we don't get involved
-#     # modifiers or math terms
-#     if len(w) != 3:
-#         sc_simpleassign.append((num, pay, sta))
-#         continue
-# 
-#     vet_newsymbol(w[1])
-# 
-#     # In '.equ frog abc', 'abc' can either be a symbol or a number. We want it
-#     # to be a symbol by default, so we check the symbol table first
-#     try:
-#         r = symbol_table[w[2]]
-#         symbol_table[w[1]] = r
-#         continue
-#     except KeyError:
-#         pass
-# 
-#     f_num, r = convert_number(w[2])
-# 
-#     # If it's a number, add it to the symbol table, otherwise we'll have to wait
-#     # until we've figured out more stuff
-#     if f_num:
-#         symbol_table[w[1]] = r
-#     else:
-#         sc_simpleassign.append((num, pay, sta))
-# 
-# n_passes += 1
-# verbose('PASS SIMPLE ASSIGN: Assigned {0} new symbol(s) to symbol table'.\
-#         format(len(sc_end)-len(sc_simpleassign)))
-# dump(sc_simpleassign, "nps")
-# 
-# # Print symbol table
-# if args.verbose:
-#     dump_symbol_table(symbol_table, "after SIMPLEASSIGN (numbers in hex)")
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS REPLACE (1): Handle known assignments
-# sc_replaced01 = replace_symbols(sc_simpleassign)
-
-
  
-# 
-# # -------------------------------------------------------------------
-# # PASS STRINGS: Convert strings to bytes and byte lists
-# 
-# # Since strings are constants, we can convert them very early on
-# 
-# # Since we have gotten rid of comments, every quotation mark must belong to
-# # a string. We convert these strings to comma-separated byte lists 
-# # Example: "aaa" -> 61, 61, 61
-# 
-# # This method could also work for single-character strings in instructions such
-# # as 'lda.# "a"'. However, this could be source of errors because the assembler
-# # will happily also try to turn multi-character strings into byte lists in this
-# # instance as well ('lda.# "ab"' would become 'lda.# 61, 62'). Use 
-# # single-quotation marks for this, see next step.
-# 
-# sc_strings = []
-# p = re.compile('\".*?\"')
-# 
-# for num, pay, sta in sc_invoke:
-# 
-#         # Most lines won't have a string, so we skip them first
-#         if '"' not in pay:
-#             sc_strings.append((num, pay, sta))
-#             continue 
-# 
-#         # The save directive may not have a string as a parameter
-#         w = pay.split()
-#         
-#         if w[0] == '.save':
-#             fatal(num, 'Illegal string in save directive, should be number.')
-# 
-#         ma = p.findall(pay)
-#         new_pay = pay
-# 
-#         # Replace the contents of the strings with a comma-separated list of 
-#         # bytes
-#         for m in ma:
-# 
-#             # It is an error to use double quotation marks for a single
-#             # character, use 'a' instead, see next step
-#             if len(m) == 3:
-#                 fatal(num,\
-#                         "Found single-character string {0}, use 'x' for chars".\
-#                         format(m))
-# 
-#             new_pay = new_pay.replace(m, string2bytestring(m))
-#         
-#         sc_strings.append((num, new_pay, sta))
-# 
-# verbose('PASS STRINGS: Converted all strings to byte lists')
-# dump(sc_strings, "nps")
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS CHARS: Convert single characters delimited by single quotes
-# 
-# # Since characters are constants, we can convert them early on
-# 
-# # Single characters are put in single quotes ('a'). This step must come after
-# # the conversion of strings to make sure that we don't accidently find single
-# # characters that are part of a string.
-# 
-# sc_chars = []
-# p = re.compile("\'.\'")
-# 
-# for num, pay, sta in sc_strings:
-#     
-#     # We usually don't have a single quote in a line so we get rid of that
-#     # immediately
-#     if "'" not in pay:
-#         sc_chars.append((num, pay, sta))
-#         continue
-# 
-#     ma = p.findall(pay)
-#     new_pay = pay
-# 
-#     # Replace each instance of a single-quoted string with the string of its
-#     # hex number. Note that ord() returns unicode, but we currently slice off 
-#     # anything that is not the last two hex digits
-#     for m in ma:
-#         new_pay = new_pay.replace(m, hexstr(2, ord(m[1])))
-# 
-#     sc_chars.append((num, new_pay, sta))
-# 
-# verbose('PASS CHARS: Converted all single characters to bytes')
-# dump(sc_chars, "nps")
-# 
  
 # # -------------------------------------------------------------------
 # # PASS LABELS - Construct symbol table by finding all labels

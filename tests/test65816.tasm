@@ -10,6 +10,7 @@
         .endmacro
 
         .equ frog 0000
+        .equ cat frog
         .equ pig { frog + 1 }
         .equ fish .lsb frog
         .equ goat .msb { pig + 2 }
@@ -42,8 +43,8 @@ fuller          lda.# 00  ; label with instruction and comment
         .invoke frog 
         .include includeme.tasm
 
-        .byte 1, %00000010, &2, 'a', "aaa", .lsb { 8000 + 11 }
-        .word 1000, 2000, 3000
+        .byte 1, %00000010, &2, 'a', "aaa", .lsb { frog + 11 }
+        .word 1000, frog, 3000
         .long 01aaaa, 02bbbb
 
         .end
