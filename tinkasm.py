@@ -1026,18 +1026,6 @@ else:
 # We add the actual REP/SEP instructions as well as internal directives for the
 # following steps.
 
-# -------------------------------------------------------------------
-# PRIMITIVE PRINTOUT FOR TESTING
-# Replace by formated templates later
-for e in modes_source:
-    print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
-            .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
-            e.il_comment), e.raw)
-
-# TODO HIER HIER TODO
-
-
-
 axy_source = []
 
 # We don't need to define these if we're not using a 65816
@@ -1131,7 +1119,6 @@ if MPU == '65816':
 
 else:
     move_source = axy_source
-
 
 
 # -------------------------------------------------------------------
@@ -1287,6 +1274,7 @@ n_steps += 1
 verbose('ASSERT: Intermediate Representation (IR) created with {0} lines of code'.\
         format(len(ir_source)))
 
+
 # -------------------------------------------------------------------
 # PASS: SAVE IR FILE 
 #
@@ -1379,50 +1367,42 @@ if args.ir:
                 fatal(line, 'ERROR: Unknown line type "{0}" in line {1}:{2}'.\
                         format(line.type, line.ln, line.sec_ln))
 
+
 # -------------------------------------------------------------------
-# PRIMITIVE PRINTOUT FOR TESTING
-# Replace by formated templates later
-for e in macro_source:
-    print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
-            .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
-            e.il_comment), e.raw)
+# STEP ORIGIN: Find .ORIGIN directive
 
-# TODO HIER HIER TODO
+# Standard requires origin to be the highest line. Since we've alread taken care
+# of the .MPU, this should be the first non-completed line. 
 
+for line in ir_source:
 
-# PASS RENUMBER SECONDARY LINE NUMBERS
+    if line.status == DONE:
+        continue
 
-#### IR #### 
+    # .ORIGIN should be first line, or else we're in trouble. Note that in
+    # theory, it could be uppercase, so we go the extra mile and convert it
+    s = line.action.strip().lower() 
+    if s != '.origin':
+        fatal(line, '".origin" directive missing or too late, found "{0}" instead'.\
+                format(line.action))
 
-# # -------------------------------------------------------------------
-# # STEP ORIGIN: Find .ORIGIN directive
-# 
-# # Origin line should be at the top of the list now. 
-# 
-# sc_origin = []
-# 
-# originline = sc_macros[0][1].strip().split()
-# 
-# if originline[0] != '.origin':
-#     n = sc_macros[0][0]   # Fatal always needs a number line, fake it
-#     fatal(n, 'No ORIGIN directive found, must be first line after macros')
-# 
-# f_num, LC0 = convert_number(originline[1])
-# 
-# # ORIGIN may not take a symbol, because we haven't defined any yet, and
-# # we don't accept math or modifiers either
-# if not f_num:
-#     n = sc_macros[0][0]
-#     fatal(n, 'ORIGIN directive gives "{0}", not number as required')
-# 
-# sc_origin = sc_macros[1:]
-# 
-# n_steps += 1
-# verbose('STEP ORIGIN: Found ORIGIN directive, starting at {0:06x}'.\
-#         format(LC0))
+    f_num, LC0 = convert_number(line.parameters)
+
+    # ORIGIN may not take a symbol, because we haven't defined any yet, and
+    # we don't accept math or modifiers either
+    if not f_num:
+        fatal(n, '".origin" directive gives "{0}", not number as required')
+
+    line.status = DONE
+    break
+        
+
+n_steps += 1
+verbose('STEP ORIGIN: Found ."origin" directive, starting code at {0:06x}'.\
+        format(LC0))
 # dump(sc_origin, "nps")
-# 
-# 
+
+
 # # -------------------------------------------------------------------
 # # STEP END: Find .END directive
 # 
@@ -1439,8 +1419,20 @@ for e in macro_source:
 # n_steps += 1
 # verbose('STEP END: Found END directive in last line')
 # dump(sc_end, "nps")
-# 
-# 
+
+# -------------------------------------------------------------------
+# PRIMITIVE PRINTOUT FOR TESTING
+# Replace by formated templates later
+for e in macro_source:
+    print('{0:04}:{1:03} {2} {3:11} | {4:11}|{5:11}|{6:11} ||'\
+            .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
+            e.il_comment), e.raw)
+
+# TODO HIER HIER TODO
+
+
+
+
 # # -------------------------------------------------------------------
 # # PASS SIMPLE ASSIGN: Handle first round of basic assigments
 # 
