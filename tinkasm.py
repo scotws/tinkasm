@@ -1503,7 +1503,7 @@ for line in ir_source:
 
     # The save directive may not have a string as a parameter
     if line.action == '.save':
-        fatal(line, 'Found "{0}" in ".save" directive, may not be string'.\
+        fatal(line, 'Found {0} in ".save" directive, may not be string'.\
                 format(line.parameters))
 
     ma = p.findall(line.parameters)
@@ -1524,6 +1524,7 @@ for line in ir_source:
 
 verbose('PASS STRINGS: Converted all strings to byte lists')
 # dump(sc_strings, "nps")
+
 
 # -------------------------------------------------------------------
 # PASS CHARS: Convert single characters delimited by single quotes
