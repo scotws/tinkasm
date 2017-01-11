@@ -47,6 +47,7 @@ n_instructions = 0      # How many instruction lines
 n_invocations = 0       # How many macros were expanded
 n_passes = 0            # Number of passes during processing
 n_steps = 0             # Number of steps during processing
+n_switches = 0          # How many 8/16 bit register switches on 65816
 n_warnings = 0          # How many warnings were generated
 
 
@@ -116,6 +117,8 @@ def suggestion(n, s):
 def warning(s):
     """If program called with -w or --warnings, print a warning string.
     """
+    global n_warnings
+    n_warnings += 1
     if args.warnings:
         print('WARNING: {0}'.format(s))
 
@@ -124,7 +127,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA 08. January 2017
+Version BETA 11. January 2017
 Copyright 2015-2017 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -159,9 +162,8 @@ PARTIAL_FILE = 'tink.prt' # Default name of partial listing
 # TODO make this work 
 formatter = './tinkfmt/tinkfmt.py'
 
-xy_width = 8    # For 65816, assumed width of XY registers at this point
-a_width = 8     # For 65816, assumed width of A register at this point
-
+# We store the general lists here, those specific to one processor type are put
+# in the relevant passes
 SUPPORTED_MPUS = ['6502', '65c02', '65816']
 DATA_DIRECTIVES = ['.byte', '.word', '.long']
 
@@ -1542,6 +1544,7 @@ for line in ir_source:
         line.parameters = line.parameters.replace(m, string2bytestring(m))
         line.status = MODIFIED
 
+n_passes += 1
 verbose('PASS STRINGS: Converted all strings to byte lists')
 # dump(sc_strings, "nps")
 
@@ -1572,9 +1575,68 @@ for line in ir_source:
         line.parameters = line.parameters.replace(m, hexstr(2, ord(m[1])))
         line.status = MODIFIED
 
+n_passes += 1
 verbose('PASS CHARS: Converted all single characters to bytes')
 # dump(sc_chars, "nps")
 
+
+# -------------------------------------------------------------------
+# PASS REGISTER SWITCHES: Add size of registers to lines for 65816
+#
+# REQUIRES all register size directives turned into asserts
+# ASSUMES no naked rep/sep instructions in code
+
+# For the 65816, see where we have rep/sep register size switches and add the
+# size we think A, X, and Y have to the line data. We do not recognize the
+# rep/sep instructions directly, but only the assert directives, so when we get
+# here, we should have checked to make sure there are no naked sep/rep in code
+# and that all .A8 etc have been changed to .!A8
+
+if MPU == '65816':
+
+    # Keep these variables in this pass
+    current_xy_width = 8  
+    current_a_width = 8
+    current_mode = 'emu'
+
+    register_asserts = ['.!a8', '.!a16', '.!xy8', '.!xy16', '.!axy8',\
+            '.!axy16']
+
+
+    for line in ir_source: 
+
+        # We walk though all lines, not only instructions, which is probably
+        # paranoid
+        
+        if line.action == '.native':
+            current_mode = 'nat'
+
+        elif line.action == '.emulated':
+            current_mode = 'emu'
+            current_a_size = 8
+            current_xy_size = 8
+
+        elif line.action in register_asserts:
+
+            if line.action[-1] == '8':
+                size = 8
+            else:
+                size = 16
+
+            if 'a' in line.action: 
+                current_a_size = size
+
+            if 'xy' in line.action: 
+                current_xy_size = size
+
+        line.mode = current_mode
+        line.a_width = current_a_size
+        line.xy_width = current_xy_size
+
+    n_passes += 1
+    verbose('PASS REGISTER SWITCHES Handled 65816 register changes')
+    # dump(frog)
+        
 
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
