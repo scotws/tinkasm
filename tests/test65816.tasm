@@ -23,6 +23,8 @@ solo_label
                 BRA solo_label  ; upper case!
                 jmp full
 
+                rep 20          ; Should throw warning
+
                 mvp 00,01
         
         ; another comment, indented

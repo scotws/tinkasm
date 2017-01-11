@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 08. Jan 2017
+# This version: 11. Jan 2017
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1013,6 +1013,26 @@ if MPU == '65816':
 
 else:
     modes_source = relabeled_source
+
+# -------------------------------------------------------------------
+# PASS REP/SEP: Warn if there are any direct REP/SEP 
+#
+# Must come before we handle the register size switches. 
+
+if MPU == '65816': 
+
+    for line in modes_source:
+
+        if line.type != INSTRUCTION:
+            continue
+
+        if line.action == 'rep' or line.action == 'sep':
+            warning('"{0}" in line {1}, switch will not be recognized'.\
+                    format(line.action, line.ln))
+            warning('Use register size directives such as .A8 instead')
+
+    n_passes += 1
+    verbose('PASS REP/SEP: Check for naked rep/sep instructions')
 
 # -------------------------------------------------------------------
 # PASS AXY: Handle register size switches on the 65816
