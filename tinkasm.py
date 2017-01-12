@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 11. Jan 2017
+# This version: 12. Jan 2017
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -200,6 +200,7 @@ class CodeLine:
         self.parameters = ''    # Parameter(s) of instruction or directive
         self.address = 0        # Address where line data begins (16/24 bit)
         self.il_comment = ''    # Storage area for any inline comments
+        self.notes = ''         # Internal notes for assembly
         self.bytes = []         # List of bytes after assembly
         self.mode = 'em'        # For 65816: default mode (emulated)
         self.a_width = 8        # For 65816: defalt width of A register
@@ -1668,8 +1669,83 @@ for line in ir_source:
 
 n_passes += 1
 # dump(frog)
- 
 
+
+ 
+ 
+# -------------------------------------------------------------------
+# PASS LABELS - Construct symbol table by finding all labels
+
+# This is the equivalent of the traditional "Pass 1" in normal two-pass
+# assemblers. 
+
+def lc_offset(register_width):
+    """For the 65816, convert the register width of A or XY to the byte
+    offset that must be added during assembly for the immediate
+    instructions.
+    """
+    return (register_width-8)//8
+
+
+BRANCHES = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
+           'bra.l', 'phe.r']
+
+# These are only used for 65816. The offsets are used to calculate if an extra
+# byte is needed for immediate forms such as lda.# with the 65816
+A_IMM = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
+XY_IMM = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
+
+verbose('PASS LABELS: Assigning value to all labels.')
+
+for line in ir_source: 
+
+    if line.status == DONE:
+        continue
+
+    # --- SUBSTEP CURRENT: Replace the CURRENT symbol by current address ---
+    # This must come before we handle mnemonics
+
+    if CURRENT in line.parameters:
+        LC = LC0 + LCi
+        line.parameters = line.parameters.replace(CURRENT, hexstr(6, LC))
+        line.status = MODIFIED
+
+        verbose('- Current line marker in line {0} replaced with {1}'.\
+                format(line.ln, hexstr(6, LC)))
+
+
+    # --- SUBSTEP MNEMONIC: See if we have a mnemonic ---
+
+    # Because we are using Typist's Assembler Notation and every mnemonic
+    # maps to one and only one opcode, we don't have to look at the operand of
+    # the instruction at all, which is a lot simpler
+
+    if line.action in mnemonics:
+
+        # For branches, we want to remember were the instruction is to make our
+        # life easier later
+        if line.action in BRANCHES:
+            line.notes = hexstr(4, LC0+LCi)
+            line.status = MODIFIED
+            verbose('- Found address of branch in line {0} ({1})'.\
+                    format(line.ln, line.notes))
+
+        LCi += opcode_table[mnemonics[line.action]][2]
+
+        # Factor in register size if this is a 65816
+        if MPU == '65816':
+
+            if line.action in A_IMM:
+                LCi += lc_offset(line.a_width)
+            elif line.action in XY_IMM:
+                LCi += lc_offset(line.xy_width)
+
+        continue
+
+ 
+ 
+ 
+ 
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
 # Replace by formated templates later
@@ -1678,85 +1754,17 @@ for e in macro_source:
     print('{0:04}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7:11}|{8:11}|{9:11} ||'.\
             format(e.ln, e.sec_ln, e.status, e.type,\
             e.mode, e.a_width, e.xy_width,\
-            e.action, e.parameters, e.il_comment))
+            e.action, e.parameters, e.il_comment), e.notes)
 
 # TODO HIER HIER TODO
 
 
+
+
+
  
  
-# # -------------------------------------------------------------------
-# # PASS LABELS - Construct symbol table by finding all labels
-# 
-# # This is the equivalent of the traditional "Pass 1" in normal two-pass
-# # assemblers. We assume that the most common line by far will be mnemonics, and
-# # that then we'll see lots of labels (at some point, we should measure this).
-# 
-# # Though we don't start acutal assembling here, we do remember information for
-# # later passes when it is useful, like for branches and such, and get rid of
-# # some directives such as ADVANCE and SKIP
-# 
-# sc_labels = []
-# 
-# BRANCHES = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
-#         'bra.l', 'phe.r']
-# 
-# # These are only used for 65816. The offsets are used to calculate if an extra
-# # byte is needed for immediate forms such as lda.# with the 65816
-# a_len_offset = 0
-# xy_len_offset = 0
-# mpu_status = 'emulated'   # Start 65816 out in emulated status
-# A_IMM = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
-# XY_IMM = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
-# 
-# for num, pay, sta in sc_splitmove:
-# 
-#     w = pay.split()
-# 
-#     # --- SUBSTEP CURRENT: Replace the CURRENT symbol by current address
-# 
-#     # This must come before we handle mnemonics. Don't add a continue because
-#     # that will screw up the line count; we replace in-place
-#     if CURRENT in pay: 
-#         pay = pay.replace(CURRENT, hexstr(6, LC0+LCi))
-#         w = pay.split()
-#         verbose('Current marker "{0}" in line {1}, replaced with {2}'.\
-#                 format(CURRENT, num, hexstr(6, LC0+LCi)))
-# 
-# 
-#     # --- SUBSTEP MNEMONIC: See if we have a mnemonic ---
-# 
-#     # Because we are using Typist's Assembler Notation and every mnemonic
-#     # maps to one and only one opcode, we don't have to look at the operand of
-#     # the instruction at all, which is a lot simpler
-# 
-#     try:
-#         oc = mnemonics[w[0]]
-#     except KeyError:
-#         pass
-#     else:
-# 
-#         # For branches, we want to remember were the instruction is to make our
-#         # life easier later
-#         if w[0] in BRANCHES:
-#             pay = pay + ' ' + hexstr(4, LC0+LCi)
-#             sta = MODIFIED
-#             verbose('Added address of branch to its payload in line {0}'.\
-#                     format(num))
-# 
-#         LCi += opcode_table[oc][2]
-# 
-#         # Factor in register size if this is a 65816
-#         if MPU == '65816':
-# 
-#             if w[0] in A_IMM:
-#                 LCi += a_len_offset
-#             elif w[0] in XY_IMM:
-#                 LCi += xy_len_offset
-# 
-#         sc_labels.append((num, pay, sta))
-#         continue
-# 
+ 
 #     # --- SUBSTEP SAVE: Handle the .save directive ---
 #     if w[0] == '.save':
 # 
@@ -1815,6 +1823,8 @@ for e in macro_source:
 #     # Because of ideological reasons, we don't convert the instructions at this
 #     # point, but just count their bytes. Note these entries are not separated by
 #     # spaces, but by commas, so we have to split them all over again.
+#
+#     # TODO if last char in list is a comma, remove it before processign
 # 
 #     d = pay.split(',')
 # 
@@ -1879,7 +1889,6 @@ for e in macro_source:
 # 
 # 
 # n_passes += 1
-# verbose('PASS LABELS: Assigned value to all labels.')
 # dump(sc_labels, "nps")
 # 
 # if args.verbose:

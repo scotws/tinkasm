@@ -19,7 +19,7 @@ solo_label
                 lda.# 00        ; my inline-comment
                 lda.# { 0 + 0 }
                 iny
-                lda.l 00:1000
+                lda.l .*
                 BRA solo_label  ; upper case!
                 jmp full
 
