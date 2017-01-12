@@ -196,13 +196,14 @@ class CodeLine:
         self.sec_ln = sec_ln    # Secondary line number for expanded lines
         self.status = UNTOUCHED # Flag if line has been processed
         self.type = UNKNOWN     # Type of line, starts UNKNOWN, ends DATA
-        self.il_comment = ''    # Storage area for any inline comments
         self.action = ''        # First word of instruction or directive
         self.parameters = ''    # Parameter(s) of instruction or directive
-        self.xy_width = 8       # For 65816 REP and SEP instructions
-        self.a_width = 8        # For 65816 REP and SEP instructions
         self.address = 0        # Address where line data begins (16/24 bit)
+        self.il_comment = ''    # Storage area for any inline comments
         self.bytes = []         # List of bytes after assembly
+        self.mode = 'em'        # For 65816: default mode (emulated)
+        self.a_width = 8        # For 65816: defalt width of A register
+        self.xy_width = 8       # For 65816: default width of XY registers
 
 
 # List of all directives. Note the anonymous label character is not included
@@ -1592,12 +1593,14 @@ verbose('PASS CHARS: Converted all single characters to bytes')
 # here, we should have checked to make sure there are no naked sep/rep in code
 # and that all .A8 etc have been changed to .!A8
 
+# TODO Rewrite this with cleaner IF logic
+
 if MPU == '65816':
 
     # Keep these variables in this pass
     current_xy_width = 8  
     current_a_width = 8
-    current_mode = 'emu'
+    current_mode = 'em'
 
     register_asserts = ['.!a8', '.!a16', '.!xy8', '.!xy16', '.!axy8',\
             '.!axy16']
@@ -1608,15 +1611,20 @@ if MPU == '65816':
         # We walk though all lines, not only instructions, which is probably
         # paranoid
         
-        if line.action == '.native':
-            current_mode = 'nat'
+        if line.action == '.!native':
+            current_mode = 'na'
+            line.status = DONE
 
-        elif line.action == '.emulated':
-            current_mode = 'emu'
-            current_a_size = 8
-            current_xy_size = 8
+        elif line.action == '.!emulated':
+            current_mode = 'em'
+            current_a_width = 8
+            current_xy_width = 8
+            line.status = DONE
 
         elif line.action in register_asserts:
+
+            line.status = DONE
+            n_switches += 1
 
             if line.action[-1] == '8':
                 size = 8
@@ -1624,28 +1632,53 @@ if MPU == '65816':
                 size = 16
 
             if 'a' in line.action: 
-                current_a_size = size
+                current_a_width = size
 
             if 'xy' in line.action: 
-                current_xy_size = size
+                current_xy_width = size
 
         line.mode = current_mode
-        line.a_width = current_a_size
-        line.xy_width = current_xy_size
+        line.a_width = current_a_width
+        line.xy_width = current_xy_width
 
     n_passes += 1
-    verbose('PASS REGISTER SWITCHES Handled 65816 register changes')
+    verbose('PASS REGISTER SWITCHES: Found {0} A/XY width change(s)'.\
+            format(n_switches))
     # dump(frog)
         
+# -------------------------------------------------------------------
+# PASS SKIP - Convert .skip directives to .byte directives
+
+verbose('PASS SKIP: Converting ".skip" directives')
+
+for line in ir_source:
+
+    if line.type != DIRECTIVE:
+        continue 
+
+    if line.action == '.skip':
+        r = convert_term(line.ln, line.parameters)
+        zl = ' '.join(['00,']*r)
+        line.action = '.byte'
+        line.parameters = zl
+        line.status = MODIFIED
+
+        verbose('- Converted ".skip" in line {0} to {1} zero bytes'.\
+                format(line.ln, r))
+
+n_passes += 1
+# dump(frog)
+ 
 
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
 # Replace by formated templates later
 
 for e in macro_source:
-    print('{0:04}:{1:03} | {2} {3} | {4:11}|{5:11}|{6:11} ||'\
-            .format(e.ln, e.sec_ln, e.status, e.type, e.action, e.parameters,\
-            e.il_comment), e.raw)
+    print('{0:04}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7:11}|{8:11}|{9:11} ||'.\
+            format(e.ln, e.sec_ln, e.status, e.type,\
+            e.mode, e.a_width, e.xy_width,\
+            e.action, e.parameters, e.il_comment))
 
 # TODO HIER HIER TODO
 
@@ -1802,54 +1835,6 @@ for e in macro_source:
 #         LCi += 3*(len(d))
 #         sc_labels.append((num, pay, sta))
 #         continue
-# 
-# 
-#     # --- SUBSTEP SWITCHES: Handle Register Switches on the 65816 ---
-# 
-#     # For the 65816, we have to take care of the register size switches
-#     # because the Immediate Mode instructions such as lda.# compile a different
-#     # number of bytes. We need to keep the directives themselves for the later
-#     # stages while we are at it
-# 
-#     if MPU == '65816':
-# 
-#         if w[0] == '.!native':
-#             mpu_status = 'native'
-#             continue
-# 
-#         if w[0] == '.!emulated':
-#             mpu_status = 'emulated'
-#             continue
-# 
-#         if w[0] == '.!a8':
-#             a_len_offset = 0
-#             sc_labels.append((num, pay, sta))
-#             continue
-# 
-#         elif w[0] == '.!a16':
-# 
-#             # We can't switch to 16 bit A if we're not in native mode
-#             if mpu_status == 'emulated':
-#                 fatal(num, 'Attempt to switch A to 16 bit in emulated mode')
-# 
-#             a_len_offset = 1
-#             sc_labels.append((num, pay, sta))
-#             continue
-# 
-#         elif w[0] == '.!xy8':
-#             xy_len_offset = 0
-#             sc_labels.append((num, pay, sta))
-#             continue
-# 
-#         elif w[0] == '.!xy16':
-# 
-#             # We can't switch to 16 bit X/Y if we're not in native mode
-#             if mpu_status == 'emulated':
-#                 fatal(num, 'Attempt to switch X/Y to 16 bit in emulated mode')
-# 
-#             xy_len_offset = 1
-#             sc_labels.append((num, pay, sta))
-#             continue
 # 
 # 
 #     # --- SUBSTEP ADVANCE: See if we have the .advance directive ---

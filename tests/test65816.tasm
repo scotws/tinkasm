@@ -26,6 +26,9 @@ solo_label
                 rep 20          ; Should throw warning
 
                 mvp 00,01
+
+        .skip 5
+        .skip { frog + 5 }
         
         ; another comment, indented
 
