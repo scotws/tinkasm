@@ -4,6 +4,8 @@
         .mpu 65816
         .ORIGIN e000
 
+        .advance 00e00a
+
         .macro frog
                 inx     ; first macro line
                 iny     ; second macro line 
@@ -25,6 +27,8 @@ solo_label
 
                 rep 20          ; Should throw warning
 
+        .save fivezeros 5
+
                 mvp 00,01
 
         .skip 5
@@ -35,9 +39,11 @@ solo_label
 lbl+comment ; I'm the comment
 
         .EMULATED  ; upper case!
+@
         .native    
         .a16       ; another inline-comment
         .xy16
+                bra -
                 lda.# { 0 + 0 }
 
 full    .a8     ; label with directive and comment
@@ -49,7 +55,7 @@ fuller          lda.# 00  ; label with instruction and comment
         .include includeme.tasm
 
         .byte 1, %00000010, &2, 'a', "aaa", .lsb { frog + 11 }
-        .word 1000, frog, 3000
+        .word 1000, frog, 3000,    ; test trailing comma
         .long 01aaaa, 02bbbb
 
         .end

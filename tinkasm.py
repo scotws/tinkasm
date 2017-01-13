@@ -1647,31 +1647,6 @@ if MPU == '65816':
             format(n_switches))
     # dump(frog)
         
-# -------------------------------------------------------------------
-# PASS SKIP - Convert .skip directives to .byte directives
-
-verbose('PASS SKIP: Converting ".skip" directives')
-
-for line in ir_source:
-
-    if line.type != DIRECTIVE:
-        continue 
-
-    if line.action == '.skip':
-        r = convert_term(line.ln, line.parameters)
-        zl = ' '.join(['00,']*r)
-        line.action = '.byte'
-        line.parameters = zl
-        line.status = MODIFIED
-
-        verbose('- Converted ".skip" in line {0} to {1} zero bytes'.\
-                format(line.ln, r))
-
-n_passes += 1
-# dump(frog)
-
-
- 
  
 # -------------------------------------------------------------------
 # PASS LABELS - Construct symbol table by finding all labels
@@ -1695,7 +1670,7 @@ BRANCHES = ['bra', 'beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
 A_IMM = ['adc.#', 'and.#', 'bit.#', 'cmp.#', 'eor.#', 'lda.#', 'ora.#', 'sbc.#']
 XY_IMM = ['cpx.#', 'cpy.#', 'ldx.#', 'ldy.#']
 
-verbose('PASS LABELS: Assigning value to all labels.')
+verbose('PASS LABELS: Assigning value to all labels')
 
 for line in ir_source: 
 
@@ -1737,12 +1712,152 @@ for line in ir_source:
 
 
         LCi += line.size
+        continue
 
+    # --- SUBSTEP SKIP: Convert .skip directive to zero bytes ---
+
+    if line.action == '.skip':
+
+        # Number of bytes to be skipped should be in parameter
+        r = convert_term(line.ln, line.parameters)
+
+        # We save r zeros (initialize skipped space)
+        line.action = '.byte'
+        line.parameters = ' '.join(['00,']*r)
+        line.size = r
+        line.status = MODIFIED
+        line.address = LC0+LCi
+
+        verbose('- Converted ".skip" in line {0} to {1} zero byte(s)'.\
+                format(line.ln, r))
+
+        LCi += line.size
         continue
 
  
+    # --- SUBSTEP SAVE: Convert .save directive to zero bytes ---
+
+    if line.action == '.save':
+
+        ws = line.parameters.split()
+
+        # Add the symbol to the symbol list. This should be the first word of
+        # the parameter string
+        vet_newsymbol(ws[0])
+        symbol_table[ws[0]] = LC0+LCi
+
+        # Number of bytes to save should be the second entry in the parameter
+        # string
+        r = convert_term(line.ln, ws[1])
+
+        # We save r zeros (initialize reserved space)
+        line.action = '.byte'
+        line.parameters = ' '.join(['00,']*r)
+        line.size = r
+        line.status = MODIFIED
+        line.address = LC0+LCi
+        
+        verbose('- Converted ".save" in line {0} to {1} zero byte(s)'.\
+                    format(line.ln, r))
+        LCi += line.size
+        continue
+
+
+    # --- SUBSTEP ADVANCE: See if we have the .advance directive ---
+    
+    if line.action == '.advance':
+
+        line.address = LC0+LCi
+        r = convert_term(line.ln, line.parameters)
+
+        # Make sure the user is not attempting to advance backwards
+        if r < line.address:
+            fatal(line, 'Negative ".advance" (you can never go back)')
+
+        # While we're here, we might as well already convert this to .byte
+        line.action = '.byte'
+        offset = r - line.address
+        line.parameters = ' '.join(['00,']*offset)
+        line.size = offset
+        line.status = MODIFIED
+
+        verbose('- Converted ".advance" in line {0} to {1} zero byte(s)'.\
+                format(line.ln, offset))
+        LCi += line.size
+        continue
+
+
+    # --- SUBSTEP LABELS: Figure out where our labels are ---
+
+    if line.type == LABEL:
+
+        line.address = LC0+LCi
+
+        # Local labels are easiest, start with them first
+        if line.action == LOCAL_LABEL:
+            anon_labels.append((line.ln, line.address))
+            line.status == DONE
+            verbose('- New anonymous label found in line {0}, address {1:06x}'.\
+                    format(line.ln, line.address))
+            continue
+
+        # This must be a real label. If we don't have it in the symbol table,
+        # all is well and we add a new entry
+        if line.action not in symbol_table:
+            verbose('- New label "{0}" found in line {1}, address {2:06x}'.\
+                    format(line.action, line.ln, line.address))
+            symbol_table[line.action] = line.address
+            line.status = DONE
+            continue
+
+        # If it is already known, something went wrong, because we can't
+        # redefine a label, because that gets really confusing very fast
+        else:
+            fatal(line, 'Attempt to redefine symbol "{0}" in line {1}'.\
+                    format(line.action, line.ln))
+
+
+    # --- SUBSTEP DATA: See if we were given data to store ---
+    
+    # We don't convert the instructions at this point, but just count their
+    # bytes. Note these entries are not separated by spaces, but by commas
+
+    # TODO if last char in list is a comma, remove it before processign
+
+    if line.action in DATA_DIRECTIVES:
+
+        line.address = LC0+LCi
+        line.status = MODIFIED
+
+        # Make sure there is no trailing comma, or the split will produce an
+        # extra empty entry in the list, throwing our count off. We only catch
+        # one comma. We've already converted all strings and characters so we
+        # don't have to be worried we'll get one of those by mistake
+        p = line.parameters.strip()
+
+        if p[-1] == ',':
+            p = p[:-1] 
+
+        # We're just interested in the number of parameters right now
+        np = len(p.split(','))
+
+        # .BYTE stores one byte per comma-separated word
+        if line.action == '.byte':
+            line.size = np 
+
+        # .WORD stores two bytes per comma-separated word
+        elif line.action == '.word':
+            line.size = 2*np
  
+        # .LONG stores three bytes per comma-separated word
+        elif line.action == '.long':
+             line.size = 3*np
  
+        LCi += line.size
+        continue
+
+n_passes += 1
+
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
 # Replace by formated templates later
@@ -1760,7 +1875,7 @@ for e in macro_source:
     else:
         size = e.size
     
-    print('{0:04}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8} | {9:11}|{10:11}|{11:11}'.\
+    print('{0:4}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8:2} | {9:11}|{10:11}|{11:11}'.\
             format(e.ln, e.sec_ln, e.status, e.type,\
             e.mode, e.a_width, e.xy_width, addr, size,\
             e.action, e.parameters, e.il_comment.strip()))
@@ -1769,139 +1884,6 @@ for e in macro_source:
 
 
 
-
-
- 
- 
- 
-#     # --- SUBSTEP SAVE: Handle the .save directive ---
-#     if w[0] == '.save':
-# 
-#         # Add the symbol to the symbol list
-#         vet_newsymbol(w[1])
-#         symbol_table[w[0]] = LC0+LCi
-# 
-#         # We've already taken care of any strings, which we couldn't use anyway,
-#         # and characters, which is weird but legal.
-#         wt = pay.strip().split(' ', 2)[2]
-#         r = convert_term(num, wt)
-# 
-#         # We save r zeros (initialize reserved space)
-#         zl = ' '.join(['00']*r)
-#         new_pay = INDENT+'.byte '+zl
-#         sc_labels.append((num, new_pay, DATA_DONE))
-#         
-#         verbose('Saved {0} bytes at address {1:06x} per directive in line {2}'.\
-#                     format(r, LC0+LCi, num))
-#  
-#         LCi += r
-#         continue 
-# 
-# 
-#     # --- SUBSTEP LABELS: Figure out where our labels are ---
-# 
-#     # Labels and anonymous labels are the only things that should be in the first
-#     # column at this point
-# 
-#     if pay[0] not in string.whitespace:
-# 
-#         # Local labels are easiest, start with them first
-#         if w[0] == LOCAL_LABEL:
-#             anon_labels.append((num, LC0+LCi))
-#             verbose('New anonymous label found in line {0}, address {1:06x}'.\
-#                     format(num, LC0+LCi))
-#             continue
-# 
-#         # This must be a real label. If we don't have it in the symbol table,
-#         # all is well and we add a new entry
-#         if w[0] not in symbol_table.keys():
-#             verbose('New label "{0}" found in line {1}, address {2:06x}'.\
-#                     format(w[0], num, LC0+LCi))
-#             symbol_table[w[0]] = LC0+LCi
-#             continue
-# 
-#         # If it is already known, something went wrong, because we can't
-#         # redefine a label, because that gets really confusing very fast
-#         else:
-#             fatal(num, 'Attempt to redefine symbol "{0}" in line {1}'.\
-#                     format(w[0], pay))
-# 
-# 
-#     # --- SUBSTEP DATA: See if we were given data to store ---
-#     
-#     # Because of ideological reasons, we don't convert the instructions at this
-#     # point, but just count their bytes. Note these entries are not separated by
-#     # spaces, but by commas, so we have to split them all over again.
-#
-#     # TODO if last char in list is a comma, remove it before processign
-# 
-#     d = pay.split(',')
-# 
-#     # .BYTE stores one byte per comma-separated word
-#     if w[0] == '.byte':
-#         LCi += len(d)
-#         sc_labels.append((num, pay, sta))
-#         continue
-# 
-#     # .WORD stores two bytes per comma-separated word
-#     if w[0] == '.word':
-#         LCi += 2*(len(d))
-#         sc_labels.append((num, pay, sta))
-#         continue
-# 
-#     # .LONG stores three bytes per comma-separated word
-#     if w[0] == '.long':
-#         LCi += 3*(len(d))
-#         sc_labels.append((num, pay, sta))
-#         continue
-# 
-# 
-#     # --- SUBSTEP ADVANCE: See if we have the .advance directive ---
-#     
-#     if w[0] == '.advance':
-#         r = convert_term(num, w[1])
-# 
-#         # Make sure the user is not attempting to advance backwards
-#         if r < (LCi+LC0):
-#             fatal(num, '.advance directive attempting to march backwards')
-# 
-#         # While we're here, we might as well already convert this to .byte
-#         # though it violates our ideology ("Do as I say, don't do as I do")
-#         
-#         offset = r - (LCi+LC0)
-#         zl = ' '.join(['00']*offset)
-#         new_pay = INDENT+'.byte '+zl
-#         sc_labels.append((num, new_pay, DATA_DONE))
-#         LCi = r-(LCi+LC0)
-#         verbose('Replaced .advance directive in line {0} by .byte directive'.\
-#                 format(num))
-#         continue
-# 
-# 
-#     # --- SUBSTEP SKIP: See if we have a .skip directive ---
-#     
-#     if w[0] == '.skip':
-#         r = convert_term(num, w[1])
-# 
-#         # While we're here, we might as well already convert this to .byte
-#         # though it is against our ideology ("Do as I say, don't do as I do")
-#         zl = ' '.join(['00']*r)
-#         new_pay = INDENT+'.byte '+zl
-#         sc_labels.append((num, new_pay, DATA_DONE))
-#         LCi += r
-#         verbose('Replaced .skip directive in line {0} by .byte directive'.\
-#                 format(num))
-#         continue
-# 
-#     # If none of that was right, keep the old line
-#     sc_labels.append((num, pay, sta))
-# 
-# 
-# n_passes += 1
-# dump(sc_labels, "nps")
-# 
-# if args.verbose:
-#     dump_symbol_table(symbol_table, "after LABELS (numbers in hex)")
 # 
 # if args.dump:
 #     print('Anonymous Labels:')
@@ -1911,8 +1893,8 @@ for e in macro_source:
 #         print('\n')
 #     else:
 #         print('  (none)\n')
-# 
-# 
+
+
 # # -------------------------------------------------------------------
 # # PASS ASSIGN: Handle complex assignments
 # 
