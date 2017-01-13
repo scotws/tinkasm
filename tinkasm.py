@@ -200,8 +200,8 @@ class CodeLine:
         self.parameters = ''    # Parameter(s) of instruction or directive
         self.address = 0        # Address where line data begins (16/24 bit)
         self.il_comment = ''    # Storage area for any inline comments
-        self.notes = ''         # Internal notes for assembly
-        self.bytes = []         # List of bytes after assembly
+        self.size = 0           # Size of instruction in bytes
+        self.bytes = []         # List of bytes (after assembly)
         self.mode = 'em'        # For 65816: default mode (emulated)
         self.a_width = 8        # For 65816: defalt width of A register
         self.xy_width = 8       # For 65816: default width of XY registers
@@ -1722,27 +1722,24 @@ for line in ir_source:
 
     if line.action in mnemonics:
 
-        # For branches, we want to remember were the instruction is to make our
-        # life easier later
-        if line.action in BRANCHES:
-            line.notes = hexstr(4, LC0+LCi)
-            line.status = MODIFIED
-            verbose('- Found address of branch in line {0} ({1})'.\
-                    format(line.ln, line.notes))
+        line.address = LC0+LCi
+        line.status = MODIFIED
+        line.size = opcode_table[mnemonics[line.action]][2]
 
-        LCi += opcode_table[mnemonics[line.action]][2]
-
-        # Factor in register size if this is a 65816
+        # Add extra byte according to register size for 65816
+        # immediate instructions such as lda.#
         if MPU == '65816':
 
             if line.action in A_IMM:
-                LCi += lc_offset(line.a_width)
+                line.size += lc_offset(line.a_width)
             elif line.action in XY_IMM:
-                LCi += lc_offset(line.xy_width)
+                line.size += lc_offset(line.xy_width)
+
+
+        LCi += line.size
 
         continue
 
- 
  
  
  
@@ -1751,10 +1748,22 @@ for line in ir_source:
 # Replace by formated templates later
 
 for e in macro_source:
-    print('{0:04}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7:11}|{8:11}|{9:11} ||'.\
+    # Put empty word instead of address if address is zero
+    if e.address == 0:
+        addr = '      '
+    else:
+        addr = hexstr(6, e.address)
+
+    # Put empty string instead of line size if line size is zero
+    if e.size == 0:
+        size = ' '
+    else:
+        size = e.size
+    
+    print('{0:04}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8} | {9:11}|{10:11}|{11:11}'.\
             format(e.ln, e.sec_ln, e.status, e.type,\
-            e.mode, e.a_width, e.xy_width,\
-            e.action, e.parameters, e.il_comment), e.notes)
+            e.mode, e.a_width, e.xy_width, addr, size,\
+            e.action, e.parameters, e.il_comment.strip()))
 
 # TODO HIER HIER TODO
 
