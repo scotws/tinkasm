@@ -1976,112 +1976,80 @@ verbose('PASS DATA: Converted all data formats to .byte lists')
 # dump(ir_status)
 
 
+# -------------------------------------------------------------------
+# PASS MATH
+
+# Replace all math terms that are left in the text, eg 'jmp { label + 2 }'. 
+# None of these should be in assignments any more, and none of them should be in
+# data directives
+
+for line in ir_source:
+
+    if line.status == DONE:
+        continue
+
+    # We've gotten rid of all strings and characters so we don't have to worry
+    # about them containing a LEFTMATH
+    if LEFTMATH not in line.parameters:
+        continue
+
+    # More than one math term, so we have to do this the hard way
+    while LEFTMATH in line.parameters:
+        line.parameters = do_math(line.parameters)
+
+    line.status = MODIFIED
+    
+n_passes += 1
+verbose('PASS MATH: replaced all math terms by numbers')
+# dump(ir_source)
+
 
 # -------------------------------------------------------------------
-# PRIMITIVE PRINTOUT FOR TESTING
-# Replace by formated templates later
+# PASS MODIFY
 
-for e in macro_source:
-    # Put empty word instead of address if address is zero
-    if e.address == 0:
-        addr = '      '
-    else:
-        addr = hexstr(6, e.address)
+# Replace all modify terms that are left in the text, eg 'lda.# .msb 1000'. 
+# None of these should be in assignments any more
 
-    # Put empty string instead of line size if line size is zero
-    if e.size == 0:
-        size = ' '
-    else:
-        size = e.size
-    
-    print('{0:4}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8:2} | {9:11}|{10:11}|{11:11}'.\
-            format(e.ln, e.sec_ln, e.status, e.type,\
-            e.mode, e.a_width, e.xy_width, addr, size,\
-            e.action, e.parameters, e.il_comment.strip()))
-
-# TODO HIER HIER TODO
+def has_modifier(s):
+    """Given a string with space-separated words, return True if one of 
+    these words is a modifier, else false.
+    """
+    return bool([i for i in MODIFIERS if i in s])
 
 
+for line in ir_source:
+
+    if line.status == DONE:
+        continue
+
+    if has_modifier(line.parameters):
+        
+        # We need to use next entry once we find a modifier, so we need to make
+        # this iterable
+        new_p = ""
+        ws = iter(line.parameters.split())
+
+        for w in ws:
+
+            if w in MODIFIERS:
+                f_num, r = convert_number(next(ws))
+
+                if f_num:
+                    w = hexstr(6, MODIFIERS[w](r))
+                else: 
+                    fatal(line.ln, 'Modifier operand "{0}" not a number'.format(w))
+
+            new_p = new_p + ' ' + w
+             
+        line.paramenters = new_p
+        line.status = MODIFIED
+
+n_passes += 1
+verbose('PASS MODIFY: replaced all modifier terms by numbers')
+# dump(ir_source)
 
 
 
-# # -------------------------------------------------------------------
-# # PASS MATH
-# 
-# # Replace all math terms that are left in the text, eg 'jmp { label + 2 }'. 
-# # None of these should be in assignments any more
-# 
-# sc_math = []
-# 
-# for num, pay, sta in sc_data:
-# 
-#     if LEFTMATH not in pay:
-#         sc_math.append((num, pay, sta))
-#         continue
-# 
-#     # Life is still easy if we only have one bracket
-#     if pay.count(LEFTMATH) == 1:
-#         sc_math.append((num, do_math(pay), MODIFIED))
-#         continue
-# 
-#     # More than one math term, so we have to do this the hard way
-#     while LEFTMATH in pay:
-#         pay = do_math(pay)
-# 
-#     sc_math.append((num, pay, MODIFIED))
-#     
-# 
-# n_passes += 1
-# verbose('PASS MATH: replaced all math terms by numbers')
-# dump(sc_math, "nps")
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS MODIFY
-# 
-# # Replace all modify terms that are left in the text, eg 'lda.# .msb 1000'. 
-# # None of these should be in assignments any more
-# 
-# sc_modify = []
-# 
-# def has_modifier(s):
-#     """Given a string with space-separated words, return True if one of 
-#     these words is a modifier, else false.
-#     """
-#     return bool([i for i in MODIFIERS if i in s])
-# 
-# 
-# for num, pay, sta in sc_math:
-# 
-#     if has_modifier(pay):
-#         
-#         # We need to use next entry once we find a modifier, so we need to make
-#         # this iterable
-#         new_pay = ""
-#         ws = iter(pay.split())
-# 
-#         for w in ws:
-# 
-#             if w in MODIFIERS:
-#                 f_num, r = convert_number(next(ws))
-# 
-#                 if f_num:
-#                     w = hexstr(6, MODIFIERS[w](r))
-#                 else: 
-#                     fatal(num, 'Modifier operand "{0}" not a number'.format(w))
-# 
-#             new_pay = new_pay + ' ' + w
-#              
-#         pay = new_pay
-#         sta = MODIFIED
-# 
-#     sc_modify.append((num, INDENT+pay.strip(), sta))
-# 
-# n_passes += 1
-# verbose('PASS MODIFY: replaced all modifier terms by numbers')
-# dump(sc_modify, "nps")
-# 
-# 
 # # -------------------------------------------------------------------
 # # PASS ANONYMOUS: Replace all anonymous label references by correct numbers
 # 
@@ -2115,21 +2083,50 @@ for e in macro_source:
 # n_passes += 1
 # verbose('PASS ANONYMOUS: Replaced all anonymous labels with address values')
 # dump(sc_anons, "nps")
-# 
+
+
+# -------------------------------------------------------------------
+# PRIMITIVE PRINTOUT FOR TESTING
+# Replace by formated templates later
+
+for e in macro_source:
+    # Put empty word instead of address if address is zero
+    if e.address == 0:
+        addr = '      '
+    else:
+        addr = hexstr(6, e.address)
+
+    # Put empty string instead of line size if line size is zero
+    if e.size == 0:
+        size = ' '
+    else:
+        size = e.size
+    
+    print('{0:4}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8:2} | {9:11}|{10:11}|{11:11}'.\
+            format(e.ln, e.sec_ln, e.status, e.type,\
+            e.mode, e.a_width, e.xy_width, addr, size,\
+            e.action, e.parameters, e.il_comment.strip()))
+
+# TODO HIER HIER TODO
+
+
+
+
+
 # # -------------------------------------------------------------------
 # # CLAIM: At this point we should have completely replaced all labels and
 # # symbols with numerical values.
 # 
 # verbose('CLAMING there should be no labels or symbols left in the source')
-# 
-# 
+
+
 # # -------------------------------------------------------------------
 # # CLAIM: At this point there should only be .byte data directives in the code
 # # with numerical values.
-# 
+
 # verbose('CLAMING that all data is now contained in .byte directives')
-# 
-# 
+
+
 # # -------------------------------------------------------------------
 # # PASS 1BYTE: Convert all single-byte instructions to .byte directives
 # 
