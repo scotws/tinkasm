@@ -1911,11 +1911,69 @@ replace_symbols(ir_source)
 n_passes += 1
 # dump(ir_source) 
 
+
 # -------------------------------------------------------------------
 # CLAIM: At this point we should have all symbols present and known in the
 # symbol table, and anonymous labels in the anonymous label list
 
 verbose('CLAMING that all symbols should now be known')
+
+
+# -------------------------------------------------------------------
+# PASS DATA: Convert various data formats like .byte
+
+# Converts all .byte, .word and .long lines. We also allow .long for the 8-bit
+# MPUs though they might be of little use
+
+for line in ir_source:
+
+    if (line.status == DONE) or (line.action not in DATA_DIRECTIVES):
+        continue
+
+    # Make sure there is no trailing comma, or the split will produce an
+    # extra empty entry in the list, throwing our count off. We only catch
+    # one comma. We've already converted all strings and characters so we
+    # don't have to be worried we'll get one of those by mistake
+    p = line.parameters.strip()
+
+    if p[-1] == ',':
+        p = p[:-1] 
+
+    # We work with a list of terms
+    ts = (p.split(','))
+    new_ts = []
+
+    for t in ts: 
+        new_ts.append(convert_term(line.ln, t))
+
+    # We now have a list of the numbers, but need to break them down into
+    # their bytes. This could be solved a lot more elegantly, but this is
+    # easier to understand
+    byte_list = []
+
+    if line.action == '.byte':
+        byte_list = new_ts
+
+    elif line.action == '.word':
+        for n in new_ts:
+            for b in little_endian_16(n):
+                byte_list.append(b)
+
+    elif line.action == '.long':
+        for n in new_ts:
+            for b in little_endian_24(n):
+                byte_list.append(b)
+
+
+    # Reassemble the datastring, now without commas
+    line.parameters = ' '.join([hexstr(2, b) for b in byte_list])
+    line.action = '.byte'
+    line.status = MODIFIED
+    line.size = len(byte_list)
+
+n_passes += 1
+verbose('PASS DATA: Converted all data formats to .byte lists')
+# dump(ir_status)
 
 
 
@@ -1943,66 +2001,6 @@ for e in macro_source:
 
 # TODO HIER HIER TODO
 
-
-
-
-
-
-# # -------------------------------------------------------------------
-# # PASS DATA: Convert various data formats like .byte
-# 
-# sc_data = []
-# 
-# for num, pay, sta in sc_replaced02:
-# 
-#     w = pay.split()
-# 
-#     # This is for .byte, .word, and .long
-#     if w[0] not in DATA_DIRECTIVES:
-#         sc_data.append((num, pay, sta))
-#         continue 
-# 
-#     # Stuff like .advance and .skip might already be done, we don't have to do
-#     # it over
-#     if sta == DATA_DONE or sta == CODE_DONE:
-#         sc_data.append((num, pay, sta))
-#         continue 
-# 
-#     # Regardless of which format we have, it should contain a list of
-#     # comma-separated terms
-#     ps = pay.strip().split(' ', 1)[1] # Get rid of the directive
-#     ts = ps.split(',')
-#     new_t = []
-# 
-#     for t in ts:
-#         new_t.append(convert_term(num, t))
-# 
-#     # We now have a list of the numbers, but need to break them down into
-#     # their bytes. This could be solved a lot more elegantly, but this is
-#     # easier to understand
-#     byte_t = []
-# 
-#     if w[0] == '.byte':
-#         byte_t = new_t
-# 
-#     elif w[0] == '.word':
-#         for n in new_t:
-#             for b in little_endian_16(n):
-#                 byte_t.append(b)
-# 
-#     elif w[0] == '.long':
-#         for n in new_t:
-#             for b in little_endian_24(n):
-#                 byte_t.append(b)
-# 
-#     # Reassemble the datastring, getting rid of the trailing comma
-#     new_pay = INDENT+'.byte '+' '.join([hexstr(2, b) for b in byte_t])
-#     
-#     sc_data.append((num, new_pay, DATA_DONE))
-# 
-# n_passes += 1
-# verbose('PASS DATA: Converted all data formats to .byte')
-# dump(sc_data, "nps")
 
 
 
