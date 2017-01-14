@@ -207,6 +207,7 @@ class CodeLine:
         self.xy_width = 8       # For 65816: default width of XY registers
 
 
+
 # List of all directives. Note the anonymous label character is not included
 # because this is used to keep the user from using these words as labels
 
@@ -1925,6 +1926,8 @@ verbose('CLAMING that all symbols should now be known')
 # Converts all .byte, .word and .long lines. We also allow .long for the 8-bit
 # MPUs though they might be of little use
 
+# TODO see what happens if there is a local (anon) label in the data directive
+
 for line in ir_source:
 
     if (line.status == DONE) or (line.action not in DATA_DIRECTIVES):
@@ -2049,212 +2052,159 @@ verbose('PASS MODIFY: replaced all modifier terms by numbers')
 # dump(ir_source)
 
 
+# -------------------------------------------------------------------
+# PASS ANONYMOUS: Replace all anonymous label references by correct numbers
 
-# # -------------------------------------------------------------------
-# # PASS ANONYMOUS: Replace all anonymous label references by correct numbers
-# 
-# # We don't modify anonymous labels or do math on them
-# 
-# sc_anons = []
-# 
-# for num, pay, sta in sc_modify:
-# 
-#     w = pay.split()
-# 
-#     # We only allow the anonymous references to be in the second word of the line,
-#     # that is, as an operand to an opcode
-# 
-#     if len(w) > 1 and w[1] == '+':
-#         for ln, ll in anon_labels:
-#             if ln > num:
-#                 pay = pay.replace('+', hexstr(6, ll))
-#                 sta = MODIFIED
-#                 break
-# 
-#     if len(w) > 1 and w[1] == '-':
-#         for ln, ll in reversed(anon_labels):
-#             if ln < num:
-#                 pay = pay.replace('-', hexstr(6, ll))
-#                 sta = MODIFIED
-#                 break
-# 
-#     sc_anons.append((num, pay, sta))
-# 
-# n_passes += 1
-# verbose('PASS ANONYMOUS: Replaced all anonymous labels with address values')
+# We don't modify anonymous labels or do math on them. All strings and
+# characters are taken care of, as all math terms, so the only '+' and '-' in
+# the code should be in local (anonymous) label jumps
+
+# TODO figure out what happens if there is a local label in a data directive, we
+# might have to move this pass up
+
+for line in ir_source:
+
+    if (line.status == DONE) or (line.type != INSTRUCTION):
+        continue
+
+    if line.parameters.strip() == '+':   # strip() is paranoid
+        for ln, ll in anon_labels:
+
+            if ln > line.ln:
+                line.parameters = hexstr(6, ll)
+                line.status = MODIFIED
+                break
+
+    if line.parameters.strip() == '-':   # strip() is paranoid
+        for ln, ll in reversed(anon_labels):
+
+            if ln < line.ln:
+                line.parameters = hexstr(6, ll)
+                line.status = MODIFIED
+                break
+
+n_passes += 1
+verbose('PASS ANONYMOUS: Replaced all anonymous labels with address values')
 # dump(sc_anons, "nps")
 
 
 # -------------------------------------------------------------------
-# PRIMITIVE PRINTOUT FOR TESTING
-# Replace by formated templates later
+# CLAIM: At this point we should have completely replaced all labels and
+# symbols with numerical values.
 
-for e in macro_source:
-    # Put empty word instead of address if address is zero
-    if e.address == 0:
-        addr = '      '
+verbose('CLAMING there should be no labels or symbols left in the source')
+
+
+# -------------------------------------------------------------------
+# PASS 1BYTE: Convert all single-byte instructions to .byte directives
+
+# Low-hanging fruit first: Compile the opcodes without operands
+
+for line in ir_source:
+
+    if (line.status == DONE) or (line.type != INSTRUCTION):
+        continue
+
+    try:
+        oc = mnemonics[line.action]
+    except KeyError:
+        continue 
     else:
-        addr = hexstr(6, e.address)
 
-    # Put empty string instead of line size if line size is zero
-    if e.size == 0:
-        size = ' '
-    else:
-        size = e.size
-    
-    print('{0:4}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8:2} | {9:11}|{10:11}|{11:11}'.\
-            format(e.ln, e.sec_ln, e.status, e.type,\
-            e.mode, e.a_width, e.xy_width, addr, size,\
-            e.action, e.parameters, e.il_comment.strip()))
+        if opcode_table[oc][2] == 1:    # look up length of instruction
+            line.action = '.byte '
+            line.parameters = hexstr(2, oc)
+            line.status = MODIFIED
 
-# TODO HIER HIER TODO
+n_passes += 1
+verbose('PASS SINGLE BYTE: Assembled all single byte instructions')
+# dump(ir_source)
 
 
+# -------------------------------------------------------------------
+# PASS BRANCHES: Assemble branch instructions
+
+# Keep this definition in the branches pass
+BRANCHES = {
+    '6502': ['beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs'],\
+    '65c02': ['beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
+        'bra'],\
+    # We keep bra.l in this list though we filter it out beforehand
+    '65816': ['beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
+        'bra', 'bra.l', 'phe.r']}
 
 
+for line in ir_source: 
 
-# # -------------------------------------------------------------------
-# # CLAIM: At this point we should have completely replaced all labels and
-# # symbols with numerical values.
-# 
-# verbose('CLAMING there should be no labels or symbols left in the source')
+    if (line.status == DONE) or (line.type != INSTRUCTION):
+        continue
 
+    # We treat this as a special case. Check for MPU so we don't suddenly allow
+    # a 6502 to do a long branch
+    if (line.action == 'bra.l') and (MPU == '65816'):
+        _, target_addr = convert_number(line.parameters)
+        bl, bm = little_endian_16(target_addr - line.address - 3)
+        opr = hexstr(2, bl)+' '+hexstr(2, bm)
+        line.parameters = hexstr(2, mnemonics[line.action])+' '+opr
+        line.action = '.byte'
+        line.status = MODIFIED
+        continue
+   
+    if line.action in BRANCHES[MPU]:
+        _, target_addr = convert_number(line.parameters)
+        opr = hexstr(2, lsb(target_addr - line.address - 2))
+        line.parameters = hexstr(2, mnemonics[line.action])+' '+opr
+        line.action = '.byte'
+        line.status = MODIFIED
+        continue
 
-# # -------------------------------------------------------------------
-# # CLAIM: At this point there should only be .byte data directives in the code
-# # with numerical values.
-
-# verbose('CLAMING that all data is now contained in .byte directives')
-
-
-# # -------------------------------------------------------------------
-# # PASS 1BYTE: Convert all single-byte instructions to .byte directives
-# 
-# # Low-hanging fruit first: Compile the opcodes without operands
-# 
-# sc_1byte = []
-# 
-# for num, pay, sta in sc_anons:
-# 
-#     w = pay.split()
-# 
-#     try:
-#         oc = mnemonics[w[0]]
-#     except KeyError:
-#         sc_1byte.append((num, pay, sta))
-#     else:
-# 
-#         if opcode_table[oc][2] == 1:    # look up length of instruction
-#             bl = INDENT+'.byte '+hexstr(2, oc)
-#             sc_1byte.append((num, bl, CODE_DONE))
-#         else:
-#             sc_1byte.append((num, pay, sta))
-# 
-# n_passes += 1
-# verbose('PASS 1BYTE: Assembled single byte instructions')
-# dump(sc_1byte, "nps")
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS BRANCHES: Assemble branch instructions
-# 
-# # All our branch instructions, including bra.l and phe.r on the 65816, should
-# # include the line they are on as the last entry in the payload at this point
-# 
-# sc_branches = []
-# 
-# # Keep this definition in the branches pass
-# BRANCHES = {
-#     '6502': ['beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs'],\
-#     '65c02': ['beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
-#         'bra'],\
-#     '65816': ['beq', 'bne', 'bpl', 'bmi', 'bcc', 'bcs', 'bvc', 'bvs',\
-#         'bra', 'bra.l', 'phe.r']}
-# 
-# for num, pay, sta in sc_1byte:
-# 
-#     # Skip stuff that is already done
-#     if sta == CODE_DONE or sta == DATA_DONE:
-#         sc_branches.append((num, pay, sta))
-#         continue
-# 
-#     w = pay.split()
-# 
-#     if w[0] in BRANCHES[MPU]:
-#         new_pay = '.byte '+hexstr(2, mnemonics[w[0]])+' '
-#         _, branch_addr = convert_number(w[-1])
-#         _, target_addr = convert_number(w[-2])
-#         opr = hexstr(2, lsb(target_addr - branch_addr - 2))
-#         sc_branches.append((num, INDENT+new_pay+opr, CODE_DONE))
-#         continue
-# 
-#     if MPU == '65816' and w[0] in BRANCHES[MPU]: 
-#         new_pay = '.byte '+hexstr(2, mnemonics[w[0]])+' '
-#         _, branch_addr = convert_number(w[-1])
-#         _, target_addr = convert_number(w[-2])
-#         bl, bm = little_endian_16(target_addr - branch_addr - 3)
-#         opr = INDENT+new_pay+hexstr(2, bl)+' '+hexstr(2, bm)
-#         sc_branches.append((num, opr, CODE_DONE))
-#         continue
-# 
-#     # Everything else
-#     sc_branches.append((num, pay, sta))
-# 
-# n_passes += 1
-# verbose('PASS BRANCHES: Encoded all branch instructions')
+n_passes += 1
+verbose('PASS BRANCHES: Encoded all branch instructions')
 # dump(sc_branches, "nps")
-# 
+
+# -------------------------------------------------------------------
+# PASS FUSEMOVE: Reassemble and convert move instructions
+
+# All move instructions should have been split up and their operands converted.
+# We now put them back together, remembering that destination comes before
+# source in the machine code of MVN and MVP
+
+if MPU == '65816':
+
+    # We need to be able to skip ahead in the list so we have to use an iter
+    # object in this case
+    l = iter(ir_source)
+
+    for line in l: 
+
+        if (line.action == 'mvp') or (line.action == 'mvn'):
+
+            # Handle source byte
+            _, r = convert_number(line.parameters)
+            src = hexstr(2,r)
+
+            # Handle opcode
+            line.parameters = str(mnemonics[line.action]) + ' '
+            line.action = '.byte'
+            line.status = MODIFIED
+
+            # Handle destination byte
+            nl = next(l)
+            _, r = convert_number(nl.parameters)
+            des = hexstr(2,r)
+            nl.status = DONE
+
+            # Put it all together
+            line.parameters = line.parameters + des + ' ' + src
+            line.status = MODIFIED
+
+    n_passes += 1
+    verbose('PASS FUSEMOVE: Handled mvn/mvp instructions on the 65816')
+#   dump(sc_move, "nps")
+
+
 # # -------------------------------------------------------------------
-# # PASS FUSEMOVE: Reassemble and convert move instructions
-# 
-# # All move instructions should have been split up and their operands converted.
-# # We now put them back together, remembering that destination comes before
-# # source in the machine code of MVN and MVP
-# 
-# sc_move = []
-# 
-# if MPU == '65816':
-# 
-#     # We need to be able to skip ahead in the list so we have to use an iter
-#     # object in this case
-#     l = iter(sc_branches)
-# 
-#     for num, pay, _ in l:
-# 
-#         w = pay.split()
-# 
-#         if w[0] == 'mvp' or w[0] == 'mvn':
-# 
-#             # Handle opcode
-#             tmp_pay = INDENT + '.byte ' + str(mnemonics[w[0]]) + ' '
-# 
-#             # Handle source byte
-#             _, r = convert_number(w[1])
-#             m_src = hexstr(2,r)
-# 
-#             # Handle destination byte
-#             _, pay2, _ = next(l)
-#             _, r = convert_number(pay2.split()[1])
-#             m_des = hexstr(2,r)
-# 
-#             # Put it all together
-#             tmp_pay = tmp_pay + m_des + ' ' + m_src
-#             sc_move.append((num, tmp_pay, CODE_DONE))
-# 
-#         else:
-# 
-#             sc_move.append((num, pay, sta))
-# 
-#     n_passes += 1
-#     verbose('PASS FUSEMOVE: Handled mvn/mvp instructions on the 65816')
-#     dump(sc_move, "nps")
-# 
-# else:
-#     sc_move = sc_branches
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS ALLIN: Assemble all remaining operands
+# # PASS ALL IN: Assemble all remaining operands
 # 
 # # This should remove all CONTROL entries as well
 # 
@@ -2328,10 +2278,11 @@ for e in macro_source:
 #         sc_allin.append((num, pay, CODE_DONE))
 # 
 # n_passes += 1
-# verbose('PASS ALLIN: Assembled all remaining operands')
+# verbose('PASS ALL IN: Assembled all remaining operands')
 # dump(sc_allin, "nps")
-# 
-# 
+
+
+
 # # -------------------------------------------------------------------
 # # PASS VALIDATE: Make sure we only have .byte instructions
 # 
@@ -2347,8 +2298,33 @@ for e in macro_source:
 # 
 # n_passes += 1
 # verbose('PASS VALIDATE: Confirmed that all lines are now byte data')
-# 
-# 
+
+# -------------------------------------------------------------------
+# PRIMITIVE PRINTOUT FOR TESTING
+# Replace by formated templates later
+
+for e in macro_source:
+    # Put empty word instead of address if address is zero
+    if e.address == 0:
+        addr = '      '
+    else:
+        addr = hexstr(6, e.address)
+
+    # Put empty string instead of line size if line size is zero
+    if e.size == 0:
+        size = ' '
+    else:
+        size = e.size
+    
+    print('{0:4}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8:2} | {9:11}|{10:11}|{11:11}'.\
+            format(e.ln, e.sec_ln, e.status, e.type,\
+            e.mode, e.a_width, e.xy_width, addr, size,\
+            e.action, e.parameters, e.il_comment.strip()))
+
+# TODO HIER HIER TODO
+
+
+
 # # -------------------------------------------------------------------
 # # PASS BYTECHECK: Make sure all values are valid bytes
 # 
@@ -2368,45 +2344,8 @@ for e in macro_source:
 # 
 # n_passes +=1
 # verbose('PASS BYTECHECK: Confirmed all byte values are in range from 0 to 256')
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS ADR: Add addresses for human readers and listing generation
-# 
-# # This produces the final human readable version and is the basis for the
-# # listing file
-# 
-# def format_adr16(i):
-#     """Convert an integer to a 16 bit hex address string for the listing
-#     file
-#     """
-#     return '{0:04x}'.format(i & 0xffff)
-# 
-# def format_adr24(i):
-#     """Convert an integer to a 24 bit hex address string for the listing
-#     file. We use a separator for the bank byte
-#     """
-#     return '{0:02x}:{1:04x}'.format(bank(i), i & 0xffff)
-# 
-# format_adr_mpu = {'6502': format_adr16,\
-#         '65c02': format_adr16,\
-#         '65816': format_adr24}
-# 
-# sc_adr = []
-# LCi = 0
-# 
-# for num, pay, sta in sc_allin:
-# 
-#     b = len(pay.split())-1
-#     adr = format_adr_mpu[MPU](LC0+LCi)
-#     sc_adr.append((num, pay, sta, adr))
-#     LCi += b
-# 
-# n_passes += 1
-# verbose('PASS ADR: Added MPU address locations to each byte line')
-# dump(sc_adr, "npsa")
-# 
-# 
+
+
 # # -------------------------------------------------------------------
 # # PASS OPTIMIZE: Analyze and optimize code
 # 
@@ -2426,35 +2365,8 @@ for e in macro_source:
 # 
 # n_passes += 1
 # verbose('PASS ANALYZE: Searched for obvious errors and improvements')
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS PUREBYTES: Remove everything except byte values (ie, remove .byte)
-# 
-# def strip_byte(s):
-#     """Strip out the '.byte' directive from a string"""
-#     return s.replace('.byte ', '').strip()
-# 
-# sc_purebytes = []
-# 
-# for _, pay, _, _ in sc_adr:
-#     pay_bytes = strip_byte(pay)
-#     bl = [int(b, 16) for b in pay_bytes.split()]
-#     sc_purebytes.append(bl)
-# 
-# n_passes += 1
-# verbose('PASS PUREBYTES: Converted all lines to pure byte lists')
-# 
-# if args.dump:
-# 
-#     for l in sc_purebytes:
-#         print('  ', end=' ')
-#         for b in l:
-#             print('{0:02x}'.format(b), end=' ')
-#         print()
-#     print()
-# 
-# 
+
+
 # # -------------------------------------------------------------------
 # # PASS TOBIN: Convert lists of bytes into one single byte list
 # 
@@ -2469,8 +2381,8 @@ for e in macro_source:
 # n_passes += 1
 # verbose('PASS TOBIN: Converted {0} lines of bytes to one list of {1} bytes'.\
 #         format(len(sc_purebytes), code_size))
-# 
-# 
+
+
 # # -------------------------------------------------------------------
 # # STEP SAVEBIN: Save binary file
 # 

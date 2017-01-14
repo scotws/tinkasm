@@ -22,14 +22,14 @@ solo_label
                 lda.# { 0 + 0 }
                 iny
                 lda.l .*
-                BRA solo_label  ; upper case!
+                BRA.L solo_label  ; upper case bra.l
                 jmp full
 
                 rep 20          ; Should throw warning
 
         .save fivezeros 5
 
-                mvp 00,01
+                mvp 00,01       ; mvp 00,01
 
         .skip 5
         .skip { frog + 5 }
@@ -43,7 +43,7 @@ lbl+comment ; I'm the comment
         .native    
         .a16       ; another inline-comment
         .xy16
-                bra -
+                bra -   ; anon branch backwards
                 lda.# { 0 + 0 }
 
 full    .a8     ; label with directive and comment
