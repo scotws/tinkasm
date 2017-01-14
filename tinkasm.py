@@ -2162,8 +2162,9 @@ n_passes += 1
 verbose('PASS BRANCHES: Encoded all branch instructions')
 # dump(sc_branches, "nps")
 
+
 # -------------------------------------------------------------------
-# PASS FUSEMOVE: Reassemble and convert move instructions
+# PASS FUSE MOVE: Reassemble and convert move instructions
 
 # All move instructions should have been split up and their operands converted.
 # We now put them back together, remembering that destination comes before
@@ -2184,8 +2185,7 @@ if MPU == '65816':
             src = hexstr(2,r)
 
             # Handle opcode
-            line.parameters = str(mnemonics[line.action]) + ' '
-            line.action = '.byte'
+            line.parameters = str(mnemonics[line.action])
             line.status = MODIFIED
 
             # Handle destination byte
@@ -2195,92 +2195,50 @@ if MPU == '65816':
             nl.status = DONE
 
             # Put it all together
-            line.parameters = line.parameters + des + ' ' + src
+            line.action = '.byte'
+            line.parameters = line.parameters + ' ' + des + ' ' + src
             line.status = MODIFIED
 
     n_passes += 1
-    verbose('PASS FUSEMOVE: Handled mvn/mvp instructions on the 65816')
+    verbose('PASS FUSE MOVE: Handled mvn/mvp instructions on the 65816')
 #   dump(sc_move, "nps")
 
 
-# # -------------------------------------------------------------------
-# # PASS ALL IN: Assemble all remaining operands
-# 
-# # This should remove all CONTROL entries as well
-# 
-# sc_allin = []
-# 
-# # On the 65816, remember to start in emulated, 8-bit mode at the beginning
-# mpu_status = 'emulated'
-# a_len_offset = 0
-# xy_len_offset = 0
-# 
-# for num, pay, sta in sc_move:
-# 
-#     w = pay.split()
-# 
-#     if MPU == '65816':
-# 
-#         # TODO Rewrite this horrible code once we are sure this is what we want
-#         # to do. Note it appears twice
-#         # TODO make sure switch to 16 only works in native mode
-#         if w[0] == '.!a8':
-#             a_len_offset = 0
-#             continue
-# 
-#         elif w[0] == '.!a16':
-#             a_len_offset = 1
-#             continue
-# 
-#         elif w[0] == '.!xy8':
-#             xy_len_offset = 0
-#             continue
-# 
-#         elif w[0] == '.!xy16':
-#             xy_len_offset = 1
-#             continue
-# 
-#     try:
-#         oc = mnemonics[w[0]]
-#     except KeyError:
-#         sc_allin.append((num, pay, sta))
-#     else:
-# 
-#         # Get number of bytes in instruction
-#         n_bytes = opcode_table[oc][2]
-# 
-#         # Factor in register size if this is a 65816
-#         if MPU == '65816':
-# 
-#             if w[0] in A_IMM:
-#                 n_bytes += a_len_offset
-#             elif w[0] in XY_IMM:
-#                 n_bytes += xy_len_offset
-# 
-#         _, opr = convert_number(w[1])
-# 
-#         # We hand tuples to the next step
-#         if n_bytes == 2:
-#             bl = (lsb(opr), )
-#         elif n_bytes == 3:
-#             bl = little_endian_16(opr)
-#         elif n_bytes == 4:
-#             bl = little_endian_24(opr)
-#         else:
-#             # This should never happen, obviously, but we're checking anyway
-#             fatal(num, 'Found {0} byte instruction in opcode list'.\
-#                     format(n_bytes))
-# 
-#         # Reassemble payload as a byte instruction. We keep the data in
-#         # human-readable form instead of converting it to binary data
-#         pay = '{0}.byte {1:02x} {2}'.\
-#                 format(INDENT, oc, ' '.join([hexstr(2, i) for i in bl]))
-#         sc_allin.append((num, pay, CODE_DONE))
-# 
-# n_passes += 1
-# verbose('PASS ALL IN: Assembled all remaining operands')
-# dump(sc_allin, "nps")
+# -------------------------------------------------------------------
+# PASS ALL IN: Assemble all remaining operands
 
+for line in ir_source:
+
+    if (line.status == DONE) or (line.type != INSTRUCTION):
+        continue 
+
+    # We already have some instructions that have been converted to .bytes
+    try:
+        oc = mnemonics[line.action]
+    except KeyError:
+        continue
+
+    _, opr = convert_number(line.parameters)
+
+    if line.size == 2:
+        bl = (lsb(opr), )
+    elif line.size == 3:
+        bl = little_endian_16(opr)
+    elif line.size == 4:
+        bl = little_endian_24(opr)
+    else:
+        # This should never happen, obviously, but we're checking anyway
+        fatal(num, 'Found {0} byte instruction in opcode list'.\
+                format(line.size))
+
+    # Reassemble payload as a byte instruction
+    line.action = '.byte'
+    line.status = MODIFIED
+    line.parameters = hexstr(2, oc) + ' ' + ' '.join([hexstr(2, i) for i in bl])
+
+n_passes += 1
+verbose('PASS ALL IN: Assembled all remaining operands')
+# dump(sc_allin, "nps")
 
 
 # # -------------------------------------------------------------------
