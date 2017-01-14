@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 12. Jan 2017
+# This version: 14. Jan 2017
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -127,7 +127,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA 11. January 2017
+Version BETA 14. January 2017
 Copyright 2015-2017 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -390,7 +390,7 @@ def replace_symbols(src):
 
     for line in src: 
 
-        if line.status == DONE or line.type == LABEL:
+        if (line.status == DONE) or (line.type == LABEL):
             continue 
     
         # We need to go word-by-word because somebody might be defining .byte 
@@ -1025,6 +1025,8 @@ else:
 
 if MPU == '65816': 
 
+    verbose('PASS REP/SEP: Check for naked rep/sep instructions')
+
     for line in modes_source:
 
         if line.type != INSTRUCTION:
@@ -1036,7 +1038,7 @@ if MPU == '65816':
             warning('Use register size directives such as .A8 instead')
 
     n_passes += 1
-    verbose('PASS REP/SEP: Check for naked rep/sep instructions')
+
 
 # -------------------------------------------------------------------
 # PASS AXY: Handle register size switches on the 65816
@@ -1449,7 +1451,7 @@ verbose('STEP END: Found ".end" directive in last line, very good')
 
 for line in ir_source:
 
-    if line.status == DONE or line.action != '.equ':
+    if (line.status == DONE) or (line.action != ASSIGNMENT):
         continue 
 
     w = line.parameters.split()
@@ -1492,8 +1494,8 @@ if args.verbose:
 
 # -------------------------------------------------------------------
 # PASS REPLACE (1): Handle known assignments
-#
 
+# Note this does not touch symbols in .BYTE etc directives
 replace_symbols(ir_source)
 
 n_passes += 1
@@ -1677,6 +1679,7 @@ for line in ir_source:
     if line.status == DONE:
         continue
 
+
     # --- SUBSTEP CURRENT: Replace the CURRENT symbol by current address ---
     # This must come before we handle mnemonics
 
@@ -1713,6 +1716,7 @@ for line in ir_source:
 
         LCi += line.size
         continue
+
 
     # --- SUBSTEP SKIP: Convert .skip directive to zero bytes ---
 
@@ -1793,7 +1797,7 @@ for line in ir_source:
 
         line.address = LC0+LCi
 
-        # Local labels are easiest, start with them first
+        # Local (anonymous) labels are easiest, start with them first
         if line.action == LOCAL_LABEL:
             anon_labels.append((line.ln, line.address))
             line.status == DONE
@@ -1821,8 +1825,6 @@ for line in ir_source:
     
     # We don't convert the instructions at this point, but just count their
     # bytes. Note these entries are not separated by spaces, but by commas
-
-    # TODO if last char in list is a comma, remove it before processign
 
     if line.action in DATA_DIRECTIVES:
 
@@ -1858,6 +1860,65 @@ for line in ir_source:
 
 n_passes += 1
 
+
+# -------------------------------------------------------------------
+# PASS ASSIGN: Handle complex assignments
+
+# Complete all .equ statements
+
+for line in ir_source:
+
+    if (line.status == DONE) or (line.action != ASSIGNMENT):
+        continue
+
+    w = line.parameters.split(' ', 1)
+    vet_newsymbol(w[0])
+
+    # In '.equ frog abc', 'abc' can either be a symbol or a number. We want it
+    # to be a symbol by default, so we check the symbol table first
+    try:
+        r = symbol_table[w[1]]
+    except KeyError:
+        pass
+    else:
+        symbol_table[w[0]] = r
+        line.status = DONE
+        continue
+
+    rs = convert_term(line.ln, w[1])
+
+    # If it's a number, add it to the symbol table, otherwise we'll have to wait
+    # until we've figured out more stuff
+    if f_num:
+        symbol_table[w[0]] = rs
+        line.status = DONE
+
+n_passes += 1
+verbose('PASS ASSIGN: Assigned all remaining symbol(s) to symbol table')
+# dump(sc_simpleassign, "nps")
+
+# Print symbol table
+if args.verbose:
+    dump_symbol_table(symbol_table, "after ASSIGN (numbers in hex)")
+
+
+# -------------------------------------------------------------------
+# PASS REPLACE (2): Handle known assignments
+
+# At this point, we still haven't handled symbols in .BYTE etc directives
+replace_symbols(ir_source)
+
+n_passes += 1
+# dump(ir_source) 
+
+# -------------------------------------------------------------------
+# CLAIM: At this point we should have all symbols present and known in the
+# symbol table, and anonymous labels in the anonymous label list
+
+verbose('CLAMING that all symbols should now be known')
+
+
+
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
 # Replace by formated templates later
@@ -1884,64 +1945,9 @@ for e in macro_source:
 
 
 
-# 
-# if args.dump:
-#     print('Anonymous Labels:')
-#     if len(anon_labels) > 0:
-#         for ln, ll in anon_labels:
-#             print('{0:5}: {1:06x} '.format(ln, ll))
-#         print('\n')
-#     else:
-#         print('  (none)\n')
 
 
-# # -------------------------------------------------------------------
-# # PASS ASSIGN: Handle complex assignments
-# 
-# # We accept assignments in the form ".equ <SYM> <NBR>". Since we've
-# # moved all labels to their own lines, any such directive must be the first
-# # word in the line
-# 
-# sc_assign = []
-# 
-# for num, pay, sta in sc_labels:
-# 
-#     w = pay.split()
-# 
-#     # Leave if this is not an assignment (line doesn't start with '.equ')
-#     if w[0] != ASSIGNMENT:
-#         sc_assign.append((num, pay, sta))
-#         continue
-#         
-#     vet_newsymbol(w[1]) 
-#     
-#     # Everything after the assignment directive and the symbol has to be part of
-#     # the term
-#     cp = pay.strip()
-#     rs = convert_term(num, cp.split(' ', 2)[2])
-#     symbol_table[w[1]] = rs
-# 
-# n_passes += 1
-# verbose('PASS ASSIGN: Assigned {0} symbols to symbol table'.\
-#         format(len(sc_labels)-len(sc_assign)))
-# dump(sc_assign, "nps")
-# 
-# # Print symbol table
-# if args.verbose:
-#     dump_symbol_table(symbol_table, "after ASSIGN (numbers in hex)")
-# 
-# 
-# # -------------------------------------------------------------------
-# # PASS REPLACE (2): Handle known assignments, reprise
-# sc_replaced02 = replace_symbols(sc_assign)
-# 
-# 
-# # -------------------------------------------------------------------
-# # CLAIM: At this point we should have all symbols present and known in the
-# # symbol table, and anonymous labels in the anonymous label list
-# 
-# verbose('CLAMING that all symbols should now be known')
-# 
+
 # # -------------------------------------------------------------------
 # # PASS DATA: Convert various data formats like .byte
 # 
@@ -1997,7 +2003,10 @@ for e in macro_source:
 # n_passes += 1
 # verbose('PASS DATA: Converted all data formats to .byte')
 # dump(sc_data, "nps")
-# 
+
+
+
+
 # # -------------------------------------------------------------------
 # # PASS MATH
 # 
