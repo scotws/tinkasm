@@ -85,12 +85,11 @@ def hexstr(n, i):
     has the '0x' portion stripped out and is limited to 24 bit (to correctly
     handle the negative numbers) and is n characters wide.  
     """
-
     try:
         fmtstr = '{0:0'+str(n)+'x}'
         return fmtstr.format(i & 0x0ffffff)
     except TypeError as err:
-        fatal(num, 'TypeError in hexstr for "{0}": {1}'.format(i, err)) 
+        fatal(line, 'TypeError in hexstr for "{0}": {1}'.format(i, err)) 
 
 def fatal(line, s):
     """Abort program because of fatal error during assembly.
@@ -216,27 +215,43 @@ DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
 
 ### HELPER FUNCTIONS ###
 
-def lsb(n):
+def lsb(line, n):
     """Return Least Significant Byte of a number"""
-    return n & 0xff
+    try: 
+        t = n & 0xff
+    except TypeError:
+        fatal(line, "Can't convert '{0}' to lsb".format(n))
+    else:
+        return t
 
-def msb(n):
+def msb(line, n):
     """Return Most Significant Byte of a number"""
-    return (n & 0xff00) >> 8
+    try: 
+        t = (n & 0xff00) >> 8
+    except TypeError: 
+        fatal(line, "Can't convert '{0}' to msb".format(n))
+    else:
+        return t
 
-def bank(n):
+def bank(line, n):
     """Return Bank Byte of a number"""
-    return (n & 0xff0000) >> 16
+    try: 
+        t = (n & 0xff0000) >> 16
+    except TypeError: 
+        fatal(line, "Can't convert '{0}' to bank".format(n))
+    else:
+        return t
+
 
 MODIFIERS = {'.lsb': lsb, '.msb': msb, '.bank': bank}
 
-def little_endian_16(n):
+def little_endian_16(line, n):
     """Given a number, return a tuple with two bytes in correct format"""
-    return lsb(n), msb(n)
+    return lsb(line, n), msb(line, n)
 
-def little_endian_24(n):
+def little_endian_24(line, n):
     """Given a number, return a tuple with three bytes in correct format"""
-    return lsb(n), msb(n), bank(n)
+    return lsb(line, n), msb(line, n), bank(line, n)
 
 def string2bytestring(s):
     """Given a string marked with quotation marks, return a string that is a
@@ -326,9 +341,9 @@ def sanitize_math(s):
         # Last chance, maybe it's a variable we already know about. In theory,
         # we should have converted them all already, of course
         try:
-            r = symbol_table[w]
+            r = symbol_table[w.lower()]
         except KeyError:
-            fatal(num, 'Illegal term "{0}" in math term'.format(w))
+            fatal(line, 'Illegal term "{0}" in math term'.format(w))
         else:
             evalstring.append(str(r))
 
@@ -341,7 +356,6 @@ def do_math(s):
     What is before and after the math term is conserved. Returns a string 
     representation of a hex number
     """
-
     # Save the parts that are left and right of the math term
     w1 = s.split(LEFTMATH, 1)
     pre_math = w1[0]
@@ -362,18 +376,18 @@ def vet_newsymbol(s):
     # We don't allow using directives as symbols because that gets very
     # confusing really fast
     if s in DIRECTIVES:
-        fatal(num, 'Directive "{0}" cannot be redefined as a symbol'.\
+        fatal(line, 'Directive "{0}" cannot be redefined as a symbol'.\
                 format(s))
 
     # We don't allow using mnemonics as symbols because that screws up other
     # stuff and is really weird anyway
     if s in mnemonics.keys(): 
-        fatal(num, 'Mnemonic "{0}" cannot be redefined as a symbol'.\
+        fatal(line, 'Mnemonic "{0}" cannot be redefined as a symbol'.\
                 format(s))
 
     # We don't allow redefining existing symbols, this catches various errors 
     if s in symbol_table.keys():
-        fatal(num, 'Symbol "{0}" already defined'.format(s))
+        fatal(line, 'Symbol "{0}" already defined'.format(s))
 
 
 def replace_symbols(src):
@@ -469,7 +483,7 @@ def dump_symbol_table(st, s=""):
         print('- {0:{width}} : {1:06x}'.format(v, st[v], width=max_sym_len))
 
 
-def convert_term(n, s): 
+def convert_term(line, s): 
     """Given the line number and a string that can be a number (in various 
     formats), a symbol (that must already be known), a modifier (such as
     '.lsb'), a math term (such as '{ 1 + 1 }') or a combination of modifier
@@ -481,7 +495,7 @@ def convert_term(n, s):
     because there are assumed to have been already converted as part of a 
     diffent step.
     """
-    
+
     # --- SUBSTEP 1: KNOWN SYMBOL ---
        
     # We test to see if the term is a symbol before it is a number. Therefore, by
@@ -524,12 +538,13 @@ def convert_term(n, s):
         # The parameter offered to the modification can be a number, symbol, 
         # math term etc itself. We isolate it and send it and call ourselves to
         # convert it again
-        rt = convert_term(n, s.split(' ', 1)[1])
-        r = MODIFIERS[w[0]](rt)
+        rest = s.split(' ', 1)[1]
+        rt = convert_term(line, rest)
+        r = MODIFIERS[w[0]](line, rt)
         return r 
 
     # --- SUBSTEP OOPS: If we made it to here, something is wrong ---
-    fatal(n, 'Cannot convert term "{0}"'.format(s))
+    fatal(line, 'Cannot convert term "{0}"'.format(s))
 
 
 #####################################################################
@@ -1115,7 +1130,7 @@ if MPU == '65816':
         try:
             l_bank, r_bank = line.parameters.split(',')
         except ValueError:
-            fatal(num, 'Malformed "{0}" instruction ("{1}")'.\
+            fatal(line, 'Malformed "{0}" instruction ("{1}")'.\
                     format(line.action, line.parameters))
 
         line.parameters = l_bank
@@ -1405,7 +1420,7 @@ for line in ir_source:
     # ORIGIN may not take a symbol, because we haven't defined any yet, and
     # we don't accept math or modifiers either
     if not f_num:
-        fatal(n, '".origin" directive gives "{0}", not number as required')
+        fatal(line, '".origin" directive gives "{0}", not number as required')
 
     line.status = DONE
     break
@@ -1464,7 +1479,7 @@ for line in ir_source:
     except KeyError:
         pass
     else:
-        symbol_table[w[0]] = r
+        symbol_table[w[0].lower()] = r
         line.status = DONE
         continue
 
@@ -1473,7 +1488,7 @@ for line in ir_source:
     # If it's a number, add it to the symbol table, otherwise we'll have to wait
     # until we've figured out more stuff
     if f_num:
-        symbol_table[w[0]] = r
+        symbol_table[w[0].lower()] = r
         line.status = DONE
 
 n_passes += 1
@@ -1719,7 +1734,7 @@ for line in ir_source:
     if line.action == '.skip':
 
         # Number of bytes to be skipped should be in parameter
-        r = convert_term(line.ln, line.parameters)
+        r = convert_term(line, line.parameters)
 
         # We save r zeros (initialize skipped space)
         line.bytes = ' '.join(['00']*r)
@@ -1743,11 +1758,11 @@ for line in ir_source:
         # Add the symbol to the symbol list. This should be the first word of
         # the parameter string
         vet_newsymbol(ws[0])
-        symbol_table[ws[0]] = LC0+LCi
+        symbol_table[ws[0].lower()] = LC0+LCi
 
         # Number of bytes to save should be the second entry in the parameter
         # string
-        r = convert_term(line.ln, ws[1])
+        r = convert_term(line, ws[1])
 
         # We save r zeros (initialize reserved space)
         line.bytes = ' '.join(['00']*r)
@@ -1766,7 +1781,7 @@ for line in ir_source:
     if line.action == '.advance':
 
         line.address = LC0+LCi
-        r = convert_term(line.ln, line.parameters)
+        r = convert_term(line, line.parameters)
 
         # Make sure the user is not attempting to advance backwards
         if r < line.address:
@@ -1803,7 +1818,7 @@ for line in ir_source:
         if line.action not in symbol_table:
             verbose('- New label "{0}" found in line {1}, address {2:06x}'.\
                     format(line.action, line.ln, line.address))
-            symbol_table[line.action] = line.address
+            symbol_table[line.action.lower()] = line.address
             line.status = DONE
             continue
 
@@ -1878,7 +1893,7 @@ for line in ir_source:
         line.status = DONE
         continue
 
-    rs = convert_term(line.ln, w[1])
+    rs = convert_term(line, w[1])
 
     # If it's a number, add it to the symbol table, otherwise we'll have to wait
     # until we've figured out more stuff
@@ -1939,7 +1954,7 @@ for line in ir_source:
     new_ts = []
 
     for t in ts: 
-        new_ts.append(convert_term(line.ln, t))
+        new_ts.append(convert_term(line, t))
 
     # We now have a list of the numbers, but need to break them down into
     # their bytes. This could be solved a lot more elegantly, but this is
@@ -1951,12 +1966,12 @@ for line in ir_source:
 
     elif line.action == '.word':
         for n in new_ts:
-            for b in little_endian_16(n):
+            for b in little_endian_16(line, n):
                 byte_list.append(b)
 
     elif line.action == '.long':
         for n in new_ts:
-            for b in little_endian_24(n):
+            for b in little_endian_24(line, n):
                 byte_list.append(b)
 
 
@@ -2029,7 +2044,7 @@ for line in ir_source:
                 f_num, r = convert_number(next(ws))
 
                 if f_num:
-                    w = hexstr(6, MODIFIERS[w](r))
+                    w = hexstr(6, MODIFIERS[w](line, r))
                 else: 
                     fatal(line.ln, 'Modifier operand "{0}" not a number'.format(w))
 
@@ -2133,7 +2148,7 @@ for line in ir_source:
     # a 6502 to do a long branch
     if (line.action == 'bra.l') and (MPU == '65816'):
         _, target_addr = convert_number(line.parameters)
-        bl, bm = little_endian_16(target_addr - line.address - 3)
+        bl, bm = little_endian_16(line, target_addr - line.address - 3)
         opr = hexstr(2, bl)+' '+hexstr(2, bm)
         line.bytes = hexstr(2, mnemonics[line.action])+' '+opr
         line.status = DONE
@@ -2141,7 +2156,7 @@ for line in ir_source:
    
     if line.action in BRANCHES[MPU]:
         _, target_addr = convert_number(line.parameters)
-        opr = hexstr(2, lsb(target_addr - line.address - 2))
+        opr = hexstr(2, lsb(line, target_addr - line.address - 2))
         line.bytes = hexstr(2, mnemonics[line.action])+' '+opr
         line.status = DONE
         continue
@@ -2193,6 +2208,8 @@ if MPU == '65816':
 # -------------------------------------------------------------------
 # PASS ALL IN: Assemble all remaining operands
 
+verbose('PASS ALL IN: Assembling all remaining operands')
+
 for line in ir_source:
 
     if (line.status == DONE) or (line.type != INSTRUCTION):
@@ -2204,17 +2221,18 @@ for line in ir_source:
     except KeyError:
         continue
 
-    _, opr = convert_number(line.parameters)
+    opr = convert_term(line, line.parameters)
 
+    # We hand tuples to the next step
     if line.size == 2:
-        bl = (lsb(opr), )
+        bl = (lsb(line, opr), )
     elif line.size == 3:
-        bl = little_endian_16(opr)
+        bl = little_endian_16(line, opr)
     elif line.size == 4:
-        bl = little_endian_24(opr)
+        bl = little_endian_24(line, opr)
     else:
         # This should never happen, obviously, but we're checking anyway
-        fatal(num, 'Found {0} byte instruction in opcode list'.\
+        fatal(line, 'Found {0} byte instruction in opcode list'.\
                 format(line.size))
 
     # Reassemble payload as a byte instruction
@@ -2222,7 +2240,6 @@ for line in ir_source:
     line.status = DONE
 
 n_passes += 1
-verbose('PASS ALL IN: Assembled all remaining operands')
 # dump(sc_allin, "nps")
 
 
@@ -2469,17 +2486,6 @@ if args.hexdump:
     n_steps += 1
     verbose('STEP HEXDUMP: Saved hexdump file {0} as requested'.format(HEX_FILE))
 
-
-# # -------------------------------------------------------------------
-# # STEP END: Sign off
-# 
-# time_end = timeit.default_timer()
-# verbose('\nSuccess! All steps completed in {0:.5f} seconds.'.\
-#         format(time_end - time_start))
-# verbose('Enjoy your cake.')
-# sys.exit(0)
-
-
 # -------------------------------------------------------------------
 # PRIMITIVE PRINTOUT FOR TESTING
 # Replace by formated templates later
@@ -2505,7 +2511,14 @@ for e in macro_source:
 # TODO HIER HIER TODO
 
 
+# -------------------------------------------------------------------
+# STEP END: Sign off
 
+time_end = timeit.default_timer()
+verbose('\nSuccess! All steps completed in {0:.5f} seconds.'.\
+        format(time_end - time_start))
+verbose('Enjoy your cake.')
+sys.exit(0)
 
-# ### END ###
-# 
+### END ###
+
