@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 14. Jan 2017
+# This version: 15. Jan 2017
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -127,7 +127,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA 14. January 2017
+Version BETA 15. January 2017
 Copyright 2015-2017 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -155,12 +155,6 @@ LIST_FILE = 'tink.lst'    # Default name of listing file
 IR_FILE = 'tink.ir'       # Default name of IR file 
 S28_FILE = 'tink.s28'     # Default name of S28 file
 PARTIAL_FILE = 'tink.prt' # Default name of partial listing
-
-# The user can request a correctly formatted source file as a goody while
-# running the program. We call a separate program for this, which has the
-# following command line 
-# TODO make this work 
-formatter = './tinkfmt/tinkfmt.py'
 
 # We store the general lists here, those specific to one processor type are put
 # in the relevant passes
@@ -201,7 +195,7 @@ class CodeLine:
         self.address = 0        # Address where line data begins (16/24 bit)
         self.il_comment = ''    # Storage area for any inline comments
         self.size = 0           # Size of instruction in bytes
-        self.bytes = []         # List of bytes (after assembly)
+        self.bytes = ''         # Bytes for actual, final assembly
         self.mode = 'em'        # For 65816: default mode (emulated)
         self.a_width = 8        # For 65816: defalt width of A register
         self.xy_width = 8       # For 65816: default width of XY registers
@@ -422,7 +416,7 @@ def replace_symbols(src):
             format(sr_count))
 
 
-# TODO 
+# TODO completely rewrite 
 def dump(ls, fs='npsa'):
     """At each assembly stage, print the complete stage as a list, with the
     exact type of elements to print depending on the format string. Produces
@@ -537,12 +531,14 @@ def convert_term(n, s):
     # --- SUBSTEP OOPS: If we made it to here, something is wrong ---
     fatal(n, 'Cannot convert term "{0}"'.format(s))
 
+
 #####################################################################
 ### PASSES AND STEPS ###
 
 # A STEP is executed once, a PASS can be excuted more than once, but usually
 # only once per line
  
+
 # -------------------------------------------------------------------
 # STEP BANNER: Set up timing, print banner
 
@@ -552,10 +548,9 @@ verbose(TITLE_STRING)
 time_start = timeit.default_timer()
 verbose('Beginning assembly. Timer started.')
  
+
 # -------------------------------------------------------------------
 # STEP LOAD: Load original source code and add line numbers
-#
-# REQUIREMENTS: none
 
 # Line numbers start with 1 because this is for humans. 
 
@@ -731,8 +726,6 @@ verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
 #
 # REQUIRES opcodes loaded depending on CPU type
 
-# This step does not change the source code
-
 mnemonics = {opcode_table[n][1]:n for n, e in enumerate(opcode_table)}
 
 # For the 6502 and 65c02, we have 'UNUSED' for the entries in the opcode table
@@ -746,7 +739,6 @@ verbose('STEP MNEMONICS: Generated mnemonics list')
 verbose('- Number of mnemonics found: {0}'.format(len(mnemonics.keys())))
 if args.dump:
     print('Mnemonics found: {0}'.format(mnemonics.keys()))
-    print()
 
 
 # -------------------------------------------------------------------
@@ -791,7 +783,7 @@ for line in expanded_source:
         
     # We know all our mnemonics. We just remember that we've found one, but
     # don't process it yet. Silly user might have given us uppercase mnemonics,
-    # but we accept this gracefully for the moment and stick itto him later
+    # but we accept this gracefully for the moment and stick it to him later
     if w1.lower() in mnemonics:
         line.type = INSTRUCTION
         relabeled_source.append(line) 
@@ -875,6 +867,7 @@ for line in relabeled_source:
 
 n_passes += 1
 verbose('PASS VALIDATE TYPE: All lines are of known type')
+
 
 # -------------------------------------------------------------------
 # PASS INLINE COMMENTS: Isolate inline comments
@@ -1018,6 +1011,7 @@ if MPU == '65816':
 
 else:
     modes_source = relabeled_source
+
 
 # -------------------------------------------------------------------
 # PASS REP/SEP: Warn if there are any direct REP/SEP 
@@ -1211,8 +1205,6 @@ for m in macros.keys():
 # 
 # REQUIRES macros to have been defined
 
-# TODO add parameters, which might force us to move this to a later point
-
 macro_source = []
 pre_invok_len = len(move_source)
 
@@ -1281,6 +1273,7 @@ verbose('PASS RENAME SECONDARY LINES: Secondary lines now numbered in sequence.'
 # dump(macro_source)
 
 ir_source = macro_source
+
    
 # -------------------------------------------------------------------
 # ASSERT INTERMEDIATE REPRESENTATION
@@ -1289,7 +1282,7 @@ ir_source = macro_source
 
 # The Intermediate Representation (IR) ends the phase of preprocessing (parsing
 # etc) and is the basis for the actually assembly. The source code has now
-# reached its maximal size.
+# reached its maximal number of line.
 
 n_steps += 1
 verbose('ASSERT: Intermediate Representation (IR) created with {0} lines of code'.\
@@ -1721,16 +1714,17 @@ for line in ir_source:
 
     # --- SUBSTEP SKIP: Convert .skip directive to zero bytes ---
 
+    # This is the first step where we save final bytes
+
     if line.action == '.skip':
 
         # Number of bytes to be skipped should be in parameter
         r = convert_term(line.ln, line.parameters)
 
         # We save r zeros (initialize skipped space)
-        line.action = '.byte'
-        line.parameters = ' '.join(['00,']*r)
+        line.bytes = ' '.join(['00']*r)
         line.size = r
-        line.status = MODIFIED
+        line.status = DONE
         line.address = LC0+LCi
 
         verbose('- Converted ".skip" in line {0} to {1} zero byte(s)'.\
@@ -1756,10 +1750,9 @@ for line in ir_source:
         r = convert_term(line.ln, ws[1])
 
         # We save r zeros (initialize reserved space)
-        line.action = '.byte'
-        line.parameters = ' '.join(['00,']*r)
+        line.bytes = ' '.join(['00']*r)
         line.size = r
-        line.status = MODIFIED
+        line.status = DONE
         line.address = LC0+LCi
         
         verbose('- Converted ".save" in line {0} to {1} zero byte(s)'.\
@@ -1780,11 +1773,10 @@ for line in ir_source:
             fatal(line, 'Negative ".advance" (you can never go back)')
 
         # While we're here, we might as well already convert this to .byte
-        line.action = '.byte'
         offset = r - line.address
-        line.parameters = ' '.join(['00,']*offset)
+        line.bytes= ' '.join(['00']*offset)
         line.size = offset
-        line.status = MODIFIED
+        line.status = DONE
 
         verbose('- Converted ".advance" in line {0} to {1} zero byte(s)'.\
                 format(line.ln, offset))
@@ -1801,7 +1793,7 @@ for line in ir_source:
         # Local (anonymous) labels are easiest, start with them first
         if line.action == LOCAL_LABEL:
             anon_labels.append((line.ln, line.address))
-            line.status == DONE
+            line.status = DONE
             verbose('- New anonymous label found in line {0}, address {1:06x}'.\
                     format(line.ln, line.address))
             continue
@@ -1969,9 +1961,8 @@ for line in ir_source:
 
 
     # Reassemble the datastring, now without commas
-    line.parameters = ' '.join([hexstr(2, b) for b in byte_list])
-    line.action = '.byte'
-    line.status = MODIFIED
+    line.bytes = ' '.join([hexstr(2, b) for b in byte_list])
+    line.status = DONE
     line.size = len(byte_list)
 
 n_passes += 1
@@ -2112,9 +2103,8 @@ for line in ir_source:
     else:
 
         if opcode_table[oc][2] == 1:    # look up length of instruction
-            line.action = '.byte '
-            line.parameters = hexstr(2, oc)
-            line.status = MODIFIED
+            line.bytes = hexstr(2, oc)
+            line.status = DONE
 
 n_passes += 1
 verbose('PASS SINGLE BYTE: Assembled all single byte instructions')
@@ -2145,17 +2135,15 @@ for line in ir_source:
         _, target_addr = convert_number(line.parameters)
         bl, bm = little_endian_16(target_addr - line.address - 3)
         opr = hexstr(2, bl)+' '+hexstr(2, bm)
-        line.parameters = hexstr(2, mnemonics[line.action])+' '+opr
-        line.action = '.byte'
-        line.status = MODIFIED
+        line.bytes = hexstr(2, mnemonics[line.action])+' '+opr
+        line.status = DONE
         continue
    
     if line.action in BRANCHES[MPU]:
         _, target_addr = convert_number(line.parameters)
         opr = hexstr(2, lsb(target_addr - line.address - 2))
-        line.parameters = hexstr(2, mnemonics[line.action])+' '+opr
-        line.action = '.byte'
-        line.status = MODIFIED
+        line.bytes = hexstr(2, mnemonics[line.action])+' '+opr
+        line.status = DONE
         continue
 
 n_passes += 1
@@ -2185,8 +2173,7 @@ if MPU == '65816':
             src = hexstr(2,r)
 
             # Handle opcode
-            line.parameters = str(mnemonics[line.action])
-            line.status = MODIFIED
+            line.bytes = str(mnemonics[line.action])
 
             # Handle destination byte
             nl = next(l)
@@ -2195,8 +2182,7 @@ if MPU == '65816':
             nl.status = DONE
 
             # Put it all together
-            line.action = '.byte'
-            line.parameters = line.parameters + ' ' + des + ' ' + src
+            line.bytes = line.bytes + ' ' + des + ' ' + src
             line.status = MODIFIED
 
     n_passes += 1
@@ -2232,135 +2218,116 @@ for line in ir_source:
                 format(line.size))
 
     # Reassemble payload as a byte instruction
-    line.action = '.byte'
-    line.status = MODIFIED
-    line.parameters = hexstr(2, oc) + ' ' + ' '.join([hexstr(2, i) for i in bl])
+    line.bytes = hexstr(2, oc) + ' ' + ' '.join([hexstr(2, i) for i in bl])
+    line.status = DONE
 
 n_passes += 1
 verbose('PASS ALL IN: Assembled all remaining operands')
 # dump(sc_allin, "nps")
 
 
-# # -------------------------------------------------------------------
-# # PASS VALIDATE: Make sure we only have .byte instructions
-# 
-# # We shouldn't have anything left now that isn't a byte directive
-# # This pass does not change the source file
-# 
-# for num, pay, _ in sc_allin:
-# 
-#     w = pay.split()
-# 
-#     if w[0] != '.byte':
-#         fatal(num, 'Found illegal opcode/directive "{0}"'.format(pay.strip()))
-# 
-# n_passes += 1
-# verbose('PASS VALIDATE: Confirmed that all lines are now byte data')
+# -------------------------------------------------------------------
+# PASS VALIDATE: Make sure we're really done  
+
+for line in ir_source:
+
+    if line.status != DONE:
+        fatal(line, 'Found a leftover in line "{0}"'.format(line.ln))
+
+n_passes += 1
+verbose('PASS VALIDATE: Confirmed that all lines are done')
+
+
 
 # -------------------------------------------------------------------
-# PRIMITIVE PRINTOUT FOR TESTING
-# Replace by formated templates later
+# PASS BYTE CHECK: Make sure all byte values are valid bytes
 
-for e in macro_source:
-    # Put empty word instead of address if address is zero
-    if e.address == 0:
-        addr = '      '
-    else:
-        addr = hexstr(6, e.address)
+for line in ir_source:
 
-    # Put empty string instead of line size if line size is zero
-    if e.size == 0:
-        size = ' '
-    else:
-        size = e.size
+    if not line.bytes: 
+        continue
+
+    bl = line.bytes.split()
+
+    for b in bl:
+
+        f_num, r = convert_number(b)
+
+        if not f_num:
+            fatal(line, 'Found non-number "{0}" in byte list'.format(b))
+
+        if r > 0xff or r < 0:
+            fatal(line, 'Value "{0}" does not fit into one byte'.format(b))
+
+n_passes +=1
+verbose('PASS BYTE CHECK: Confirmed all byte values are in range from 0 to 255')
+
+
+# -------------------------------------------------------------------
+# PASS OPTIMIZE: Analyze and optimize code
+
+# We don't perform automatic optimizations at the moment, but only provide
+# suggestions and warnings here. We need the line numbers so we can offer
+# the user suggestions based on his original source code
+
+verbose('PASS ANALYZE: Searched for obvious errors and improvements')
+
+for line in ir_source: 
+
+    if not line.bytes:
+        continue
+
+    if line.type == INSTRUCTION: 
+
+        # --- SUBSTEP WDM: Check to see if we have WDM instruction --- 
+        ws = line.bytes
+
+        if w[0] == '42':
+            warning('Reserved instruction WDM (0x42) found in line {0}'.\
+                    format(line.ln))
+            continue
+
+n_passes += 1
+
+
+# -------------------------------------------------------------------
+# PASS BINARY: Convert lists of bytes into one byte array
+
+# Take all lines that are not DONE and write their values to 
+
+byte_list = []
+
+for line in ir_source:
+
+    if not line.bytes: 
+        continue 
+
+    line.bytes = line.bytes.strip()     # paranoid 
+    bl = [int(b, 16) for b in line.bytes.split()]
+    byte_list.extend(bl)
     
-    print('{0:4}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8:2} | {9:11}|{10:11}|{11:11}'.\
-            format(e.ln, e.sec_ln, e.status, e.type,\
-            e.mode, e.a_width, e.xy_width, addr, size,\
-            e.action, e.parameters, e.il_comment.strip()))
+objectcode = bytes(byte_list)
+code_size = len(objectcode)
 
-# TODO HIER HIER TODO
-
-
-
-# # -------------------------------------------------------------------
-# # PASS BYTECHECK: Make sure all values are valid bytes
-# 
-# for num, pay, _ in sc_allin:
-# 
-#     bl = pay.split()[1:]
-# 
-#     for b in bl:
-# 
-#         f_num, r = convert_number(b)
-# 
-#         if not f_num:
-#             fatal(num, 'Found non-number "{0}" in byte list'.format(b))
-# 
-#         if r > 0xff or r < 0:
-#             fatal(num, 'Value "{0}" does not fit into one byte'.format(b))
-# 
-# n_passes +=1
-# verbose('PASS BYTECHECK: Confirmed all byte values are in range from 0 to 256')
+n_passes += 1
+verbose('PASS BINARY: Combined byte lists to {0} bytes of final code'.\
+        format(len(objectcode)))
 
 
-# # -------------------------------------------------------------------
-# # PASS OPTIMIZE: Analyze and optimize code
-# 
-# # We don't perform automatic optimizations at the moment, but only provide
-# # suggestions and warnings here. We need the line numbers so we can offer
-# # the user suggestions based on his original source code
-# 
-# for num, pay, _, _ in sc_adr:
-# 
-#     w = pay.split()[1:]  # get rid of '.byte' directive
-# 
-#     # SUBSTEP WDM: Check to see if we have WDM instruction
-#     if w[0] == '42':
-#         warning('Reserved instruction WDM (0x42) found in line {0}'.\
-#                 format(num))
-#         continue
-# 
-# n_passes += 1
-# verbose('PASS ANALYZE: Searched for obvious errors and improvements')
+# -------------------------------------------------------------------
+# STEP SAVEBIN: Save binary file
+
+with open(args.output, 'wb') as f:
+    f.write(objectcode)
+
+n_steps += 1
+verbose('STEP SAVE BINARY: Saved object code as {0}'.\
+        format(args.output))
 
 
-# # -------------------------------------------------------------------
-# # PASS TOBIN: Convert lists of bytes into one single byte list
-# 
-# sc_tobin = []
-# 
-# for i in sc_purebytes:
-#     sc_tobin.extend(i)
-# 
-# objectcode = bytes(sc_tobin)
-# code_size = len(objectcode)
-# 
-# n_passes += 1
-# verbose('PASS TOBIN: Converted {0} lines of bytes to one list of {1} bytes'.\
-#         format(len(sc_purebytes), code_size))
 
 
-# # -------------------------------------------------------------------
-# # STEP SAVEBIN: Save binary file
-# 
-# with open(args.output, 'wb') as f:
-#     f.write(objectcode)
-# 
-# n_steps += 1
-# verbose('STEP SAVEBIN: Saved {0} bytes of object code as {1}'.\
-#         format(code_size, args.output))
-# 
-# 
-# # -------------------------------------------------------------------
-# # STEP WARNINGS: Print warnings unless user said not to
-# #
-# if n_warnings != 0 and args.warnings:
-#     print('Generated {0} warning(s).'.format(n_warnings))
-# 
-# n_steps += 1
-# 
-# 
+
 # # -------------------------------------------------------------------
 # # STEP LIST: Create listing file if requested
 # 
@@ -2473,36 +2440,36 @@ for e in macro_source:
 # 
 #     n_steps += 1
 #     verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
-# 
-# 
-# # -------------------------------------------------------------------
-# # STEP HEXDUMP: Create hexdump file if requested
-# 
-# if args.hexdump:
-# 
-#     with open(HEX_FILE, 'w') as f:
-#         f.write(TITLE_STRING)
-#         f.write('Hexdump file of {0}'.format(args.source))
-#         f.write(' (total of {0} bytes)\n'.format(code_size))
-#         f.write('Generated on {0}\n\n'.format(time.asctime(time.localtime())))
-#         a65 = LC0
-#         f.write('{0:06x}: '.format(a65))
-# 
-#         c = 0
-# 
-#         for e in objectcode:
-#             f.write('{0:02x} '.format(e))
-#             c += 1
-#             if c % 16 == 0:
-#                 f.write('\n')
-#                 a65 += 16
-#                 f.write('{0:06x}: '.format(a65))
-#         f.write('\n')
-# 
-#     n_steps += 1
-#     verbose('STEP HEXDUMP: Saved hexdump file as {0}'.format(HEX_FILE))
-# 
-# 
+
+
+# -------------------------------------------------------------------
+# STEP HEXDUMP: Create hexdump file if requested
+
+if args.hexdump:
+
+    with open(HEX_FILE, 'w') as f:
+        f.write(TITLE_STRING)
+        f.write('Hexdump file of {0}'.format(args.source))
+        f.write(' (total of {0} bytes)\n'.format(code_size))
+        f.write('Generated on {0}\n\n'.format(time.asctime(time.localtime())))
+        a65 = LC0
+        f.write('{0:06x}: '.format(a65))
+
+        c = 0
+
+        for e in objectcode:
+            f.write('{0:02x} '.format(e))
+            c += 1
+            if c % 16 == 0:
+                f.write('\n')
+                a65 += 16
+                f.write('{0:06x}: '.format(a65))
+        f.write('\n')
+
+    n_steps += 1
+    verbose('STEP HEXDUMP: Saved hexdump file {0} as requested'.format(HEX_FILE))
+
+
 # # -------------------------------------------------------------------
 # # STEP END: Sign off
 # 
@@ -2511,6 +2478,34 @@ for e in macro_source:
 #         format(time_end - time_start))
 # verbose('Enjoy your cake.')
 # sys.exit(0)
-# 
+
+
+# -------------------------------------------------------------------
+# PRIMITIVE PRINTOUT FOR TESTING
+# Replace by formated templates later
+
+for e in macro_source:
+    # Put empty word instead of address if address is zero
+    if e.address == 0:
+        addr = '      '
+    else:
+        addr = hexstr(6, e.address)
+
+    # Put empty string instead of line size if line size is zero
+    if e.size == 0:
+        size = ' '
+    else:
+        size = e.size
+    
+    print('{0:4}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8:2} | {9:11} | {10:11} | {11:12} |{12:11}'.\
+            format(e.ln, e.sec_ln, e.status, e.type,\
+            e.mode, e.a_width, e.xy_width, addr, size,\
+            e.action, e.parameters, e.bytes, e.il_comment.strip()))
+
+# TODO HIER HIER TODO
+
+
+
+
 # ### END ###
 # 
