@@ -1265,9 +1265,7 @@ verbose('PASS INVOKE: {0} macro expansion(s), net {1} line(s) added'.\
 
 # Different combinations of macros and includes can lead to strange secondary
 # line numbers. Instead of trying to figure them out in the previous steps, we
-# renumber them here before
-# TODO count of secondary lines currently starts with zero, change so it starts
-# with one as well
+# renumber them here before. This count starts with zero
 
 prev_ln = 0
 sec_ln_count = 0 
@@ -2340,9 +2338,6 @@ with open(args.output, 'wb') as f:
 n_steps += 1
 verbose('STEP SAVE BINARY: Saved object code as {0}'.\
         format(args.output))
-
-
-
 
 
 # # -------------------------------------------------------------------
