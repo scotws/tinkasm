@@ -64,16 +64,14 @@ parser.add_argument('-o', '--output', dest='output',\
         help='Binary output file (default TINK.BIN)', default='tink.bin')
 parser.add_argument('-v', '--verbose',\
         help='Display additional information', action='store_true')
-parser.add_argument('-d', '--dump',\
-        help='Print intermediate steps as (long) lists', action='store_true')
 parser.add_argument('-l', '--listing', action='store_true',\
         help='Create listing file (default TINK.LST)')
 parser.add_argument('-x', '--hexdump', action='store_true',\
         help='Create ASCII hexdump listing file (default TINK.HEX)')
 parser.add_argument('-s28', action='store_true',\
         help='Create S28 format file from binary (default TINK.S28)')
-parser.add_argument('-p', '--partial', action='store_true',\
-        help='Save partial listing file on fatal error (default TINK.PRT)')
+parser.add_argument('-p', '--print', action='store_true', default=False,\
+        help='Print listing to screen at end')
 parser.add_argument('-w', '--warnings', default=True,\
         help='Disable warnings (default: print them)', action='store_false')
 args = parser.parse_args()
@@ -431,43 +429,6 @@ def replace_symbols(src):
             format(sr_count))
 
 
-# TODO completely rewrite 
-def dump(ls, fs='npsa'):
-    """At each assembly stage, print the complete stage as a list, with the
-    exact type of elements to print depending on the format string. Produces
-    an enormous amount of output. Format string controls which parts of the 
-    line are printed: 
-    
-        'n' for line number ('num', element 0) 
-        'p' for payload ('pay', element 1)
-        's' for status ('sta', element 2) 
-        'a' for address ('adr', element 3)
-
-    In addition, there is the letter 'r' to print the 'raw payload' (element
-    1) with linefeeds etc.
-    """
-
-    if args.dump:
-
-        for l in ls:
-
-            s = ''
-
-            if 'n' in fs:
-                s = s + "{0:5d}: ".format(l[0]) 
-            if 's' in fs:
-                s = s + "{0} ".format(l[2])
-            if 'a' in fs:
-                s = s + "{0!s} ".format(l[3])
-            if 'p' in fs:
-                s = s + "{0!s}".format(l[1].rstrip())
-            if 'r' in fs:
-                s = s + "{0}".format(repr(l[1]))
-
-            print(s.rstrip())
-
-    print()
-
 
 def dump_symbol_table(st, s=""):
     """Print Symbol Table to screen"""
@@ -713,7 +674,7 @@ def make_listing(src):
 
     # Code listing
     listing.append('\nLISTING:')
-    listing.append('       Line Address  Bytes        Instruction')
+    listing.append('   Line  Status/Type State/Width Address     Bytes     Instruction')
 
     for line in src:
 
@@ -735,18 +696,16 @@ def make_listing(src):
             listing.append('Macro "{0}"'.format(m))
 
             for ml in macros[m]:
-                listing.append('    {0}'.format(ml))
-
-        listing.append('\n')
+                listing.append('    {0}'.format(ml.action))
 
     else:
-        listing.append(INDENT+'(none)\n')
+        listing.append(INDENT+'(none)')
 
 
     # Only add symbol table if we have one already
     if symbol_table:
 
-        listing.append('\nSYMBOL TABLE')
+        listing.append('\nSYMBOL TABLE:')
 
         if len(symbol_table) <= 0:
             listing.append(' - (symbol table is empty)\n')
@@ -794,7 +753,6 @@ with open(args.source, "r") as f:
 n_steps += 1
 verbose('STEP LOAD: Read {0} lines from {1}'.\
         format(len(raw_source), args.source))
-# dump(raw_source) 
 
 
 # -------------------------------------------------------------------
@@ -835,7 +793,6 @@ for line in raw_source:
 
 n_passes += 1
 verbose('PASS INCLUDE: Added {0} external file(s)'.format(n_external_files))
-# dump(expanded_source) 
 
 
 # -------------------------------------------------------------------
@@ -856,7 +813,6 @@ for line in expanded_source:
 
 n_passes += 1
 verbose('PASS EMPTY: Found {0} empty line(s)'.format(n_empty_lines))
-# dump(expanded_source)
 
 
 # -------------------------------------------------------------------
@@ -877,7 +833,6 @@ for line in expanded_source:
 
 n_passes += 1
 verbose('PASS COMMENTS: Found {0} full-line comment(s)'.format(n_comment_lines))
-# dump(expanded_source)
 
 
 # -------------------------------------------------------------------
@@ -922,7 +877,6 @@ if not MPU:
 
 n_passes += 1
 verbose('PASS MPU: Found MPU "{0}", is supported'.format(MPU))
-# dump(expanded_source)
 
 
 # -------------------------------------------------------------------
@@ -967,8 +921,6 @@ if MPU != '65816':
 n_steps += 1
 verbose('STEP MNEMONICS: Generated mnemonics list')
 verbose('- Number of mnemonics found: {0}'.format(len(mnemonics.keys())))
-if args.dump:
-    print('Mnemonics found: {0}'.format(mnemonics.keys()))
 
 
 # -------------------------------------------------------------------
@@ -1072,7 +1024,6 @@ for line in expanded_source:
 
 n_passes += 1
 verbose('PASS SPLIT LABELS: Split lines that have code following their labels')
-# dump(relabeled_source)
 
 
 # -------------------------------------------------------------------
@@ -1128,7 +1079,6 @@ for line in relabeled_source:
     
 n_passes += 1
 verbose('PASS INLINE COMMENTS: Isolated all inline comments')
-# dump(relabeled_source)
 
 
 # -------------------------------------------------------------------
@@ -1237,7 +1187,6 @@ if MPU == '65816':
 
     n_passes += 1
     verbose('PASS MODES: Handled 65816 native/emulated mode switches')
-#   dump(modes_source)
 
 else:
     modes_source = relabeled_source
@@ -1317,7 +1266,6 @@ if MPU == '65816':
 
     n_passes += 1
     verbose('PASS AXY: Registered 8/16 bit switches for A, X, and Y')
-#   dump(axy_source)
 
 else:
     axy_source = modes_source 
@@ -1361,7 +1309,6 @@ if MPU == '65816':
 
     n_passes += 1
     verbose('PASS SPLIT MOVES: Split mvn/mvp instructions on the 65816')
-#     dump(sc_splitmove, "nps")
 
 else:
     move_source = axy_source
@@ -1418,17 +1365,15 @@ for line in move_source:
 
 n_passes += 1
 verbose('STEP MACROS: Defined {0} macros'.format(len(macros)))
-# dump(sc_macros, "nps")
 
 # TODO pretty format this
-# TODO only print if dump requested
 for m in macros.keys():
-    print('Macro {0}:'.format(m))
+    verbose('Macro {0}:'.format(m))
 
     for ml in macros[m]:
-        print('- {0:04}:{1:03} | {2} {3} | {4:11}|{5:11}|{6:11} ||'\
+        verbose('- {0:04}:{1:03} | {2} {3} | {4:11}|{5:11}|{6:11} {7}||'\
                 .format(ml.ln, ml.sec_ln, ml.status, ml.type, ml.action,\
-                ml.parameters, ml.il_comment), ml.raw)
+                ml.parameters, ml.il_comment, ml.raw))
 
 
 # -------------------------------------------------------------------
@@ -1470,7 +1415,6 @@ n_passes += 1
 # line itself
 verbose('PASS INVOKE: {0} macro expansion(s), net {1} line(s) added'.\
         format(n_invocations, post_invok_len - pre_invok_len))
-# dump(sc_invoke, "nps")
 
 
 # -------------------------------------------------------------------
@@ -1499,7 +1443,6 @@ for line in macro_source:
 
 n_passes += 1
 verbose('PASS RENAME SECONDARY LINES: Secondary lines now numbered in sequence.')
-# dump(macro_source)
 
 ir_source = macro_source
 
@@ -1631,7 +1574,6 @@ for line in ir_source:
 n_passes += 1
 verbose('PASS SIMPLE ASSIGN: Assigned {0} new symbol(s) to symbol table'.\
         format(len(symbol_table)))
-# dump(sc_simpleassign, "nps")
 
 # Print symbol table
 if args.verbose:
@@ -1645,7 +1587,6 @@ if args.verbose:
 replace_symbols(ir_source)
 
 n_passes += 1
-# dump(ir_source) 
 
  
 # -------------------------------------------------------------------
@@ -1696,7 +1637,6 @@ for line in ir_source:
 
 n_passes += 1
 verbose('PASS STRINGS: Converted all strings to byte lists')
-# dump(sc_strings, "nps")
 
 
 # -------------------------------------------------------------------
@@ -1727,7 +1667,6 @@ for line in ir_source:
 
 n_passes += 1
 verbose('PASS CHARS: Converted all single characters to bytes')
-# dump(sc_chars, "nps")
 
 
 # -------------------------------------------------------------------
@@ -1793,7 +1732,6 @@ if MPU == '65816':
     n_passes += 1
     verbose('PASS REGISTER SWITCHES: Found {0} A/XY width change(s)'.\
             format(n_switches))
-    # dump(frog)
         
  
 # -------------------------------------------------------------------
@@ -2042,7 +1980,6 @@ for line in ir_source:
 
 n_passes += 1
 verbose('PASS ASSIGN: Assigned all remaining symbol(s) to symbol table')
-# dump(sc_simpleassign, "nps")
 
 # Print symbol table
 if args.verbose:
@@ -2056,7 +1993,6 @@ if args.verbose:
 replace_symbols(ir_source)
 
 n_passes += 1
-# dump(ir_source) 
 
 
 # -------------------------------------------------------------------
@@ -2121,7 +2057,6 @@ for line in ir_source:
 
 n_passes += 1
 verbose('PASS DATA: Converted all data formats to .byte lists')
-# dump(ir_status)
 
 
 # -------------------------------------------------------------------
@@ -2149,7 +2084,6 @@ for line in ir_source:
     
 n_passes += 1
 verbose('PASS MATH: replaced all math terms by numbers')
-# dump(ir_source)
 
 
 # -------------------------------------------------------------------
@@ -2194,7 +2128,6 @@ for line in ir_source:
 
 n_passes += 1
 verbose('PASS MODIFY: replaced all modifier terms by numbers')
-# dump(ir_source)
 
 
 # -------------------------------------------------------------------
@@ -2230,7 +2163,6 @@ for line in ir_source:
 
 n_passes += 1
 verbose('PASS ANONYMOUS: Replaced all anonymous labels with address values')
-# dump(sc_anons, "nps")
 
 
 # -------------------------------------------------------------------
@@ -2262,7 +2194,6 @@ for line in ir_source:
 
 n_passes += 1
 verbose('PASS SINGLE BYTE: Assembled all single byte instructions')
-# dump(ir_source)
 
 
 # -------------------------------------------------------------------
@@ -2302,7 +2233,6 @@ for line in ir_source:
 
 n_passes += 1
 verbose('PASS BRANCHES: Encoded all branch instructions')
-# dump(sc_branches, "nps")
 
 
 # -------------------------------------------------------------------
@@ -2341,7 +2271,6 @@ if MPU == '65816':
 
     n_passes += 1
     verbose('PASS FUSE MOVE: Handled mvn/mvp instructions on the 65816')
-#   dump(sc_move, "nps")
 
 
 # -------------------------------------------------------------------
@@ -2379,7 +2308,6 @@ for line in ir_source:
     line.status = DONE
 
 n_passes += 1
-# dump(sc_allin, "nps")
 
 
 # -------------------------------------------------------------------
@@ -2482,6 +2410,13 @@ verbose('STEP SAVE BINARY: Saved object code as {0}'.\
 
 
 # -------------------------------------------------------------------
+# STEP S28: Create S28 date file if requested
+
+if args.s28:
+    print('(So sorry, STEP S28 not implemented yet)')
+
+
+# -------------------------------------------------------------------
 # STEP HEXDUMP: Create hexdump file if requested
 
 if args.hexdump:
@@ -2511,17 +2446,32 @@ if args.hexdump:
             format(HEX_FILE))
 
 
-
 # -------------------------------------------------------------------
 # STEP LIST: Create listing file if requested
 
-n_steps += 1
+if args.listing:
 
-with open(LIST_FILE, 'w') as f:
+    n_steps += 1
+
+    with open(LIST_FILE, 'w') as f:
+        for l in make_listing(ir_source):
+            f.write(l+'\n') 
+
+    verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
+
+# -------------------------------------------------------------------
+# STEP PRINT: Print listing to screen if requested
+
+if args.print: 
+
+    n_steps += 1
+    print () 
+
     for l in make_listing(ir_source):
-        f.write(l+'\n') 
+        print(l)
 
-verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
+    print()
+    verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
 
 
 # -------------------------------------------------------------------
