@@ -12,7 +12,7 @@ loop            sta.x 1000
 
                 bra loop
 
-        .include tests/includeme.tasm
+        .include includeme.tasm
 
         .word 3000, 4000, 5000
 

@@ -61,6 +61,6 @@ fuller          lda.# 00  ; label with instruction and comment
         .long 00:0000
         .byte 1, %00000010, &2, 'a', "aaa", .lsb { frog + 11 }
         .word 1000, frog, 3000,    ; test trailing comma
-        .long 01aaaa, 02bbbb
+        .long 01aaaa, 02bbbb, 03cccc, 04dddd, 05eeee, 06ffff
 
         .end

@@ -831,7 +831,7 @@ for line in expanded_source:
     # The simple case is that we have a comment after the label, and can just
     # put it in the inline comment field without adding another line
     if rw1[0] == ';':
-        line.il_comment = rest_of_line
+        line.il_comment = rest_of_line.strip()
         relabeled_source.append(line) 
         continue
 
@@ -897,7 +897,7 @@ def remove_inlines(s):
     later.  
     """
     non_comment = s.split(COMMENT_MARKER)[0].rstrip()
-    comment = s.replace(non_comment, '')
+    comment = s.replace(non_comment, '').strip()
     return non_comment, comment
 
 
@@ -1107,6 +1107,7 @@ if MPU == '65816':
 else:
     axy_source = modes_source 
 
+
 # -------------------------------------------------------------------
 # PASS SPLIT MOVES - Split up Move instructions on the 65816
 
@@ -1298,7 +1299,7 @@ ir_source = macro_source
 # reached its maximal number of line.
 
 n_steps += 1
-verbose('ASSERT: Intermediate Representation (IR) created with {0} lines of code'.\
+verbose('STEP: Intermediate Representation (IR) created with {0} lines of code'.\
         format(len(ir_source)))
 
 
@@ -1310,7 +1311,6 @@ verbose('ASSERT: Intermediate Representation (IR) created with {0} lines of code
 if args.ir: 
 
     # Keep these with the IR pass
-    # TODO rewrite this once we're happy with it
     
     def tmpl_ir_cmt(ir_line):
         """Template for commentaries for the Intermediate Representation.
@@ -1748,6 +1748,8 @@ for line in ir_source:
 
  
     # --- SUBSTEP SAVE: Convert .save directive to zero bytes ---
+    
+    # TODO see if we need to add a label line here
 
     if line.action == '.save':
 
@@ -2340,84 +2342,186 @@ verbose('STEP SAVE BINARY: Saved object code as {0}'.\
         format(args.output))
 
 
-# # -------------------------------------------------------------------
-# # STEP LIST: Create listing file if requested
-# 
-# # This is a simple listing file, we are waiting to figure out what we need
-# # before we create a more complex one
-# 
-# LEN_BYTELIST = 11
-# LEN_INSTRUCTION = 15
-# ELLIPSIS = ' (...)'
-# 
-# if args.listing:
-# 
+# -------------------------------------------------------------------
+# STEP LIST: Create listing file if requested
+
+# We create a list of strings for all cases.
+
+def hide_zero_address(n):
+    """Given the address of an instruction, if it is zero, return an
+    empty string, else return a six-character hex string
+    """
+    if n == 0:
+        return ' ' 
+    else:
+        if MPU == '65816':
+            width = 6
+        else:
+            width = 4
+        return hexstr(width, n)
+ 
+
+def listing_header(l):
+    """Create a header for all lines, regardless of type. Takes a line object 
+    and returns a string.
+    """
+
+    if MPU == '65816':
+        h = '{0:4}:{1:03} | {2} {3} | {4} {5:2} {6:2} |'.\
+                format(l.ln, l.sec_ln, l.status, l.type, l.mode, l.a_width,\
+                l.xy_width)
+    else: 
+        h = '{0:4}:{1:03} | {2} {3} |'.format(l.ln, l.sec_ln, l.status, l.type)
+    
+    return h
+            
+
+def listing_comment(l): 
+    """Given a line object that contains a full-line comment, create a string
+    for full-line comments. Assumes that the header will be added by calling
+    program.
+    """
+    return '        |             | '+l.raw.rstrip()   # rstrip() is paranoid 
+
+
+def listing_whitespace(l):
+    """Given a line object that contains whitespace, return a string. Assumes
+    that the header will be added by calling program.
+    """
+    return '        |             |'
+
+
+def listing_instruction(l):
+    """Template for instructions for the Intermediate Representation. 
+    Takes a line object and returns a string for writing to the file.
+    Assumes that the header will be added by a calling program.
+    """
+    s = ' {0:6} | {1:11} | {2:36} {3}'.\
+        format(hide_zero_address(l.address), l.bytes, INDENT+INDENT+l.action+' '+l.parameters, l.il_comment)
+    return s 
+
+
+def listing_directive(l):
+    """Template for directives for the Intermediate Representation. 
+    Takes a line object and returns a string for writing to the file.
+    """
+    # If we get a data directive, we might have to add a table
+    table = '' 
+
+    # Some directives would overflow the line, we can simplify
+    if l.action in ['.advance', '.skip', '.save']:
+        b_list = '({0}x 00)'.format(l.size)
+    else:
+        b_list = l.bytes
+
+    # Data directives can overflow a line so we have to treat them separately
+    if l.action in DATA_DIRECTIVES:
+
+        # If the amount of info in the line is too long, we break it up
+        if l.size > 4: 
+            b_list = '({0} bytes)'.format(l.size)
+
+            table_header = '\n'+listing_header(l)+\
+                    (' '*8)+'|'+(' '*13)+'|'+INDENT+INDENT
+            table_line = table_header
+            ascii_line = ''
+            c = 0
+
+            for b in l.bytes.split():
+                table_line = table_line+' {0}'.format(b)
+
+                char = chr(int(b, 16))
+
+                if char not in string.printable:
+                    char = '.'
+
+                ascii_line = ascii_line+' '+char
+                c += 1
+                
+                if c % 8 == 0:
+                    table = table+'{0:96}  -- {1}'.format(table_line, ascii_line)
+                    ascii_line = ''
+                    table_line = table_header 
+
+            table = table+'{0:96}  -- {1}'.format(table_line, ascii_line)
+
+    s = ' {0:6} | {1:11} | {2:36} {3}{4}'.\
+        format(hide_zero_address(l.address), b_list,\
+        INDENT+l.action+' ' +l.parameters, l.il_comment, table)
+    return s 
+
+
+def listing_label(l):
+    """Template for a line object that contains a label, returns a string. 
+    Assumes that the header will be added by calling program.
+    """
+    s = ' {0} |             | {1:36} {2}'.format(hexstr(6, l.address), l.action, l.il_comment)
+    return s
+
+
+def listing_control(l):
+    """Template for a line object that contains a control instruction. 
+    Returns a string. Assumes that the header will be added by calling 
+    program.
+    """
+    s = '        |             | {0:11}'.format(INDENT+l.action)
+    return s
+
+
+
+line_listing_types = {
+        INSTRUCTION: listing_instruction,
+        COMMENT: listing_comment,
+        WHITESPACE: listing_whitespace,
+        CONTROL: listing_control,
+        DIRECTIVE: listing_directive,
+        LABEL: listing_label }
+
+
+def make_listing(src):
+    """Given a list of line objects, return a list of strings with each
+    line processed for user output.
+    """
+
+    listing = []
+
+    # Header
+
+    listing.append(TITLE_STRING)
+    listing.append('Code listing for file {0}'.format(args.source))
+    listing.append('Generated on {0}'.format(time.asctime(time.localtime())))
+    listing.append('Target MPU: {0}'.format(MPU))
+
+
+    if n_external_files != 0:
+        listing.append('External files loaded: {0}'.format(n_external_files))
+
+    listing.append('Number of passes executed: {0}'.format(n_passes))
+    listing.append('Number of steps executed: {0}'.format(n_steps))
+    time_end = timeit.default_timer()
+    listing.append('Assembly time: {0:.5f} seconds'.format(time_end - time_start))
+
+    if n_warnings != 0:
+        listing.append('Warnings generated: {0}'.format(n_warnings))
+    listing.append('Code origin: {0:06x}'.format(LC0))
+    listing.append('Bytes of machine code: {0}'.format(code_size))
+
+    # Code listing
+    listing.append('\nLISTING:')
+    listing.append('       Line Address  Bytes        Instruction')
+
+    for line in src:
+
+        try:
+            l = line_listing_types[line.type](line)
+        except KeyError:
+            fatal(line, 'ERROR: Unknown line type "{0}" in line {1}:{2}'.\
+                    format(line.type, line.ln, line.sec_ln))
+        else:
+            listing.append(listing_header(line) + l)
+
+
 #     with open(LIST_FILE, 'w') as f:
-# 
-#         # Header
-#         f.write(TITLE_STRING)
-#         f.write('Code listing for file {0}\n'.format(args.source))
-#         f.write('Generated on {0}\n'.format(time.asctime(time.localtime())))
-#         f.write('Target MPU: {0}\n'.format(MPU))
-#         time_end = timeit.default_timer()
-#         if n_external_files != 0:
-#             f.write('External files loaded: {0}\n'.format(n_external_files))
-#         f.write('Number of passes executed: {0}\n'.format(n_passes))
-#         f.write('Number of steps executed: {0}\n'.format(n_steps))
-#         f.write('Assembly time: {0:.5f} seconds\n'.format(time_end - time_start))
-#         if n_warnings != 0:
-#             f.write('Warnings generated: {0}\n'.format(n_warnings))
-#         f.write('Code origin: {0:06x}\n'.format(LC0))
-#         f.write('Bytes of machine code: {0}\n'.format(code_size))
-# 
-#         # Code listing
-#         f.write('\nLISTING:\n')
-#         f.write('       Line Address  Bytes        Instruction\n')
-# 
-# 
-#         # We start with line 1 because that is the way editors count lines
-#         c = 1
-#         sc_tmp = sc_axy     # This is where we take the instructions from
-# 
-#         for num, pay, _, adr in sc_adr:
-# 
-#             # Format bytelist
-#             bl = pay.replace('.byte', '').strip()
-# 
-#             # If the line is too long, replace later values by "..."
-#             if len(bl) > LEN_BYTELIST:
-#                 bl = bl[:LEN_BYTELIST-len(ELLIPSIS)]+ELLIPSIS
-#             else:
-#                 padding = (LEN_BYTELIST - len(bl))*' '
-#                 bl = bl+padding
-# 
-#             # Format instruction
-#             instr = '(data)'
-# 
-#             for i in range(len(sc_tmp)):
-# 
-#                 # Since we delete entries from sc_tmp, this loop will fail at
-#                 # some point because the list gets shorter. That's when we're
-#                 # done
-#                 try:
-#                     num_i, pay_i, sta_i = sc_tmp[i]
-#                 except IndexError:
-#                     break
-#                 else:
-#                     # Skip leftover CONTROL instructions
-#                     if sta_i == CONTROL:
-#                         continue
-#                     if num_i == num:
-#                         instr = pay_i.strip()
-#                         del sc_tmp[i]
-# 
-#             # Format one line 
-#             l = '{0:5d} {1:5d} {2}  {3!s}  {4}\n'.\
-#                     format(c, num, adr, bl, instr)
-# 
-#             f.write(l)
-#             c += 1
-# 
 # 
 #         # Add macro list
 #         f.write('\nMACROS:\n')
@@ -2450,10 +2554,19 @@ verbose('STEP SAVE BINARY: Saved object code as {0}'.\
 #             f.write(INDENT+'(empty)\n')
 # 
 # 
-#     n_steps += 1
-#     verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
+    return listing
+
+if args.listing:
+    for l in make_listing(ir_source):
+        print(l)
+
+# HIER HIER 
 
 
+n_steps += 1
+verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
+
+ 
 # -------------------------------------------------------------------
 # STEP HEXDUMP: Create hexdump file if requested
 
@@ -2463,7 +2576,8 @@ if args.hexdump:
         f.write(TITLE_STRING)
         f.write('Hexdump file of {0}'.format(args.source))
         f.write(' (total of {0} bytes)\n'.format(code_size))
-        f.write('Generated on {0}\n\n'.format(time.asctime(time.localtime())))
+        f.write('Generated on {0}\n\n'.\
+                format(time.asctime(time.localtime())))
         a65 = LC0
         f.write('{0:06x}: '.format(a65))
 
@@ -2479,33 +2593,33 @@ if args.hexdump:
         f.write('\n')
 
     n_steps += 1
-    verbose('STEP HEXDUMP: Saved hexdump file {0} as requested'.format(HEX_FILE))
-
-# -------------------------------------------------------------------
-# PRIMITIVE PRINTOUT FOR TESTING
-# Replace by formated templates later
-
-for e in macro_source:
-    # Put empty word instead of address if address is zero
-    if e.address == 0:
-        addr = '      '
-    else:
-        addr = hexstr(6, e.address)
-
-    # Put empty string instead of line size if line size is zero
-    if e.size == 0:
-        size = ' '
-    else:
-        size = e.size
-    
-    print('{0:4}:{1:03} | {2} {3} | {4} {5:2} {6:2} | {7} | {8:2} | {9:11} | {10:11} | {11:12} |{12:11}'.\
-            format(e.ln, e.sec_ln, e.status, e.type,\
-            e.mode, e.a_width, e.xy_width, addr, size,\
-            e.action, e.parameters, e.bytes, e.il_comment.strip()))
-
-# TODO HIER HIER TODO
+    verbose('STEP HEXDUMP: Saved hexdump file {0} as requested'.\
+            format(HEX_FILE))
 
 
+# # -------------------------------------------------------------------
+# # PRIMITIVE PRINTOUT FOR TESTING
+# # Replace by formated templates later
+# 
+# for e in macro_source:
+#     # Put empty word instead of address if address is zero
+#     if e.address == 0:
+#         addr = '      '
+#     else:
+#         addr = hexstr(6, e.address)
+# 
+#     # Put empty string instead of line size if line size is zero
+#     if e.size == 0:
+#         size = ' '
+#     else:
+#         size = e.size
+#     
+#     print(listing_header(e),' {0} | {1:2} | {2:11} | {3:11} | {4:12} |{5:11}'.\
+#             format(addr, size, e.action, e.parameters, e.bytes, e.il_comment.strip()))
+# 
+# # TODO HIER HIER TODO
+# 
+# 
 # -------------------------------------------------------------------
 # STEP END: Sign off
 
