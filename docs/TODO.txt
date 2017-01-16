@@ -4,18 +4,14 @@ First version: 24. Sep 2015
 This version: 15. Jan 2017
 
 IMMEDIATELY:
+- Test with 6502 and 65c02 code
 - See if .save needs own label line in listing code
-
-AFTER BETA RELEASE:
-
+- Add labels to output in listing files (not only addresses)
 - Add ability to generate and output S28 format srecords 
-- Show complete .byte data in listing
-- Move verbose messages to start of each pass to make errors easier to spot
-- Support conversion of UTF-8 Unicode strings to bytes
+
+FUTHER ALONG:
 - Add parameters to macros
 - Allow modify & math to work with branch instructions
-- Add comments to listing file
-- Add empty lines to listing file
 - Add advanced system macros (if/then/else, loops)
 - Analysis step: Suggest JSR, RTS --> JMP; catch TAY TYA; 2 x NOP
 - Add counts for 65816 mode and register size switches

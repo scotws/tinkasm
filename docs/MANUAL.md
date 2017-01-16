@@ -56,13 +56,17 @@ TinkAsm requires Python 3.4 or later. It will not run with Python 2.7.
 
 **-i --input**      - Input assembler file (required) 
 
+**-ir**             - Save intermediate state of assembler to file `tink.ir`
+
 **-o --output**     - Output file for the binary code, default is `tink.bin`
 
 **-l --listing**    - Create a line-by-line listing file `tink.lst` 
 
 **-v --verbose**    - Print more info about each assembly step
 
-**-d --dump**       - Dump state of in between steps, produces lots of output
+**-p --print**      - Print a listing to screen at the end of assembly
+
+**-s28**            - Create a S28 data file for uploading (NOT WORKING)
 
 **-x --hexdump**    - Create a human-readable hexdump file `tasm.hex`
 
@@ -389,6 +393,8 @@ the code.
 
 ### Language and coding style
 
+(THIS SECTION IS OUT OF DATE AND WILL BE REWRITTEN)
+
 TinkAsm uses Python because it is one of the most widespread languages in use
 and is easy to understand even for those who don't know it ("executable
 pseudo-code"). 
@@ -402,6 +408,8 @@ this style makes pylint very unhappy.
 
 
 ### Structure 
+
+(THIS SECTION IS OUT OF DATE AND WILL BE REWRITTEN)
 
 The program has the most simple structure possible: It starts at the beginning,
 runs to the end, and then stops. Everything is in one file, no external routines

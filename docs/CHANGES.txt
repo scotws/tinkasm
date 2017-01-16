@@ -1,8 +1,9 @@
 Major changes to the Tinkerer's Assembler for the 6502/65c02/65816
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 27. Oct 2015
-This version: 03. Sep 2016
+This version: 16. Jan 2017
 
+16. Jan 2017 - Major rewrite to be able to show register width in listing
 03. Sep 2016 - Add .save directory
 26. Aug 2016 - Removed .string directives, strings can now be in .byte and
         other lists. Added single-character formats.
