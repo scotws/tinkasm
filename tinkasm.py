@@ -152,7 +152,6 @@ HEX_FILE = 'tink.hex'     # Default name of hexdump file
 LIST_FILE = 'tink.lst'    # Default name of listing file
 IR_FILE = 'tink.ir'       # Default name of IR file 
 S28_FILE = 'tink.s28'     # Default name of S28 file
-PARTIAL_FILE = 'tink.prt' # Default name of partial listing
 
 # We store the general lists here, those specific to one processor type are put
 # in the relevant passes
