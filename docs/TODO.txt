@@ -4,8 +4,9 @@ First version: 24. Sep 2015
 This version: 19. Jan 2017
 
 ASAP:
-- See if .save needs own label line in listing code
 - Add ability to generate and output S28 format srecords 
+- See if .save needs own label line in listing code
+- Add ASCII output to hexdump
 
 FUTHER ALONG:
 - Add counts for 65816 mode and register size switches and other statistics
