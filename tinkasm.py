@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 15. Jan 2017
+# This version: 19. Jan 2017
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -125,7 +125,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA 15. January 2017
+Version BETA 19. January 2017
 Copyright 2015-2017 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -365,6 +365,7 @@ def do_math(s):
 
     return pre_math + hexstr(6, r) + post_math
 
+
 def vet_newsymbol(s):
     """Given a word that the user wants to define as a new symbol, make sure
     that is is legal. Does not return anything if okay, jumps to fatal error
@@ -436,6 +437,7 @@ def dump_symbol_table(st, s=""):
 
     if len(st) <= 0:
         print(' - (symbol table is empty)\n')
+        return
 
     # Find longest symbol name in table
     max_sym_len = max([len(k) for k in st.keys()])
@@ -509,6 +511,8 @@ def convert_term(line, s):
 
 
 ### OUTPUT DEFINITIONS ###
+
+# TODO make format of 6502/65c02 output prettier by eliminating whitespace
 
 def hide_zero_address(n):
     """Given the address of an instruction, if it is zero, return an
@@ -621,7 +625,10 @@ def listing_label(l):
     """Template for a line object that contains a label, returns a string. 
     Assumes that the header will be added by calling program.
     """
-    s = ' {0} |             | {1:36} {2}'.format(hexstr(6, l.address), l.action, l.il_comment)
+
+    s = ' {0:6} |             | {1:36} {2}'.\
+             format(hide_zero_address(l.address), l.action, l.il_comment)
+
     return s
 
 
