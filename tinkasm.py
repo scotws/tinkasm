@@ -429,7 +429,6 @@ def replace_symbols(src):
             format(sr_count))
 
 
-
 def dump_symbol_table(st, s=""):
     """Print Symbol Table to screen"""
 
@@ -561,10 +560,11 @@ def listing_whitespace(l):
 def listing_instruction(l):
     """Template for instructions for the Intermediate Representation. 
     Takes a line object and returns a string for writing to the file.
-    Assumes that the header will be added by a calling program.
+    Assumes that the header will be added by the caller.
     """
     s = ' {0:6} | {1:11} | {2:36} {3}'.\
-        format(hide_zero_address(l.address), l.bytes, INDENT+INDENT+l.action+' '+l.parameters, l.il_comment)
+        format(hide_zero_address(l.address), l.bytes,\
+        INDENT+INDENT+l.action+' '+l.parameters, l.il_comment)
     return s 
 
 
@@ -2322,11 +2322,11 @@ n_passes += 1
 for line in ir_source:
 
     if line.status != DONE:
-        fatal(line, 'Found a leftover in line "{0}"'.format(line.ln))
+        fatal(line, 'There is something strange and unknown in line "{0}"'.\
+                format(line.ln))
 
 n_passes += 1
 verbose('PASS VALIDATE: Confirmed that all lines are done')
-
 
 
 # -------------------------------------------------------------------
@@ -2347,7 +2347,7 @@ for line in ir_source:
             fatal(line, 'Found non-number "{0}" in byte list'.format(b))
 
         if r > 0xff or r < 0:
-            fatal(line, 'Value "{0}" does not fit into one byte'.format(b))
+            fatal(line, 'Value "{0}" refuses to fit into one byte'.format(b))
 
 n_passes +=1
 verbose('PASS BYTE CHECK: Confirmed all byte values are in range from 0 to 255')

@@ -1,16 +1,15 @@
 TODO List for A Tinkerer's Assember for the 6502/65c02/65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 18. Jan 2017
+This version: 19. Jan 2017
 
-IMMEDIATELY:
-- Test with 6502 and 65c02 code
+ASAP:
 - See if .save needs own label line in listing code
 - Add ability to generate and output S28 format srecords 
 
 FUTHER ALONG:
+- Add counts for 65816 mode and register size switches and other statistics
 - Add parameters to macros
-- Allow modify & math to work with branch instructions
+- Allow modify & math to work with branch instructions (maybe)
 - Add advanced system macros (if/then/else, loops)
 - Analysis step: Suggest JSR, RTS --> JMP; catch TAY TYA; 2 x NOP
-- Add counts for 65816 mode and register size switches

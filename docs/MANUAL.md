@@ -4,16 +4,16 @@ Scot W. Stevenson <scot.stevenson@gmail.com>
 
 ## Overview
 
-The Tinkerer's Assembler (TinkAsm for short) is a multi-pass assembler for the
-6502, 65c02, and 65816 8/16-MPUs written in Python. Its aim is to provide
-hobbyists with an assembler that will run on almost any operating system while
-being easy to understand and easy to modify. 
+The Tinkerer's Assembler (TinkAsm for short) is a multi-pass assembler in the
+style of Sarkar *et al* for the 6502, 65c02, and 65816 8/16-MPUs written in
+Python. Its aim is to provide hobbyists with an assembler that will run on
+almost any operating system while being easy to understand and easy to modify. 
 
 
 ## The General Idea
 
 People who want to play around with assemblers but are not computer scientists
-have a rough time. Like compilers, professional grade assemblers involve things
+have a rough time. Like compilers, professional-grade assemblers involve things
 like lexers, parsers, and formal grammars. They want you to descend down to
 strange places and using weird things called ASTs. And if writing one weren't
 bad enough, but trying to adapt other people's assemblers to experiment with
@@ -22,8 +22,8 @@ them is far worse.
 This is an assembler for the 6502, 65c02, and 65816 MPUs for non-computer
 scientists who like to tinker -- hence the name: A Tinkerer's Assembler. Instead
 of parsing and lexing the source code and doing other complicated stuff, the
-assembly process is broken down into a large number of very simple steps that
-usually only do one thing. The code is written in "primitive" Python.  Easy to
+assembly process is broken down into a large number of simple steps that usually
+only do one thing. The code is written in "primitive" Python: Easy to
 understand, easy to modify, if not very fast or efficient.
 
 This, then, is an assembler for those of us who associate the "Wizard Book" with
@@ -32,19 +32,21 @@ This, then, is an assembler for those of us who associate the "Wizard Book" with
 
 ### Drawbacks
 
-Because of the way it is structured, as an assembler, TinkAsm is horribly
+Because of the way it is structured, as an assembler, TinkAsm is somewhat
 inefficient as an assembler. If you're in it for raw speed, this is not the
-assembler for you.
+assembler for you. Given the size of the data involved, this is probably not 
+a problem.
 
 TinkAsm assumes that there is one and one mnemonic for each opcode. This is why
 the assembler uses Typist's Assembler Notation (TAN) instead of traditional
 notation for these MPUs. 
 
+
 ### State of Development
 
-TinkAsm, though very much functional, is not fully tested. See the
-`docs/TODO.txt` file for features that are to be added soon and those that will
-come later. Suggestions are welcome. 
+TinkAsm, though very much functional, is not fully tested, and is being used for
+Liara Forth for the 65816. See the `docs/TODO.txt` file for features that are to
+be added soon and those that will come later. Suggestions are welcome. 
 
 
 ## Requirements 
@@ -58,7 +60,7 @@ TinkAsm requires Python 3.4 or later. It will not run with Python 2.7.
 
 **-ir**             - Save intermediate state of assembler to file `tink.ir`
 
-**-o --output**     - Output file for the binary code, default is `tink.bin`
+**-o --output**     - Other name for output file, otherwise it will be `tink.bin`
 
 **-l --listing**    - Create a line-by-line listing file `tink.lst` 
 
@@ -94,7 +96,7 @@ to TAN for details.
 
 TinkAsm and TAN try to ensure that all source files have the same formatting, a
 philosophy it takes from the Go programming language. An equivalent tool to Go's
-`gofmt` is planned. 
+`gofmt`, `tinkfmt.py`, is included. 
 
 
 ### Definitions
@@ -141,7 +143,8 @@ ice&fire        nop
                 jmp ice&fire
 ```
 Note that in contrast to other assemblers, labels do not have to end with a `:`. 
-You cannot have more than one label in the same line. 
+You cannot have more than one label in the same line. Internally, labels are
+moved to their own lines during processing.
 
 
 ### Anonymous Labels 
@@ -393,61 +396,28 @@ the code.
 
 ### Language and coding style
 
-(THIS SECTION IS OUT OF DATE AND WILL BE REWRITTEN)
-
 TinkAsm uses Python because it is one of the most widespread languages in use
 and is easy to understand even for those who don't know it ("executable
 pseudo-code"). 
 
-The coding style used can be described as "primitive" Python: It neither uses
-objects nor does it follow a functional paradigm. The code starts at the
-beginning, continues to the end, and then quits. This is an unusual choice in
-the 21. century and might turn out to be oversimplification. A more conventional
-rewrite will be considered after some experience with the code. In the meantime,
-this style makes pylint very unhappy. 
-
 
 ### Structure 
-
-(THIS SECTION IS OUT OF DATE AND WILL BE REWRITTEN)
 
 The program has the most simple structure possible: It starts at the beginning,
 runs to the end, and then stops. Everything is in one file, no external routines
 are loaded, and only system library files are referenced (got to have your
-batteries). There are no objects and no generators, and list comprehensions are
+batteries). There is exactly one class, generators and list comprehensions are
 used sparingly. There are no map or filter constructs. The code just
 brute-forces its way top-to-down.
 
 On the next lower level, TinkAsm is built up out of **steps** and **passes**.  A
-pass walks through the complete source code, while a step does something without
-touching everything. Each is a closed unit that ideally does one thing and one
-thing only. However, this is not a religion: For instance, the data structures
-such as `.word` and `.long` are all converted in one pass. 
+pass walks through the complete source code, while a step does something once.
+Each is a closed unit that ideally does one thing and one thing only. However,
+this is not a religion. 
 
-Information is transmitted from one step or pass to another through a **list of
-tuples.** The first element of the tuple always contains the original line
-number of the instruction so any problems can be referenced to the source code.
-The structure of the further elements depends on the pass. In the beginning, it
-is a simple string with the content of the source code line (the "payload").
-Later, status and address strings are added. For as long as possible, the source
-code passed on is kept human-readable. In the end, it is a list of binary data
-representing the machine code. 
-
-Information is only passed through these lists, not through "side channels". For
+Information is only passed through lists, not through "side channels". For
 example, we never define a flag in one pass to signal something to a pass lower
-down. This doesn't mean that the passes can't collect other information for
-later use. For instance, full-line comments are put in a separate list so that
-the list file can later access them. These, however, are not used by the
-following step but only at the end.
-
-(The sorta, kinda exception are counters for statistical use, for instance, how
-many macros are defined and expanded. These are defined at the beginning of the
-program to show that they are "global".) 
-
-Each pass starts by defining the empty list that will filled with the output of
-this stage. Processing the previous list is then handled by the next step or
-pass, modifying what needs to be changed, and then appending the processed
-line to the new list. 
+down. 
 
 ### Known Issues
 
@@ -467,7 +437,7 @@ README file in the directory `tinkfmt` for details.
 
 TinkAsm was inspired by Samuel A. Falvo II, who pointed me to a paper by Sarkar
 *et al*, ["A Nanopass Framework for Compiler Education"](
-https://www.google.de/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&cad=rja&uact=8&ved=0CCAQFjAAahUKEwi9-_29kffIAhWKVSwKHeM8CGk&url=http%3A%2F%2Fwww.cs.indiana.edu%2F~dyb%2Fpubs%2Fnano-jfp.pdf&usg=AFQjCNHxFyzbyfAHuc-cxgTggCzBbiI7bg&sig2=-YZn5Ztrh0Nj7-EoCMgL7A&bvm=bv.106674449,bs.2,d.bGg).
+http://www.cs.indiana.edu/~dyb/pubs/nano-jfp.pdf)
 The authors discuss using compilers with multiple small passes for educational
 purposes. 
 

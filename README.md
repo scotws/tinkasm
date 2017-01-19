@@ -10,9 +10,9 @@ Use at your own risk.
 
 "Easily modified" means that is is not an assembler based on lexers and parsers,
 but a large number of simple, single passes that modify one thing. It is also
-intentionally written in "primitive" Python (no objects, few list
-comprehensions, etc). The idea is to provide a base so hobbyists who are not
-computer scientists can play around with assemblers -- hence the name. 
+intentionally written in "primitive" Python. The idea is to provide a base so
+hobbyists who are not computer scientists can play around with assemblers --
+hence the name. 
 
 See `docs/MANUAL.txt` for further information.
 
