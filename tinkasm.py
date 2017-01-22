@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 19. Jan 2017
+# This version: 21. Jan 2017
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -2418,8 +2418,122 @@ verbose('STEP SAVE BINARY: Saved object code as {0}'.\
 # -------------------------------------------------------------------
 # STEP S28: Create S28 date file if requested
 
+# The Motorola S-Record file format is described at
+# https://en.wikipedia.org/wiki/SREC_(file_format) with further discussions at 
+# http://www.s-record.com/ and http://srecord.sourceforge.net/ A handy chart is
+# https://upload.wikimedia.org/wikipedia/commons/f/f1/Motorola_SREC_Chart.png
+
 if args.s28:
-    print('(So sorry, STEP S28 not implemented yet)')
+    
+    from binascii import unhexlify
+
+    # Keep these definitions here
+
+    def crc(s):
+        """Create an 8-bit checksum of a S-Record hexstring. Adapted from
+        https://github.com/eerimoq/bincopy/blob/master/bincopy.py
+        Returns result as string
+        """
+
+        # Make sure we really got a hex string
+        if not all(c in string.hexdigits for c in s):
+            print('Error: Got malformed hexstring {0}'.format(s))
+
+        cs = unhexlify(s)
+        cs = sum(bytearray(cs))
+        cs ^= 0xff
+        cs &= 0xff
+        cs = '{0:02x}'.format(cs)
+
+        return cs
+
+        
+    def make_s0(s):
+        """Given a string for the S0 header line, return a correctly formated 
+        S-Record line
+        """
+
+        if not s:
+            print('Error: No string for S0 provided')
+            sys.exit(1)
+
+        s = s.strip()
+        h_len = '{0:02x}'.format(len(s)+3)
+        h_address = '0000'
+        h_data = ''
+
+        for c in s:
+            h_data = h_data+'{0:02x}'.format(ord(c))
+
+        h_crc = crc(h_len+h_address+h_data)
+        h_all = ('S0'+h_len+h_address+h_data+h_crc).upper()
+
+        return h_all
+
+
+    def make_s2(s, n):
+        """Given up to 64 characters of data as a string and an address,
+        return a complete S2 record as a string
+        """
+
+        if (not n) or (not s):
+            print('Error: No address for S8 provided')
+            sys.exit(1)
+
+        h_data = s
+        h_len = '{0:02x}'.format(len(s)//2+4)
+        h_address = '{0:06x}'.format(n)
+        h_crc = crc(h_len+h_address+h_data)
+        h_all = ('S2'+h_len+h_address+h_data+h_crc).upper()
+
+        return h_all
+
+
+    def make_s8(n):
+        """Given the address to pass control to, return the S8 record
+        as a string
+        """
+
+        if not n:
+            print('Error: No address for S8 provided')
+            sys.exit(1)
+
+        h_len = '04'        # Always a length of four
+        h_address = '{0:06x}'.format(n)
+        h_crc = crc(h_len+h_address)
+
+        h_all = ('S8'+h_len+h_address+h_crc).upper()
+
+        return h_all
+
+
+    # We could just hard-code the data string but that would make it
+    # harder for other people to modify the code
+    data_string = 'https://github.com/scotws/tinkasm'
+    s0_line = make_s0(data_string)
+    s8_line = make_s8(LC0)
+
+    with open(S28_FILE, 'w') as f:
+        f.write(s0_line+'\n')
+
+        h_data = ''
+
+        for c in objectcode:
+            h_data = h_data+'{0:02x}'.format(c)
+
+        t = h_data
+        a = LC0
+
+        while t:
+            f.write(make_s2(t[:64], a)+'\n')
+            t = t[64:]
+            a += 32
+
+        f.write(s8_line+'\n')
+
+    n_steps += 1
+    verbose('STEP S28: Saved Motorola S-Record file {0} as requested'.\
+            format(S28_FILE))
 
 
 # -------------------------------------------------------------------
@@ -2464,6 +2578,7 @@ if args.listing:
             f.write(l+'\n') 
 
     verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
+
 
 # -------------------------------------------------------------------
 # STEP PRINT: Print listing to screen if requested
