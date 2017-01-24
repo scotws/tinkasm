@@ -1,12 +1,11 @@
 TODO List for A Tinkerer's Assember for the 6502/65c02/65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 19. Jan 2017
+This version: 24. Jan 2017
 
 ASAP:
-- Add ability to generate and output S28 format srecords 
-- See if .save needs own label line in listing code
 - Add ASCII output to hexdump
+- See if .save needs own label line in listing code
 
 FUTHER ALONG:
 - Add counts for 65816 mode and register size switches and other statistics
