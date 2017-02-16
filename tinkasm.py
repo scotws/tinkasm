@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 24. Jan 2017
+# This version: 17. Feb 2017
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -125,7 +125,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA 24. January 2017
+Version BETA 17. Feb 2017
 Copyright 2015-2017 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -1062,17 +1062,6 @@ verbose('PASS VALIDATE TYPE: All lines are of known type')
 # REQUIRES all types to have been identified
 # REQUIRES all types to be in a line of their own 
 
-# Keep this definition with its pass
-def remove_inlines(s):
-    """Given a string, remove any inline comment, defined by the comment char.
-    We only strip the right side because we need the whitespace on the left
-    later.  
-    """
-    non_comment = s.split(COMMENT_MARKER)[0].rstrip()
-    comment = s.replace(non_comment, '').strip()
-    return non_comment, comment
-
-
 for line in relabeled_source:
 
     if line.status == DONE:
@@ -1081,8 +1070,50 @@ for line in relabeled_source:
     # For the moment, we put "non_comment" (the actual directive or instructions
     # with any operands etc) in the parameters field
     if line.type == DIRECTIVE or line.type == INSTRUCTION:
-        line.parameters, line.il_comment = remove_inlines(line.raw)
-    
+
+        # Since we haven't converted strings to bytes yet, we might still have
+        # a COMMENT_MARKER in a string. To get those, we need to go a bit more
+        # low-level than we would have liked: Going from left to right, find the
+        # first COMMENT_MARKER in the line that is not inside a string and split
+        # there
+        
+        # First, though, we deal with the easy case:
+        if COMMENT_MARKER not in line.raw:
+            line.parameters = line.raw
+            continue 
+
+        # We now know that there is at least one COMMENT_MARKER somewhere in the
+        # line
+        ls = len(line.raw)
+        dq_count = 0    # number of double quote chars
+        sq_count = 0    # number of single quote chars
+        line.parameters = ''
+        line.il_comment = ''
+
+        for i in range(ls):
+
+            if line.raw[i] == '"':
+                dq_count += 1
+                continue
+
+            if line.raw[i] == "'":
+                sq_count += 1
+                continue
+
+            if line.raw[i] == COMMENT_MARKER:
+
+                # A COMMENT_MARKER is inside a string if there is an odd number
+                # of quotation marks to its left
+                if (dq_count % 2 == 0) and (sq_count % 2 == 0):
+
+                    line.parameters = line.raw[:i]
+                    line.il_comment = line.raw[i+1:].strip()
+                    break
+
+        if not line.parameters:
+            line.parameters = line.raw
+
+   
 n_passes += 1
 verbose('PASS INLINE COMMENTS: Isolated all inline comments')
 
