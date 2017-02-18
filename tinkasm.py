@@ -2263,7 +2263,12 @@ for line in ir_source:
    
     if line.action in BRANCHES[MPU]:
         _, target_addr = convert_number(line.parameters)
-        opr = hexstr(2, lsb(line, target_addr - line.address - 2))
+
+        try: 
+            opr = hexstr(2, lsb(line, target_addr - line.address - 2))
+        except TypeError:
+            fatal(line, 'TypeError while calculating branch adress') 
+
         line.bytes = hexstr(2, mnemonics[line.action])+' '+opr
         line.status = DONE
         continue
