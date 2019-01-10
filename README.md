@@ -2,6 +2,10 @@
 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 
+**THIS BRANCH USES TYPIST ASSEMBLER NOTATION (TAN), WHICH HAS BEEN SUPERCEDED BY
+SIMPLER ASSEMBLER NOTATION (SAN). IT IS RETAINED FOR HISTORICAL REASONS, AND
+WILL NOT RECEIVE BUGFIXES OR UPDATES.**
+
 This is a BETA version of a easily modified multi-pass assembler for the
 6502/65c02/65816 8/16-bit MPUs in Python 3. 
 
