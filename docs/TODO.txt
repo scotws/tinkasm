@@ -1,14 +1,13 @@
 TODO List for A Tinkerer's Assember for the 6502/65c02/65816 in Python 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 24. Sep 2015
-This version: 24. Jan 2017
+This version: 01. Mar 2016
 
 ASAP:
-- Add ASCII output to hexdump
 - See if .save needs own label line in listing code
 
 FUTHER ALONG:
-- Add counts for 65816 mode and register size switches and other statistics
+- Add byte/cycle count to each instruction in listing
 - Add parameters to macros
 - Allow modify & math to work with branch instructions (maybe)
 - Add advanced system macros (if/then/else, loops)
