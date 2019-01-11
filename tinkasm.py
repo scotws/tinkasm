@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 17. Feb 2017
+# This version: 11. Jan 2019
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,10 +19,8 @@
 """TinkAsm is a multi-pass assembler for the 6502/65c02/65816 MPUs. 
 It is intended to be easy to modify by hobbyists without advanced knowledge
 of how lexing and parsing works -- so they can "tinker" -- and is 
-intentionally written in a "primitive" style of Python. See doc/MANUAL.md for
-details.
+intentionally written in a "primitive" style of Python.
 """
-
 ### SETUP ###
 
 import argparse
@@ -125,8 +123,8 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA 17. Feb 2017
-Copyright 2015-2017 Scot W. Stevenson <scot.stevenson@gmail.com>
+Version BETA 11. Jan 2019
+Copyright 2015-2019 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
 
@@ -138,10 +136,10 @@ SEPARATORS = '[.:]'  # Legal separators in number strings for regex
 
 HEX_PREFIX = '$'     # Prefix for hexadecimal numbers, default is "$"
 BIN_PREFIX = '%'     # Prefix for binary numbers, default is "%"
-DEC_PREFIX = '&'     # Prefix for decimal numbers, default "&"
+DEC_PREFIX = '&'     # Prefix for decimal numbers, default "&" TODO
 
-LEFTMATH = '{'       # Opening bracket for Python math terms
-RIGHTMATH = '}'      # Closing bracket for Python math terms
+LEFTMATH = '{'       # Opening bracket for Python math terms TODO
+RIGHTMATH = '}'      # Closing bracket for Python math terms TODO
 
 INDENT = ' '*8       # Indent in whitespace for formatting
 
@@ -154,7 +152,7 @@ IR_FILE = 'tink.ir'       # Default name of IR file
 S28_FILE = 'tink.s28'     # Default name of S28 file
 
 # We store the general lists here, those specific to one processor type are put
-# in the relevant passes
+# in the relevant passes.
 SUPPORTED_MPUS = ['6502', '65c02', '65816']
 DATA_DIRECTIVES = ['.byte', '.word', '.long']
 
@@ -201,7 +199,6 @@ class CodeLine:
 
 # List of all directives. Note the anonymous label character is not included
 # because this is used to keep the user from using these words as labels
-
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
         '.end', ASSIGNMENT, '.byte', '.word', '.long', '.advance', '.skip',\
         '.native', '.emulated', '.mpu', '.save',\
@@ -277,10 +274,10 @@ def convert_number(s):
     s1 = re.sub(SEPARATORS, '', s)
 
     # By default, all numbers are hexadecimal. See if we were given a different
-    # number such as "%01010000". Default is hex.
+    # number such as "%01010000". Default is hex. TODO add '0x'
     c = s1[0]
 
-    if c == DEC_PREFIX: # usually '&'
+    if c == DEC_PREFIX: # usually '&' TODO 
         BASE = 10
         s2 = s1[1:]
     elif c == BIN_PREFIX: # usually '%'
@@ -311,7 +308,8 @@ def convert_number(s):
 # the this function because is EVAL is dangerous (and possibly even evil). Math
 # operators and even round brances must be separated by whitespace, so "{1
 # * ( 2 + 2 )}" is legal, while "{(1*(2+2)}" will throw an error.  Note the MVP
-# and MVN instructions of the 65816 are treated separately.
+# and MVN instructions of the 65816 are treated separately. TODO replace by
+# stack
 
 LEGAL_MATH = ['+', '-', '/', '//', '*', '(', ')',\
         '%', '**', '|', '^', '&', '<<', '>>', '~']
@@ -625,6 +623,7 @@ def listing_label(l):
     """Template for a line object that contains a label, returns a string. 
     Assumes that the header will be added by calling program.
     """
+    # TODO add colon at end of label
 
     s = ' {0:6} |             | {1:36} {2}'.\
              format(hide_zero_address(l.address), l.action, l.il_comment)
@@ -767,8 +766,8 @@ verbose('STEP LOAD: Read {0} lines from {1}'.\
 #
 # REQUIRED as first step of processing
 
-# The .include directive must be alone in the line and the second string must
-# be the name of the file without any spaces or quotation marks. Note that this
+# The .include directive must be alone in the line and the second string must be
+# the name of the file without any spaces or quotation marks. Note that this
 # means there will be no .include directives visible in the code listings, since
 # everything will be one big file
 
@@ -785,15 +784,15 @@ for line in raw_source:
     if len(w) > 1 and w[0].lower() == '.include':
 
         # Keep the line number of the .include directive for later reference
-        # But add secondary line numbers for reference
-        with open(w[1], 'r') as f:
+        # but add secondary line numbers for reference
+        with open(w[1], 'r') as f: 
+
             for sln, ls in enumerate(f.readlines(), 1): 
                 nl = CodeLine(ls.rstrip(), line.ln, sln)
                 expanded_source.append(nl)
 
         n_external_files += 1
         verbose('- Included code from file "{0}"'.format(w[1]))
-
     else:
         expanded_source.append(line)
 
@@ -936,11 +935,12 @@ verbose('- Number of mnemonics found: {0}'.format(len(mnemonics.keys())))
 # REQUIRES list of legal mnemonics available
 # ASSUMES all empty lines have been taken care of 
 
-# Though Typist's Assembler Notation requires labels to be in a separate line,
+# Though Simpler Assembler Notation requires labels to be in a separate line,
 # we should be able to assemble code that hasn't been correctly formatted.
 # Since we have gotten rid of the full-line comments, anything that is in the
 # first column and is not whitespace is then considered a label. We don't
 # distinguish between global and anonymous labels at this point
+# TODO labels end in a colon now
 
 relabeled_source = []
 
@@ -961,6 +961,8 @@ for line in expanded_source:
     # lines
     w = line.raw.split()
     w1 = w[0]
+
+    # TODO change: we only have to check if the word ends with a ':'
 
     # Directives start with a dot. We just remember that we've found one, but
     # don't process it yet
@@ -1036,7 +1038,7 @@ verbose('PASS SPLIT LABELS: Split lines that have code following their labels')
 # CLAIM: All labels should now be in a line of their own. Also, all directives
 # and instruction lines should be identified 
 
-verbose('CLAMING all labels should be in a line of their own')
+verbose('CLAMING all labels are in a line of their own')
 
 
 # -------------------------------------------------------------------
@@ -1541,7 +1543,6 @@ for line in ir_source:
 
     line.status = DONE
     break
-        
 
 n_steps += 1
 verbose('STEP ORIGIN: Found ."origin" directive, starting code at {0:06x}'.\
@@ -1730,7 +1731,6 @@ if MPU == '65816':
     register_asserts = ['.!a8', '.!a16', '.!xy8', '.!xy16', '.!axy8',\
             '.!axy16']
 
-
     for line in ir_source: 
 
         # We walk though all lines, not only instructions, which is probably
@@ -1815,9 +1815,9 @@ for line in ir_source:
 
     # --- SUBSTEP MNEMONIC: See if we have a mnemonic ---
 
-    # Because we are using Typist's Assembler Notation and every mnemonic
+    # Because we are using Simpler Assembler Notation and every mnemonic
     # maps to one and only one opcode, we don't have to look at the operand of
-    # the instruction at all, which is a lot simpler
+    # the instruction at all, which is really nice
 
     if line.action in mnemonics:
 
@@ -1937,7 +1937,7 @@ for line in ir_source:
             continue
 
         # If it is already known, something went wrong, because we can't
-        # redefine a label, because that gets really confusing very fast
+        # redefine a label, because that gets very confusing very fast
         else:
             fatal(line, 'Attempt to redefine symbol "{0}" in line {1}'.\
                     format(line.action, line.ln))
@@ -2036,7 +2036,7 @@ n_passes += 1
 # CLAIM: At this point we should have all symbols present and known in the
 # symbol table, and anonymous labels in the anonymous label list
 
-verbose('CLAMING that all symbols should now be known')
+verbose('CLAMING that all symbols are now known')
 
 
 # -------------------------------------------------------------------
@@ -2206,7 +2206,7 @@ verbose('PASS ANONYMOUS: Replaced all anonymous labels with address values')
 # CLAIM: At this point we should have completely replaced all labels and
 # symbols with numerical values.
 
-verbose('CLAMING there should be no labels or symbols left in the source')
+verbose('CLAMING there are no labels or symbols left in the source')
 
 
 # -------------------------------------------------------------------
@@ -2224,7 +2224,6 @@ for line in ir_source:
     except KeyError:
         continue 
     else:
-
         if opcode_table[oc][2] == 1:    # look up length of instruction
             line.bytes = hexstr(2, oc)
             line.status = DONE
@@ -2261,6 +2260,7 @@ for line in ir_source:
         line.status = DONE
         continue
    
+    # Everything else gets done here
     if line.action in BRANCHES[MPU]:
         _, target_addr = convert_number(line.parameters)
 
@@ -2376,7 +2376,6 @@ for line in ir_source:
     bl = line.bytes.split()
 
     for b in bl:
-
         f_num, r = convert_number(b)
 
         if not f_num:
@@ -2406,6 +2405,7 @@ for line in ir_source:
     if line.type == INSTRUCTION: 
 
         # --- SUBSTEP WDM: Check to see if we have WDM instruction --- 
+        # TODO make sure this doesn't find WDM in data
         ws = line.bytes
 
         if w[0] == '42':
@@ -2641,4 +2641,3 @@ verbose('Enjoy your cake.')
 sys.exit(0)
 
 ### END ###
-
