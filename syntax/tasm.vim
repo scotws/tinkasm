@@ -132,7 +132,6 @@ syn match tasmNumber ' \x\+ ' display
 syn match tasmNumber ' [-+]\x+ ' display 
 
 
-
 " === All Other Definitions ===
 
 " Define comments
@@ -142,6 +141,7 @@ syn match tasmComment "\v;.*$"
 syn region tasmString start='"' end='"'
 
 " Define Python Code Instert
+" TODO change this to [ ] and rename it 'stackMath'
 syn region pythonString start='{' end='}'
 
 " === Define our own color system === 
