@@ -1,10 +1,11 @@
 ; A Tinkerer's Assembler for the 6502/65c02/65816
 ; Syntax demonstration for the 65816
+; Transfered to SAN  11. Jan 2019
 
         .mpu 65816
-        .ORIGIN e000
+        .ORIGIN 0xe000
 
-        .advance 00e00a
+        .advance 0x00:e00a
 
         .macro frog
                 inx     ; first macro line
@@ -13,15 +14,15 @@
 
         .equ frog 0000
         .equ cat frog
-        .equ pig { frog + 1 }
+        .equ pig [ frog 1 + ]
         .equ fish .lsb frog
-        .equ goat .msb { pig + 2 }
+        .equ goat .msb [ pig 2 + ]
 
-solo_label
+solo_label:
                 lda.# 00        ; my inline-comment
                 lda.# .lsb frog
-                lda.# { 0 + 0 }
-                lda.# .msb { &10 + &200 }
+                lda.# [ 0 0 + ]
+                lda.# .msb [ $10 $200 + ]
                 lda.l .*
                 BRA.L solo_label  ; upper case bra.l
                 jmp full
@@ -34,11 +35,11 @@ solo_label
                 mvp 00,01       ; mvp 00,01
 
         .skip 5
-        .skip { frog + 5 }
+        .skip [ frog 5 + ]
         
         ; another comment, indented
 
-lbl+comment ; I'm the comment
+lbl+comment: ; I'm the comment
 
         .EMULATED  ; upper case!
 @
@@ -46,12 +47,12 @@ lbl+comment ; I'm the comment
         .a16       ; another inline-comment
         .xy16
                 bra -   ; anon branch backwards
-                lda.# { 0 + 0 }
+                lda.# [ 0 0 + ]
 
-full    .a8     ; label with directive and comment
+full:   .a8     ; label with directive and comment
         .!a8
-fuller          lda.# 00  ; label with instruction and comment
-                lda.# { 0 + 0 }
+fuller:         lda.# 00  ; label with instruction and comment
+                lda.# [ 0 0 + ]
 
         .invoke frog 
         .include includeme.tasm
@@ -59,8 +60,9 @@ fuller          lda.# 00  ; label with instruction and comment
         .byte 00
         .word 0000
         .long 00:0000
-        .byte 1, %00000010, &2, 'a', "aaa", .lsb { frog + 11 }
+        .byte 1, %00000010, 2, 'a', "aaa", .lsb [ frog 11 + ]
         .word 1000, frog, 3000,    ; test trailing comma
-        .long 01aaaa, 02bbbb, 03cccc, 04dddd, 05eeee, 06ffff
+        .long 0x01aaaa, 0x02bbbb, 0x03cccc, 0x04dddd, 0x05eeee, 0x06ffff
+        .long $01aaaa, $02bbbb, $03cccc, $04dddd, $05eeee, $06ffff
 
         .end
