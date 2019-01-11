@@ -1,39 +1,39 @@
 ; Data Test for TinkAsm 
 ; Scot W. Stevenson <scot.stevenson@gmail.com>
 ; First version: 26. Aug 2016
-; This version: 26. Aug 2016
+; This version: 11. Jan 2019
 
     .mpu 65816
     .origin 0x0e000
 
     .byte 1, 2, 3
     .byte %00000001, %00000010, %00000011
-    .byte &10, &20, &30
+    .byte 10, 20, 30
     .byte 'a', 'b', 'c'
     .byte "aaa", "bbb", "ccc"
-    .byte { 1 + 0 }, { 1 + 1 }, { 1 + 2 }
+    .byte [ 1 0 + ], [ 1 1 + ], [ 1 2 + ]
     .byte .lsb 302010, .msb 302010, .bank 302010
-    .byte .lsb { 8000 + 1 }, .msb { 8000 + 2 }, .bank 800000
+    .byte .lsb [ $8000 1 + ], .msb [ $8000 2 + ], .bank $800000
 
     .word 1, 2, 3
     .word 2211, 4433
     .word %00000001, %00000010, %00000011
-    .word &10, &20, &30
+    .word 10, 20, 30
     .word 'a', 'b', 'c'
     .word "aaa", "bbb", "ccc"
-    .word { 1 + 0 }, { 1 + 1 }, { 1 + 2 }
+    .word [ 1 0 + ], [ 1 1 + ], [ 1 2 + ]
     .word .lsb 302010, .msb 302010, .bank 302010
-    .word .lsb { 8000 + 1 }, .msb { 8000 + 2 }
+    .word .lsb [ $8000 1 + ], .msb [ $8000 2 + ]
 
     .long 1, 2, 3
     .long 332211, 665544
     .long %00000001, %00000010, %00000011
-    .long &10, &20, &30
+    .long 10, 20, 30
     .long 'a', 'b', 'c'
     .long "aaa", "bbb", "ccc"
-    .long { 1 + 0 }, { 1 + 1 }, { 1 + 2 }
+    .long [ 1 0 + ], [ 1 1 + ], [ 1 2 + ]
     .long .lsb 302010, .msb 302010, .bank 302010
-    .long .lsb { 8000 + 1 }, .msb { 8000 + 2 }
+    .long .lsb [ $8000 1 + ], .msb [ $8000 2 + ]
 
     .end 
  

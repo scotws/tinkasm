@@ -1,12 +1,13 @@
 ; Test file for .byte formats, 65c02
 ; A Tinkerer's Assembler for the 6502/65c02/65816
+; Converted from TAN to SAN 11. Jan 2019
 
         .mpu 65c02
         .origin e000
 
                 lda.# 00
                 tax
-loop            sta.x 1000
+loop:           sta.x 0x1000
                 dex
                 bne loop
 
@@ -14,6 +15,6 @@ loop            sta.x 1000
 
         .include includeme.tasm
 
-        .word 3000, 4000, 5000
+        .word 0x3000, 0x4000, 0x5000
 
         .end
