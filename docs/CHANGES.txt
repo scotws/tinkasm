@@ -1,8 +1,10 @@
 Major changes to the Tinkerer's Assembler for the 6502/65c02/65816
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 27. Oct 2015
-This version: 19. Jan 2017
+This version: 11. Jan 2019
 
+11. Jan 2019 - Begin of rewrite: Move from TAN to SAN, update to more modern
+        Python (f-strings)
 19. Jan 2017 - Major rewrite, moving away from "save as little information as
         possible" to "save as much information as possible", allowing far clearer
         code and much more useful listing files.

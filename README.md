@@ -2,8 +2,11 @@
 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 
+**THIS BRANCH IS CURRENTLY BEING REWRITTEN AND IS NOT STABLE**
+
 This is a BETA version of a easily modified multi-pass assembler for the
-6502/65c02/65816 8/16-bit MPUs in Python 3. 
+6502/65c02/65816 8/16-bit MPUs in Python 3. It uses Simpler Assembler Notation
+(SAN), see https://github.com/scotws/SAN for details. 
 
 BETA means "it should probably all work as intended, but it probably doesn't".
 Use at your own risk. 
