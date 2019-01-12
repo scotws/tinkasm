@@ -321,17 +321,17 @@ byte" for 16-bit values, but the rest of the world uses "word".
 `.a8` and `.a16` - Switch the size of the A register to 8 or 16 bit. The switch
 to 16 bit only works in native mode. These insert the required instructions
 as well as the internal control sequences (see below) and should be used instead
-of directly coding the `rep`/`sep` instructions.
+of directly coding the `rep.#`/`sep.#` instructions.
 
 `.xy8` and `.xy16` - Switch the size of the X and Y registers to 8 or 16 bit.
 The switch to 16 bit only works in native mode. These insert the required instructions
 as well as the internal control sequences (see below) and should be used instead
-of directly coding the `rep`/`sep` instructions.
+of directly coding the `rep.#`/`sep.#` instructions.
 
 `.axy8` and `.axy16` - Switch the size of the A, X, and Y registers to 8 or 16
 bit. The switch to 16 bit only works in native mode. These insert the required instructions
 as well as the internal control sequences (see below) and should be used instead
-of directly coding the `rep`/`sep` instructions.
+of directly coding the `rep.#`/`sep.#` instructions.
 
 `.emulated` - Switch the MPU to emulated mode, inserting the required
 instructions and control sequences. Use this directive instead of directly

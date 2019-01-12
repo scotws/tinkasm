@@ -86,15 +86,15 @@ def hexstr(n, i):
         fmtstr = '{0:0'+str(n)+'x}'
         return fmtstr.format(i & 0x0ffffff)
     except TypeError as err:
-        fatal(line, 'TypeError in hexstr for "{0}": {1}'.format(i, err)) 
+        fatal(line, 'TypeError in hexstr for "{i}": {err}') 
 
 def fatal(line, s):
     """Abort program because of fatal error during assembly.
     """
     if line.sec_ln == 0: 
-        print('FATAL ERROR line {0} - {1}'.format(line.ln, s))
+        print(f'FATAL ERROR line {line.ln} - {s}')
     else: 
-        print('FATAL ERROR line {0}:{1} - {2}'.format(line.ln, line.sec_ln, s))
+        print(f'FATAL ERROR line {line.ln}:{line.sec_ln} - {s}')
     sys.exit(1)
 
 def verbose(s):
@@ -108,7 +108,7 @@ def suggestion(n, s):
     """Print a suggestion of how the code could be better. This is to
     be used in the analysis pass.
     """
-    print('SUGGESTION: {0} in line {1}'.format(s, n))
+    print(f'SUGGESTION: {s} in line {n}')
 
 def warning(s):
     """If program called with -w or --warnings, print a warning string.
@@ -116,7 +116,7 @@ def warning(s):
     global n_warnings
     n_warnings += 1
     if args.warnings:
-        print('WARNING: {0}'.format(s))
+        print(f'WARNING: {s}')
 
 
 ### CONSTANTS ###
@@ -215,7 +215,7 @@ def lsb(line, n):
     try: 
         t = n & 0xff
     except TypeError:
-        fatal(line, "Can't convert '{0}' to lsb".format(n))
+        fatal(line, f"Can't convert '{n}' to lsb")
     else:
         return t
 
@@ -224,7 +224,7 @@ def msb(line, n):
     try: 
         t = (n & 0xff00) >> 8
     except TypeError: 
-        fatal(line, "Can't convert '{0}' to msb".format(n))
+        fatal(line, f"Can't convert '{n}' to msb")
     else:
         return t
 
@@ -233,7 +233,7 @@ def bank(line, n):
     try: 
         t = (n & 0xff0000) >> 16
     except TypeError: 
-        fatal(line, "Can't convert '{0}' to bank".format(n))
+        fatal(line, f"Can't convert '{n}' to bank")
     else:
         return t
 
@@ -339,7 +339,7 @@ def sanitize_math(s):
         try:
             r = symbol_table[w.lower()]
         except KeyError:
-            fatal(line, 'Illegal term "{0}" in math term'.format(w))
+            fatal(line, f'Illegal term "{w}" in math term')
         else:
             evalstring.append(str(r))
 
@@ -373,18 +373,16 @@ def vet_newsymbol(s):
     # We don't allow using directives as symbols because that gets very
     # confusing really fast
     if s in DIRECTIVES:
-        fatal(line, 'Directive "{0}" cannot be redefined as a symbol'.\
-                format(s))
+        fatal(line, 'Directive "{s}" cannot be redefined as a symbol')
 
     # We don't allow using mnemonics as symbols because that screws up other
     # stuff and is really weird anyway
     if s in mnemonics.keys(): 
-        fatal(line, 'Mnemonic "{0}" cannot be redefined as a symbol'.\
-                format(s))
+        fatal(line, f'Mnemonic "{s}" cannot be redefined as a symbol')
 
     # We don't allow redefining existing symbols, this catches various errors 
     if s in symbol_table.keys():
-        fatal(line, 'Symbol "{0}" already defined'.format(s))
+        fatal(line, f'Symbol "{s}" already defined')
 
 
 def replace_symbols(src):
@@ -423,8 +421,7 @@ def replace_symbols(src):
 
         line.parameters = ' '.join(wc)
 
-    verbose('PASS REPLACED: Replaced {0} known symbol(s) with known values'.\
-            format(sr_count))
+    verbose('PASS REPLACED: Replaced {sr_count} known symbol(s) with known values')
 
 
 def dump_symbol_table(st, s=""):
@@ -504,7 +501,7 @@ def convert_term(line, s):
         return r 
 
     # --- SUBSTEP OOPS: If we made it to here, something is wrong ---
-    fatal(line, 'Cannot convert term "{0}"'.format(s))
+    fatal(line, f'Cannot convert term "{s}"')
 
 
 ### OUTPUT DEFINITIONS ###
@@ -659,23 +656,23 @@ def make_listing(src):
     # Header
 
     listing.append(TITLE_STRING)
-    listing.append('Code listing for file {0}'.format(args.source))
-    listing.append('Generated on {0}'.format(time.asctime(time.localtime())))
-    listing.append('Target MPU: {0}'.format(MPU))
+    listing.append(f'Code listing for file {args.source}')
+    listing.append(f'Generated on {time.asctime(time.localtime())}')
+    listing.append(f'Target MPU: {MPU}')
 
 
     if n_external_files != 0:
-        listing.append('External files loaded: {0}'.format(n_external_files))
+        listing.append(f'External files loaded: {n_external_files}')
 
-    listing.append('Number of passes executed: {0}'.format(n_passes))
-    listing.append('Number of steps executed: {0}'.format(n_steps))
+    listing.append(f'Number of passes executed: {n_passes}')
+    listing.append(f'Number of steps executed: {n_steps}')
     time_end = timeit.default_timer()
     listing.append('Assembly time: {0:.5f} seconds'.format(time_end - time_start))
 
     if n_warnings != 0:
-        listing.append('Warnings generated: {0}'.format(n_warnings))
+        listing.append(f'Warnings generated: {n_warnings}')
     listing.append('Code origin: {0:06x}'.format(LC0))
-    listing.append('Bytes of machine code: {0}'.format(code_size))
+    listing.append(f'Bytes of machine code: {code_size}')
 
     # Code listing
     listing.append('\nLISTING:')
@@ -698,10 +695,10 @@ def make_listing(src):
     if len(macros) > 0:
 
         for m in macros.keys():
-            listing.append('Macro "{0}"'.format(m))
+            listing.append(f'Macro "{m}"')
 
             for ml in macros[m]:
-                listing.append('    {0}'.format(ml.action))
+                listing.append(f'    {ml.action}')
 
     else:
         listing.append(INDENT+'(none)')
@@ -756,8 +753,7 @@ with open(args.source, "r") as f:
         raw_source.append(line)
 
 n_steps += 1
-verbose('STEP LOAD: Read {0} lines from {1}'.\
-        format(len(raw_source), args.source))
+verbose(f'STEP LOAD: Read {raw_source} lines from {args.source}')
 
 
 # -------------------------------------------------------------------
@@ -792,12 +788,12 @@ for line in raw_source:
                 expanded_source.append(nl)
 
         n_external_files += 1
-        verbose('- Included code from file "{0}"'.format(w[1]))
+        verbose(f'- Included code from file "{w[1]}"')
     else:
         expanded_source.append(line)
 
 n_passes += 1
-verbose('PASS INCLUDE: Added {0} external file(s)'.format(n_external_files))
+verbose(f'PASS INCLUDE: Added {n_external_files} external file(s)')
 
 
 # -------------------------------------------------------------------
@@ -817,7 +813,7 @@ for line in expanded_source:
         n_empty_lines += 1
 
 n_passes += 1
-verbose('PASS EMPTY: Found {0} empty line(s)'.format(n_empty_lines))
+verbose(f'PASS EMPTY: Found {n_empty_lines} empty line(s)')
 
 
 # -------------------------------------------------------------------
@@ -837,7 +833,7 @@ for line in expanded_source:
         n_comment_lines +=1
 
 n_passes += 1
-verbose('PASS COMMENTS: Found {0} full-line comment(s)'.format(n_comment_lines))
+verbose(f'PASS COMMENTS: Found {n_comment_lines} full-line comment(s)')
 
 
 # -------------------------------------------------------------------
@@ -875,13 +871,13 @@ for line in expanded_source:
         break
 
 if MPU not in SUPPORTED_MPUS:
-    fatal(line, 'MPU "{0}" not supported'.format(MPU))
+    fatal(line, f'MPU "{MPU}" not supported')
 
 if not MPU:
     fatal(line, 'No ".mpu" directive found')
 
 n_passes += 1
-verbose('PASS MPU: Found MPU "{0}", is supported'.format(MPU))
+verbose(f'PASS MPU: Found MPU "{MPU}", is supported')
 
 
 # -------------------------------------------------------------------
@@ -907,7 +903,7 @@ if len(opcode_table) != 256:
         format(len(opcode_table)))
 
 n_steps += 1
-verbose('STEP OPCODES: Loaded opcode table for MPU {0}'.format(MPU))
+verbose(f'STEP OPCODES: Loaded opcode table for MPU {MPU}')
 
 
 # -------------------------------------------------------------------
@@ -925,7 +921,7 @@ if MPU != '65816':
 
 n_steps += 1
 verbose('STEP MNEMONICS: Generated mnemonics list')
-verbose('- Number of mnemonics found: {0}'.format(len(mnemonics.keys())))
+verbose(f'- Number of mnemonics found: {len(mnemonics.keys())}')
 
 
 # -------------------------------------------------------------------
@@ -1027,8 +1023,7 @@ for line in expanded_source:
 
     # If we reach this point, we have something weird on the new line and give
     # up with a fatal error
-    fatal(line, 'Unidentified characters "{0}" after label'.\
-            format(rest_of_line))
+    fatal(line, f'Unidentified characters "{rest_of_line}" after label')
 
 n_passes += 1
 verbose('PASS SPLIT LABELS: Split lines that have code following their labels')
@@ -1333,8 +1328,7 @@ if MPU == '65816':
         try:
             l_bank, r_bank = line.parameters.split(',')
         except ValueError:
-            fatal(line, 'Malformed "{0}" instruction ("{1}")'.\
-                    format(line.action, line.parameters))
+            fatal(line, f'Malformed "{line.action}" instruction ("{line.parameters}")')
 
         line.parameters = l_bank
         line.status = MODIFIED
@@ -1374,14 +1368,13 @@ for line in move_source:
             macro_name = line.parameters.strip() 
             macros[macro_name] = []
             are_defining = True
-            verbose('- Found macro "{0}" in line {1}'.format(macro_name, line.ln))
+            verbose(f'- Found macro "{macro_name}" in line {line.ln}')
             line.status = DONE
     else:
 
         # Currently, we don't allow nesting
         if line.action == '.macro':
-            fatal(line, 'Illegal Attempt to nest macro "{0}"'\
-                    .format(line.parameters))
+            fatal(line, f'Illegal Attempt to nest macro "{line.parameters}"')
 
         # Remember this line so we can invoke it later
         if line.action != ".endmacro":
@@ -1403,11 +1396,11 @@ for line in move_source:
             continue
 
 n_passes += 1
-verbose('STEP MACROS: Defined {0} macros'.format(len(macros)))
+verbose(f'STEP MACROS: Defined {len(macros)} macros')
 
 # TODO pretty format this
 for m in macros.keys():
-    verbose('Macro {0}:'.format(m))
+    verbose(f'Macro {m}:')
 
     for ml in macros[m]:
         verbose('- {0:04}:{1:03} | {2} {3} | {4:11}|{5:11}|{6:11} {7}||'\
@@ -1433,19 +1426,17 @@ for line in move_source:
     try:
         m = macros[line.parameters.strip()]
     except KeyError:
-        fatal(line, 'Attempt to invoke non-existing macro "{0}"'.format(line.action))
+        fatal(line, f'Attempt to invoke non-existing macro "{line.action}"')
 
     for ml in m:
         macro_source.append(ml)
         ml.status = MODIFIED
         ml.ln = line.ln
         ml.sec_ln = 1   
-        ml.raw = '; Invoked from macro "{0}" in line {1}'.\
-                format(line.action, line.ln)
+        ml.raw = f'; Invoked from macro "{line.action}" in line {line.ln}'
 
     n_invocations += 1
-    verbose('- Expanding macro "{0}" into line {1}'.\
-            format(line.parameters, line.ln))
+    verbose(f'- Expanding macro "{line.parameters}" into line {line.ln}')
 
 post_invok_len = len(macro_source)
 n_passes += 1
@@ -1513,7 +1504,7 @@ if args.ir:
             f.write(l+'\n')
 
 n_steps += 1
-verbose('- IR saved to file {0}'.format(IR_FILE))
+verbose(f'- IR saved to file {IR_FILE}')
 
 
 # -------------------------------------------------------------------
@@ -1558,8 +1549,7 @@ s = ir_source[len(ir_source)-1]
 sa = s.action.strip().lower() 
 
 if sa != '.end':
-    fatal(s, "Can't find '.end' directive in last line, found '{0}'".\
-            format(s.raw))
+    fatal(s, f"Can't find '.end' directive in last line, found '{s.raw}'")
 
 s.status = DONE
 
@@ -1610,8 +1600,7 @@ for line in ir_source:
         line.status = DONE
 
 n_passes += 1
-verbose('PASS SIMPLE ASSIGN: Assigned {0} new symbol(s) to symbol table'.\
-        format(len(symbol_table)))
+verbose(f'PASS SIMPLE ASSIGN: Assigned {len(symbol_table)} new symbol(s) to symbol table')
 
 # Print symbol table
 if args.verbose:
@@ -1654,8 +1643,7 @@ for line in ir_source:
 
     # The save directive may not have a string as a parameter
     if line.action == '.save':
-        fatal(line, 'Found {0} in ".save" directive, may not be string'.\
-                format(line.parameters))
+        fatal(line, f'Found {line.parameters} in ".save" directive, may not be string')
 
     ma = p.findall(line.parameters)
 
@@ -1667,8 +1655,7 @@ for line in ir_source:
         # character, use 'a' instead, see next step
         if len(m) == 3:
             fatal(line,\
-                    "Found single-character string {0}, use 'x' for chars".\
-                    format(m))
+                    f"Found single-character string {m}, use 'x' for chars")
 
         line.parameters = line.parameters.replace(m, string2bytestring(m))
         line.status = MODIFIED
@@ -1767,9 +1754,8 @@ if MPU == '65816':
         line.xy_width = current_xy_width
 
     n_passes += 1
-    verbose('PASS REGISTER SWITCHES: Found {0} A/XY width change(s)'.\
-            format(n_switches))
-        
+    verbose(f'PASS REGISTER SWITCHES: Found {n_switches} A/XY width change(s)')
+
  
 # -------------------------------------------------------------------
 # PASS LABELS - Construct symbol table by finding all labels
@@ -1854,8 +1840,7 @@ for line in ir_source:
         line.status = DONE
         line.address = LC0+LCi
 
-        verbose('- Converted ".skip" in line {0} to {1} zero byte(s)'.\
-                format(line.ln, r))
+        verbose(f'- Converted ".skip" in line {line.ln} to {r} zero byte(s)')
 
         LCi += line.size
         continue
@@ -1884,8 +1869,7 @@ for line in ir_source:
         line.status = DONE
         line.address = LC0+LCi
         
-        verbose('- Converted ".save" in line {0} to {1} zero byte(s)'.\
-                    format(line.ln, r))
+        verbose(f'- Converted ".save" in line {line.ln} to {r} zero byte(s)')
         LCi += line.size
         continue
 
@@ -1939,8 +1923,7 @@ for line in ir_source:
         # If it is already known, something went wrong, because we can't
         # redefine a label, because that gets very confusing very fast
         else:
-            fatal(line, 'Attempt to redefine symbol "{0}" in line {1}'.\
-                    format(line.action, line.ln))
+            fatal(line, f'Attempt to redefine symbol "{line.action}" in line {line.ln}')
 
 
     # --- SUBSTEP DATA: See if we were given data to store ---
@@ -2156,7 +2139,7 @@ for line in ir_source:
                 if f_num:
                     w = hexstr(6, MODIFIERS[w](line, r))
                 else: 
-                    fatal(line.ln, 'Modifier operand "{0}" not a number'.format(w))
+                    fatal(line.ln, f'Modifier operand "{w}" not a number')
 
             new_p = new_p + ' ' + w
              
@@ -2342,8 +2325,7 @@ for line in ir_source:
         bl = little_endian_24(line, opr)
     else:
         # This should never happen, obviously, but we're checking anyway
-        fatal(line, 'Found {0} byte instruction in opcode list'.\
-                format(line.size))
+        fatal(line, f'Found {line.size} byte instruction in opcode list')
 
     # Reassemble payload as a byte instruction
     line.bytes = hexstr(2, oc) + ' ' + ' '.join([hexstr(2, i) for i in bl])
@@ -2358,8 +2340,7 @@ n_passes += 1
 for line in ir_source:
 
     if line.status != DONE:
-        fatal(line, 'There is something strange and unknown in line "{0}"'.\
-                format(line.ln))
+        fatal(line, f'There is something strange and unknown in line "{line.ln}"')
 
 n_passes += 1
 verbose('PASS VALIDATE: Confirmed that all lines are done')
@@ -2379,10 +2360,10 @@ for line in ir_source:
         f_num, r = convert_number(b)
 
         if not f_num:
-            fatal(line, 'Found non-number "{0}" in byte list'.format(b))
+            fatal(line, f'Found non-number "{b}" in byte list')
 
         if r > 0xff or r < 0:
-            fatal(line, 'Value "{0}" refuses to fit into one byte'.format(b))
+            fatal(line, f'Value "{b}" refuses to fit into one byte')
 
 n_passes +=1
 verbose('PASS BYTE CHECK: Confirmed all byte values are in range from 0 to 255')
@@ -2436,8 +2417,7 @@ objectcode = bytes(byte_list)
 code_size = len(objectcode)
 
 n_passes += 1
-verbose('PASS BINARY: Combined byte lists to {0} bytes of final code'.\
-        format(len(objectcode)))
+verbose(f'PASS BINARY: Combined byte lists to {len(objectcode)} bytes of final code')
 
 
 # -------------------------------------------------------------------
@@ -2447,8 +2427,7 @@ with open(args.output, 'wb') as f:
     f.write(objectcode)
 
 n_steps += 1
-verbose('STEP SAVE BINARY: Saved object code as {0}'.\
-        format(args.output))
+verbose(f'STEP SAVE BINARY: Saved object code as {args.output}')
 
 
 # -------------------------------------------------------------------
@@ -2473,7 +2452,7 @@ if args.s28:
 
         # Make sure we really got a hex string
         if not all(c in string.hexdigits for c in s):
-            print('Error: Got malformed hexstring {0}'.format(s))
+            print(f'Error: Got malformed hexstring {s}')
 
         cs = unhexlify(s)
         cs = sum(bytearray(cs))
@@ -2568,8 +2547,7 @@ if args.s28:
         f.write(s8_line+'\n')
 
     n_steps += 1
-    verbose('STEP S28: Saved Motorola S-Record file {0} as requested'.\
-            format(S28_FILE))
+    verbose(f'STEP S28: Saved Motorola S-Record file {S28_FILE} as requested')
 
 
 # -------------------------------------------------------------------
@@ -2579,8 +2557,8 @@ if args.hexdump:
 
     with open(HEX_FILE, 'w') as f:
         f.write(TITLE_STRING)
-        f.write('Hexdump file of {0}'.format(args.source))
-        f.write(' (total of {0} bytes)\n'.format(code_size))
+        f.write(f'Hexdump file of {args.source}')
+        f.write(f' (total of {code_size} bytes)\n')
         f.write('Generated on {0}\n\n'.\
                 format(time.asctime(time.localtime())))
         a65 = LC0
@@ -2598,8 +2576,7 @@ if args.hexdump:
         f.write('\n')
 
     n_steps += 1
-    verbose('STEP HEXDUMP: Saved hexdump file {0} as requested'.\
-            format(HEX_FILE))
+    verbose(f'STEP HEXDUMP: Saved hexdump file {HEX_FILE} as requested')
 
 
 # -------------------------------------------------------------------
@@ -2613,7 +2590,7 @@ if args.listing:
         for l in make_listing(ir_source):
             f.write(l+'\n') 
 
-    verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
+    verbose(f'STEP LIST: Saved listing as {LIST_FILE}')
 
 
 # -------------------------------------------------------------------
@@ -2628,7 +2605,7 @@ if args.print:
         print(l)
 
     print()
-    verbose('STEP LIST: Saved listing as {0}'.format(LIST_FILE))
+    verbose(f'STEP LIST: Saved listing as {LIST_FILE}')
 
 
 # -------------------------------------------------------------------

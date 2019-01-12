@@ -1,7 +1,7 @@
-" Vim Syntax File for a Typist's Assembler Notation, Python version 
+" Vim Syntax File for a Simpler Assembler Notation, Python version 
 " Language: Assembler (6502/65c02/65816 8/16-bit CPU) 
 " Maintainer: Scot W. Stevenson <scot.stevenson@gmail.com>
-" Latest Revision: 27. August 2016
+" Latest Revision: 11. Jan 2019
 
 " This script is distributed in the hope that it will be useful,
 " but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -97,7 +97,7 @@ syn keyword tasmFlow
     \ bbs0 bbs1 bbs2 bbs3 bbs4 bbs5 bbs6 bbs7
  
 " Keywords for 65816 special mnemonics (stp, rep ) 
-syn keyword tasmSpecial brk cop xce rep sep stp wai
+syn keyword tasmSpecial brk cop xce rep.# sep.# stp wai
 
 " Keywords for 65816 traditional instructions (pea, pei)
 syn keyword tasmLegacy brl jml jsl pea pei per rtl  
@@ -140,9 +140,8 @@ syn match tasmComment "\v;.*$"
 " Define Strings
 syn region tasmString start='"' end='"'
 
-" Define Python Code Instert
-" TODO change this to [ ] and rename it 'stackMath'
-syn region pythonString start='{' end='}'
+" Define Math Code Instert
+syn region pythonString start='\[' end='\]'
 
 " === Define our own color system === 
 
