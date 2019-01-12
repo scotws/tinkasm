@@ -43,8 +43,8 @@ if sys.version_info.major != 3:
 
 TITLE_STRING = \
 """A Formatter for the Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA  02. September 2016
-Copyright 2016 Scot W. Stevenson <scot.stevenson@gmail.com>
+Version BETA  11. Jan 2019
+Copyright 2016-2019 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
 
