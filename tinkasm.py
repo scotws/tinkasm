@@ -1238,14 +1238,14 @@ else:
 
 if MPU == '65816': 
 
-    verbose('PASS REP/SEP: Check for naked rep/sep instructions')
+    verbose('PASS REP/SEP: Check for naked rep.#/sep.# instructions')
 
     for line in modes_source:
 
         if line.type != INSTRUCTION:
             continue
 
-        if line.action == 'rep' or line.action == 'sep':
+        if line.action == 'rep.#' or line.action == 'sep.#':
             warning('"{0}" in line {1}, switch will not be recognized'.\
                     format(line.action, line.ln))
             warning('Use register size directives such as .A8 instead')
@@ -1264,18 +1264,18 @@ axy_source = []
 # We don't need to define these if we're not using a 65816
 if MPU == '65816':
 
-    AXY_INS = {'.a8': (('sep', '20', INSTRUCTION),\
+    AXY_INS = {'.a8': (('sep.#', '20', INSTRUCTION),\
                       ('.!a8', '', CONTROL)),\
-               '.a16': (('rep', '20', INSTRUCTION),\
+               '.a16': (('rep.#', '20', INSTRUCTION),\
                        ('.!a16', '', CONTROL)),\
-               '.xy8': (('sep', '10', INSTRUCTION),\
+               '.xy8': (('sep.#', '10', INSTRUCTION),\
                        ('.!xy8', '', CONTROL)),\
-               '.xy16': (('rep', '10', INSTRUCTION),\
+               '.xy16': (('rep.#', '10', INSTRUCTION),\
                         ('.!xy16', '', CONTROL)),\
-               '.axy8': (('sep', '30', INSTRUCTION),\
+               '.axy8': (('sep.#', '30', INSTRUCTION),\
                         ('.!a8', '', CONTROL),\
                         ('.!xy8', '', CONTROL)),\
-               '.axy16': (('rep', '30', INSTRUCTION),\
+               '.axy16': (('rep.#', '30', INSTRUCTION),\
                          ('.!a16', '', CONTROL),\
                          ('.!xy16', '', CONTROL))}
 

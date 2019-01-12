@@ -27,7 +27,7 @@ solo_label:
                 BRA.L solo_label  ; upper case bra.l
                 jmp full
 
-                rep 20          ; Should throw warning
+                rep.# 20          ; Should throw warning
                 inx
 
         .save fivezeros 5
@@ -55,7 +55,7 @@ fuller:         lda.# 00  ; label with instruction and comment
                 lda.# [ 0 0 + ]
 
         .invoke frog 
-        .include includeme.tasm
+        ; .include includeme.tasm
 
         .byte 00
         .word 0000
