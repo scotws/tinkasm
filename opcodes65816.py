@@ -1,7 +1,7 @@
 # Opcodes for the Tinkerer's Assembler for the 65816 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 23. Okt 2015
-# This version: 07. Dec 2015
+# This version: 11. Jan 2019
 
 # The Immediate Mode forms (<opc>.#) are listed as two-byte instructions and
 # then expanded by the assembler when the relevant instruction is called during
@@ -202,7 +202,7 @@ opcode_table = (
     (0xbf, 'lda.lx', 4),
     (0xc0, 'cpy.#', 2),
     (0xc1, 'cmp.dxi', 2),
-    (0xc2, 'rep', 2),
+    (0xc2, 'rep.#', 2),
     (0xc3, 'cmp.s', 2),
     (0xc4, 'cpy.d', 2),
     (0xc5, 'cmp.d', 2),
@@ -234,7 +234,7 @@ opcode_table = (
     (0xdf, 'cmp.lx', 4),
     (0xe0, 'cpx.#', 2),
     (0xe1, 'sbc.dxi', 2),
-    (0xe2, 'sep', 2),
+    (0xe2, 'sep.#', 2),
     (0xe3, 'sbc.s', 2),
     (0xe4, 'cpx.d', 2),
     (0xe5, 'sbc.d', 2),
