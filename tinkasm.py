@@ -196,7 +196,6 @@ class CodeLine:
         self.xy_width = 8       # For 65816: default width of XY registers
 
 
-
 # List of all directives. Note the anonymous label character is not included
 # because this is used to keep the user from using these words as labels
 DIRECTIVES = ['.!a8', '.!a16', '.a8', '.a16', '.origin', '.axy8', '.axy16',\
