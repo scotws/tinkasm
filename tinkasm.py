@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 11. Jan 2019
+# This version: 15. Jan 2019
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,12 +15,12 @@
 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 """TinkAsm is a multi-pass assembler for the 6502/65c02/65816 MPUs. 
 It is intended to be easy to modify by hobbyists without advanced knowledge
 of how lexing and parsing works -- so they can "tinker" -- and is 
 intentionally written in a "primitive" style of Python.
 """
+
 ### SETUP ###
 
 import argparse
@@ -31,6 +31,8 @@ import string
 import sys
 import time
 import timeit
+
+from rpnmath.rpnengine import engine
 
 # Check for correct version of Python
 if sys.version_info.major != 3:
@@ -123,7 +125,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA 11. Jan 2019
+Version BETA 16. Jan 2019
 Copyright 2015-2019 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
@@ -133,14 +135,11 @@ CURRENT = '.*'       # Current location counter, default is ".*"
 ASSIGNMENT = '.equ'  # Assignment directive, default is ".equ"
 LOCAL_LABEL = '@'    # Marker for anonymous labels, default is "@"
 SEPARATORS = '[.:]'  # Legal separators in number strings for regex
-
 HEX_PREFIX = '$'     # Prefix for hexadecimal numbers, default is "$"
 BIN_PREFIX = '%'     # Prefix for binary numbers, default is "%"
 DEC_PREFIX = '&'     # Prefix for decimal numbers, default "&" TODO
-
-LEFTMATH = '{'       # Opening bracket for Python math terms TODO
-RIGHTMATH = '}'      # Closing bracket for Python math terms TODO
-
+LEFTMATH = '['       # Opening bracket for Python math terms
+RIGHTMATH = ']'      # Closing bracket for Python math terms
 INDENT = ' '*8       # Indent in whitespace for formatting
 
 LC0 = 0              # Start address of code ("location counter")
@@ -301,55 +300,11 @@ def convert_number(s):
 
     return f, r
 
-
-# Math functions are contained in curly brace delimiters ("{1 + 1}"), and
-# sanitized before being sent to Python3's EVAL function. Be careful changing
-# the this function because is EVAL is dangerous (and possibly even evil). Math
-# operators and even round brances must be separated by whitespace, so "{1
-# * ( 2 + 2 )}" is legal, while "{(1*(2+2)}" will throw an error.  Note the MVP
-# and MVN instructions of the 65816 are treated separately. TODO replace by
-# stack
-
-LEGAL_MATH = ['+', '-', '/', '//', '*', '(', ')',\
-        '%', '**', '|', '^', '&', '<<', '>>', '~']
-
-def sanitize_math(s):
-    """Given a string with numbers, variables, or Python3 math terms, make sure
-    it only contains these elements so we can (more or less) safely use EVAL."""
-
-    evalstring = []
-
-    for w in s.split():
-
-        # See if it's a number, converting it while we're at it
-        f_num, opr = convert_number(w)
-
-        if f_num:
-            evalstring.append(str(opr))
-            continue
-
-        # Okay, then see if it's an operand
-        if w in LEGAL_MATH:
-            evalstring.append(w)
-            continue
-
-        # Last chance, maybe it's a variable we already know about. In theory,
-        # we should have converted them all already, of course
-        try:
-            r = symbol_table[w.lower()]
-        except KeyError:
-            fatal(line, f'Illegal term "{w}" in math term')
-        else:
-            evalstring.append(str(r))
-
-    return ' '.join(evalstring)
-
-
 def do_math(s):
     """Given a payload string with math term inside, replace the math term by
-    a string representation of the number by invoking the Python EVAL routine.
-    What is before and after the math term is conserved. Returns a string 
-    representation of a hex number
+    a string representation of the number by the math engine. What is before
+    and after the math term is conserved. Returns a string representation of
+    a hex number
     """
     # Save the parts that are left and right of the math term
     w1 = s.split(LEFTMATH, 1)
@@ -357,8 +312,8 @@ def do_math(s):
     w2 = w1[1].split(RIGHTMATH, 1)
     post_math = w2[1]
 
-    mt = sanitize_math(w2[0])
-    r = eval(mt)
+    # Run term through the RPN engine
+    r = engine(w2[0])
 
     return pre_math + hexstr(6, r) + post_math
 
@@ -479,13 +434,13 @@ def convert_term(line, s):
     if f_num:
         return r
 
-    # --- SUBSTEP 3: MATH TERM ('{ 1 + 1 }') ---
+    # --- SUBSTEP 3: MATH TERM ('[ 1 1 + ]') ---
 
     if (s[0] == LEFTMATH):
         _, r = convert_number(do_math(s))
         return r
 
-    # --- SUBSTEP 3: MODIFICATION ('.lsb 0102', '.msb { 1 + 1 }') ---
+    # --- SUBSTEP 3: MODIFICATION ('.lsb 0102', '.msb [ 1 1 + ]') ---
 
     w = s.split()
 
@@ -2081,7 +2036,7 @@ verbose('PASS DATA: Converted all data formats to .byte lists')
 # -------------------------------------------------------------------
 # PASS MATH
 
-# Replace all math terms that are left in the text, eg 'jmp { label + 2 }'. 
+# Replace all math terms that are left in the text, eg 'jmp [ label 2 + ]'. 
 # None of these should be in assignments any more, and none of them should be in
 # data directives
 
