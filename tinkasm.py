@@ -312,16 +312,20 @@ def do_math(s):
     w2 = w1[1].split(RIGHTMATH, 1)
     post_math = w2[1]
 
-    # The math engine requires some filtering: We must replace known symbols
-    # with their values and convert numbers
-
+    # The math engine requires some filtering
     ts = w2[0].split()
     rs = ''
-    print(">>> ts:", ts)
-
 
     for t in ts: 
 
+        # See if it's a number, converting it while we're at it
+        f_num, opr = convert_number(t)
+
+        if f_num:
+            rs = rs+' '+str(opr)
+            continue
+
+        # Okay, maybe it is a known symbol
         try:
             s = symbol_table[t.lower()]
         except KeyError:
@@ -329,7 +333,7 @@ def do_math(s):
         else:
             rs = rs+' '+str(s)
 
-    # Run term through the RPN engine
+    # We should be good. Run the term through the RPN engine.
     r = engine(rs)
 
     return pre_math + hexstr(6, r) + post_math
