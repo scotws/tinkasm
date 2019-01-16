@@ -222,24 +222,24 @@ Numbers of different bases and symbols will be converted. At the end of the
 calculation, there may only be one number left ("on the stack"). The following
 directives and operations are supported:
 
-      - `+`
-      - `-`
-      - `*`
-      - `/`
-      - `.and`
-      - `.bank`
-      - `.drop` - Drop the number on the top of the stack
-      - `.dup` - Duplicate the number on the top of the stack
-      - `.inv` - Invert (compliment) number on the top of the stack
-      - `.lshift`
-      - `.lsb`
-      - `.msb`
-      - `.or`
-      - `.over` - Copies second entry on stack to top of stack
-      - `.rand` - Returns a random byte (calculated during assembly)
-      - `.rshift`
-      - `.swap` - Exchange the top of the stack and the number below it
-      - `.xor`
+**+**
+**-**
+*****
+**/**
+**.and**
+**.bank**
+**.drop** - Drop the number on the top of the stack
+**.dup** - Duplicate the number on the top of the stack
+**.inv** - Invert (compliment) number on the top of the stack
+**.lshift**
+**.lsb**
+**.msb**
+**.or**
+**.over** - Copies second entry on stack to top of stack
+**.rand** - Returns a random byte (calculated during assembly)
+**.rshift**
+**.swap** - Exchange the top of the stack and the number below it
+**.xor**
 
 Note these also must be in RPN format, so `[ $00FF .lsb ]` is the correct
 format.
