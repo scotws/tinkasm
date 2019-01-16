@@ -312,8 +312,25 @@ def do_math(s):
     w2 = w1[1].split(RIGHTMATH, 1)
     post_math = w2[1]
 
+    # The math engine requires some filtering: We must replace known symbols
+    # with their values and convert numbers
+
+    ts = w2[0].split()
+    rs = ''
+    print(">>> ts:", ts)
+
+
+    for t in ts: 
+
+        try:
+            s = symbol_table[t.lower()]
+        except KeyError:
+            rs = rs+' '+t
+        else:
+            rs = rs+' '+str(s)
+
     # Run term through the RPN engine
-    r = engine(w2[0])
+    r = engine(rs)
 
     return pre_math + hexstr(6, r) + post_math
 
