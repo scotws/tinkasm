@@ -239,9 +239,9 @@ def engine(s):
     and calculate them as a stack-based RPN Forth-like machine. Return a
     single number and a flag showing success for failure.
     """
-
     ws = s.split()
     stack = deque()
+    ok = True
 
     for w in ws:
 
@@ -254,13 +254,16 @@ def engine(s):
                 n = int(w)
             except ValueError:
                 print(f'MATH ERROR: "{w}" is neither directive nor number')
+                ok = False
             else:
                 stack.append(n)
 
     if len(stack) != 1:
-        print(f'MATH ERROR: Stack ends with length {len(stack)}, not 1')
+        print(f'MATH ERROR: Stack ends with length {len(stack)}, not 1, inserting 0')
+        stack.append(0)
+        ok = False
 
-    return stack[0]
+    return stack[0], ok
 
 
 if __name__ == '__main__':

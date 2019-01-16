@@ -1,6 +1,6 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816
 
-Scot W. Stevenson <scot.stevenson@gmail.com>
+Scot W. Stevenson <scot.stevenson@gmail.com>  
 
 ## Overview
 
@@ -121,8 +121,8 @@ Modifications and math terms are allowed (see below for details).
 ```
         .equ less 8001
         .equ some .lsb less
-        .equ more { less + 1 }
-        .equ other .msb { less + 1 }
+        .equ more [ less 1 + ]
+        .equ other .msb [ less 1 + ]
 ```
 Note that numbers by default are in hexadecimal format (see below).
 
@@ -172,7 +172,7 @@ To reference the current address, by default the directive `.*` is used
 instead of an operand. It can be modified and subjected to mathematical 
 operations.
 ```
-                jmp { .* + 2 }
+                jmp [ .* 2 + ]
 ```
 In contrast to other assemblers, the current line symbol cannot be used for
 advancing the line counter. Use the directives `.advance` and `.skip` for these,
@@ -212,13 +212,33 @@ prevent errors.
 
 ### Modifiers and Math
 
-Normal references to labels (but not anonymous labels) and symbols can be
-modified by "modifiers" such as `.lsb` and simple mathematical terms such as `{
-label + 2 }` .  White space is significant, so `label+2` is not legal (and will
-be identified as a symbol). You can use anything that is a simple Python 3 math
-instruction (including `**`) because  the term between the brackets is santized
-and then sent to EVAL. Yes, EVAL is evil. Modifiers and math terms can be used
-in data lines, such as `.byte .lsb { 1 + 1 } .msb { 2 + 2 }`
+Tinkasm allows complex math terms with Reverse Polish Notation (RPN) inside
+square brackets:
+```
+        [ 2 2 + ]
+```
+Numbers of different bases and symbols will be converted. At the end of the
+calculation, there may only be one number left ("on the stack"). 
+
+        "+"
+        "-"
+        "*"
+        "/"
+        ".and"
+        ".bank"
+        ".drop"
+        ".dup": op_dup,
+        ".inv": op_inv,
+        ".lshift": op_lshift,
+        ".lsb": op_lsb,
+        ".msb": op_msb,
+        ".or": op_or,
+        ".over": op_over,
+        ".rand": op_rand,
+        ".rshift": op_rshift,
+        ".swap": op_swap,
+        ".xor": op_xor}
+
 
 
 ### Other 
@@ -260,7 +280,7 @@ label.
 label. 
 
 `.*` - As an operand in the first position after the mnemonic: Marks current
-address (eg `jmp { .* + 2 }`). 
+address (eg `jmp [ .* 2 + ]`). 
 
 `.advance` - Jump ahead to the address given as parameter, filling the space
 in between with zeros.
@@ -271,7 +291,7 @@ supported for other formats as well.
 
 `.byte` - Store the following list of comma-delimited bytes. Parameters
 can be in any supported number base or symbols. 
-Example: `.byte 'a', 2, { size + 1 }, "Kaylee", %11001001`
+Example: `.byte 'a', 2, [ size 1 + ], "Kaylee", %11001001`
 
 `.end` - Marks the end of the assembly source code. Must be last line in
 original source file. Required. 
@@ -377,7 +397,7 @@ code from their positions in assembler. The format used here is
 ```
 
 The source and destination parameters can be modified (such as `.lsb 1000`) or
-consist of math terms (`{ home + 2 }`).  For longer terms, you can use the
+consist of math terms (`[ home 2 + ]`).  For longer terms, you can use the
 `.bank` directive.
 
 ```

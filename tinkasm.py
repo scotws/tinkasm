@@ -334,7 +334,10 @@ def do_math(s):
             rs = rs+' '+str(s)
 
     # We should be good. Run the term through the RPN engine.
-    r = engine(rs)
+    r, ok = engine(rs)
+
+    if not ok:
+        fatal(line, f'Math engine failed on term: "{w2[0].strip()}"')
 
     return pre_math + hexstr(6, r) + post_math
 
