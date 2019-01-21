@@ -131,20 +131,18 @@ Note that numbers by default are in hexadecimal format (see below).
 
 ### Labels
 
-TinkAsm sees any string as a label that starts in the first column of a line and
-is not the comment directive (usually `;`) or the anonymous label (by default `@`).
-In other words, anything that is *not* a label or a comment must have white space
-in front of it. There are no rules for the string itself, so `*!$?` is a
-perfectly legal string. 
+TinkAsm sees any string as a label that is at the beginning of the line, is not
+a comment directive (default`;`) or the anonymous label (by default `@`), and
+ends in a colon.
 
 ```
-ice&fire        nop
+ice&fire:       
+                nop
                 nop
                 jmp ice&fire
 ```
-Note that in contrast to other assemblers, labels do not have to end with a `:`. 
-You cannot have more than one label in the same line. Internally, labels are
-moved to their own lines during processing.
+You cannot have more than one label in a single line. It is suggested, but not
+mandatory, to have the label in its own line.
 
 
 ### Anonymous Labels 
