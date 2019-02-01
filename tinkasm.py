@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 15. Jan 2019
+# This version: 21. Jan 2019
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -134,6 +134,7 @@ COMMENT_MARKER = ';' # Comment marker, default is ";"
 CURRENT = '.*'       # Current location counter, default is ".*"
 ASSIGNMENT = '.equ'  # Assignment directive, default is ".equ"
 LOCAL_LABEL = '@'    # Marker for anonymous labels, default is "@"
+LABEL_MARKER = ':'   # Postfix that defines a word as a label if first in line
 SEPARATORS = '[.:]'  # Legal separators in number strings for regex
 HEX_PREFIX = '$'     # Prefix for hexadecimal numbers, default is "$"
 BIN_PREFIX = '%'     # Prefix for binary numbers, default is "%"
@@ -289,8 +290,7 @@ def convert_number(s):
         s2 = s1
 
     # If we can convert this to a number, it's a number, otherweise we claim
-    # it's a symbol. The default is to convert to a number, so "dead" will be
-    # considered a hex number, not a label.
+    # it's a symbol. The default is to convert to a number.
     try:
         r = int(s2, BASE)
         f = True
@@ -421,8 +421,8 @@ def dump_symbol_table(st, s=""):
 def convert_term(line, s): 
     """Given the line number and a string that can be a number (in various 
     formats), a symbol (that must already be known), a modifier (such as
-    '.lsb'), a math term (such as '{ 1 + 1 }') or a combination of modifier
-    and math term ('.lsb { 1 + 1 }'), return a string represenation of the
+    '.lsb'), a math term (such as '[ 1 1 + ]') or a combination of modifier
+    and math term ('.lsb [ 1 1 + ]'), return a string represenation of the
     hex number they result in. Abort with fatal error, printing the line
     number, if conversion is unsuccessful.
 
@@ -433,9 +433,9 @@ def convert_term(line, s):
 
     # --- SUBSTEP 1: KNOWN SYMBOL ---
        
-    # We test to see if the term is a symbol before it is a number. Therefore, by
-    # default, terms such as 'abc' will be seen as symbols; numbers must start
-    # with '0x' or '$' if they only have hex letters
+    # We test to see if the term is a symbol before it is a number. Therefore,
+    # by default, terms such as 'abc' will be seen as symbols; hex numbers must
+    # start with '0x' or '$' if they only have hex letters
 
     s = s.strip()
 
@@ -725,7 +725,7 @@ verbose('Beginning assembly. Timer started.')
 
 raw_source = []
 
-with open(args.source, "r") as f:
+with open(args.source, 'r') as f:
     for ln, ls in enumerate(f.readlines(), 1): 
         line = CodeLine(ls.rstrip(), ln, 0)    # right strip gets rid of LF
         raw_source.append(line)
@@ -855,7 +855,7 @@ if not MPU:
     fatal(line, 'No ".mpu" directive found')
 
 n_passes += 1
-verbose(f'PASS MPU: Found MPU "{MPU}", is supported')
+verbose(f'PASS MPU: Found MPU "{MPU}", this MPU is supported')
 
 
 # -------------------------------------------------------------------
@@ -874,11 +874,8 @@ elif MPU.lower() == '65c02':
 else:
     from opcodes65816 import opcode_table
 
-# Paranoid: Make sure we were given the right number of opcodes
-# Fatal error returns first line of code 
-if len(opcode_table) != 256:
-    fatal(expanded_source[0], 'Opcode table contains {0} entries, not 256'.\
-        format(len(opcode_table)))
+# We used to check the number of opcodes to make sure there weren't more than
+# 256, however, with the inclusion of 'lda.8' etc. this is not useful anymore
 
 n_steps += 1
 verbose(f'STEP OPCODES: Loaded opcode table for MPU {MPU}')
@@ -909,14 +906,23 @@ verbose(f'- Number of mnemonics found: {len(mnemonics.keys())}')
 # REQUIRES list of legal mnemonics available
 # ASSUMES all empty lines have been taken care of 
 
-# Though Simpler Assembler Notation requires labels to be in a separate line,
-# we should be able to assemble code that hasn't been correctly formatted.
-# Since we have gotten rid of the full-line comments, anything that is in the
-# first column and is not whitespace is then considered a label. We don't
-# distinguish between global and anonymous labels at this point
-# TODO labels end in a colon now
+# Though Simpler Assembler Notation requires labels to be in a separate line, we
+# should be able to assemble code that hasn't been correctly formatted.
 
 relabeled_source = []
+
+# This is pretty short for a function but we might be changing the requirements
+# for labels again at some point (such as, must start with a letter).
+def is_label(s):
+    """Given a string without whitespace, check to see if it ends in a colon,
+    which defines it as a label.
+    """
+    have_label = False # most words will not be labels
+    if s[-1] == LABEL_MARKER:
+        have_label = True
+
+    return have_label
+
 
 for line in expanded_source: 
 
@@ -924,19 +930,13 @@ for line in expanded_source:
         relabeled_source.append(line) 
         continue
 
-    # In theory, labels should be the only thing that is in the first column,
-    # but again, we want the assembly process be as robust as possible. We
-    # therefore strip away left whitespace and try to figure out if we have an
-    # instruction or a directive. If not, it's a label because we don't allow
-    # anything else. While we're at it, we save information about the other
-    # lines that we get as a side effect
+    # While we're at it, we save information about the other lines that we get
+    # as a side effect
 
     # w has to have at least one word because we've gotten rid of all empty
     # lines
     w = line.raw.split()
     w1 = w[0]
-
-    # TODO change: we only have to check if the word ends with a ':'
 
     # Directives start with a dot. We just remember that we've found one, but
     # don't process it yet
@@ -953,8 +953,12 @@ for line in expanded_source:
         relabeled_source.append(line) 
         continue 
 
-    # We know now that we have a label. We put the label in the action field of
-    # the line for later processing
+    # We should have a label. For the moment, we just group anonymous labels
+    # with normal labels.
+    if (not w1 == LOCAL_LABEL) and (not is_label(w1)):
+        fatal(line, f'Expecting label, found "{w1}", label missing ":"?')
+
+    # We put the label in the action field of the line for later processing
     line.type = LABEL
     line.status = MODIFIED
     line.action = w1.strip() 
@@ -1892,6 +1896,10 @@ for line in ir_source:
         # This must be a real label. If we don't have it in the symbol table,
         # all is well and we add a new entry
         if line.action not in symbol_table:
+
+            # Remember to strip off the colon of the label before including it
+            # in the symbol table
+            line.action = line.action[:-1]
             verbose('- New label "{0}" found in line {1}, address {2:06x}'.\
                     format(line.action, line.ln, line.address))
             symbol_table[line.action.lower()] = line.address

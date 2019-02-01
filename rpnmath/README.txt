@@ -1,11 +1,11 @@
 Math Engine for Tinkasm 
 Scot W. Stevenson <scot.stevenson@gmail.com>
 First version: 13. Jan 2019
-This version: 13. Jan 2019
+This version: 21. Jan 2019
 
 This folder contains the math engine for Tinkasm. Inside the assembler, it
 implements a Reverse Polish Notation (RPN) stack-based calculator. It also uses
-some terms from Forth.
+some words from Forth for stack manipulation.
 
 The math engine accepts a string without the delimiters in the assembler (no "["
 or "]"). The string can contain decimal numbers, math symbols, and directives.

@@ -18,13 +18,13 @@
         .equ fish .lsb frog
         .equ goat .msb [ pig 2 + ]
 
-solo_label
+solo_label:
                 lda.# 00        ; my inline-comment
                 lda.# .lsb frog
                 lda.# [ 0 0 + ]
                 lda.# .msb [ $10 $200 + ]
                 lda.l .*
-                bra.l solo_label  ; upper case bra.l
+                bra.l solo_label
                 jmp full
 
                 rep.# 20          ; Should throw warning
@@ -39,7 +39,7 @@ solo_label
         
         ; another comment, indented
 
-lbl+comment ; I'm the comment
+lbl+comment: ; I'm the comment:
 
         .EMULATED  ; upper case!
 @
@@ -49,9 +49,9 @@ lbl+comment ; I'm the comment
                 bra -   ; anon branch backwards
                 lda.# [ 0 0 + ]
 
-full    .a8     ; label with directive and comment
+full:   .a8     ; label with directive and comment
         .!a8
-fuller          lda.# 00  ; label with instruction and comment
+fuller:         lda.# 00  ; label with instruction and comment
                 lda.# [ 0 0 + ]
 
         .invoke frog 
