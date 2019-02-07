@@ -20,6 +20,7 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(convert_number('$100'), (True, 256))
         self.assertEqual(convert_number('%0'), (True, 0))
         self.assertEqual(convert_number('%100'), (True, 4))
+        self.assertEqual(convert_number('%0000100'), (True, 4))
 
         self.assertEqual(convert_number('&100'), (False, '&100'))
 

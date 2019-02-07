@@ -26,6 +26,7 @@ intentionally written in a "primitive" style of Python.
 import argparse
 import copy
 import operator
+import re
 import string
 import sys
 import time
@@ -257,7 +258,7 @@ def do_math(s):
     """Given a payload string with math term inside, replace the math term by
     a string representation of the number by the math engine. What is before
     and after the math term is conserved. Returns a string representation of
-    a hex number
+    a decimal number
     """
     # Save the parts that are left and right of the math term
     w1 = s.split(LEFTMATH, 1)
@@ -292,7 +293,7 @@ def do_math(s):
     if not ok:
         fatal(line, f'Math engine failed on term: "{w2[0].strip()}"')
 
-    return pre_math + hexstr(6, r) + post_math
+    return pre_math + str(r) + post_math
 
 
 def vet_newsymbol(s):
@@ -341,7 +342,7 @@ def replace_symbols(src):
             try:
                 # We don't define the number of digits because we have no idea
                 # what the number they represent are supposed to be
-                w = hexstr(6, symbol_table[w])
+                w = str(symbol_table[w])
             except KeyError:
                 pass
             else:
@@ -352,7 +353,7 @@ def replace_symbols(src):
 
         line.parameters = ' '.join(wc)
 
-    verbose('PASS REPLACED: Replaced {sr_count} known symbol(s) with known values')
+    verbose(f'PASS REPLACED: Replaced {sr_count} known symbol(s) with known values')
 
 
 def dump_symbol_table(st, s=""):
@@ -684,7 +685,7 @@ with open(args.source, 'r') as f:
         raw_source.append(line)
 
 n_steps += 1
-verbose(f'STEP LOAD: Read {raw_source} lines from {args.source}')
+verbose(f'STEP LOAD: Read {len(raw_source)} lines from {args.source}')
 
 
 # -------------------------------------------------------------------
@@ -1727,7 +1728,7 @@ for line in ir_source:
 
     if CURRENT in line.parameters:
         LC = LC0 + LCi
-        line.parameters = line.parameters.replace(CURRENT, hexstr(6, LC))
+        line.parameters = line.parameters.replace(CURRENT, str(LC))
         line.status = MODIFIED
 
         verbose('- Current line marker in line {0} replaced with {1}'.\
@@ -2108,7 +2109,7 @@ for line in ir_source:
         for ln, ll in anon_labels:
 
             if ln > line.ln:
-                line.parameters = hexstr(6, ll)
+                line.parameters = str(ll)
                 line.status = MODIFIED
                 break
 
@@ -2116,7 +2117,7 @@ for line in ir_source:
         for ln, ll in reversed(anon_labels):
 
             if ln < line.ln:
-                line.parameters = hexstr(6, ll)
+                line.parameters = str(ll)
                 line.status = MODIFIED
                 break
 
@@ -2175,7 +2176,11 @@ for line in ir_source:
     # We treat this as a special case. Check for MPU so we don't suddenly allow
     # a 6502 to do a long branch
     if (line.action == 'bra.l') and (MPU == '65816'):
-        _, target_addr = convert_number(line.parameters)
+        f_num, target_addr = convert_number(line.parameters)
+
+        if not f_num:
+            fatal(line, f"Couldn't convert '{line.parameters}'")
+
         bl, bm = little_endian_16(line, target_addr - line.address - 3)
         opr = hexstr(2, bl)+' '+hexstr(2, bm)
         line.bytes = hexstr(2, mnemonics[line.action])+' '+opr
@@ -2296,10 +2301,11 @@ for line in ir_source:
     bl = line.bytes.split()
 
     for b in bl:
-        f_num, r = convert_number(b)
 
-        if not f_num:
-            fatal(line, f'Found non-number "{b}" in byte list')
+        try:
+            r = int(b, 16)
+        except TypeError:
+            fatal(line, f"Can't convert '{b}' taken from byte list to number")
 
         if r > 0xff or r < 0:
             fatal(line, f'Value "{b}" refuses to fit into one byte')

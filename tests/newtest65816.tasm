@@ -1,6 +1,6 @@
 ; Simpler Assembler Notation for the 6502/65c02/65816
 ; Syntax demonstration for the 65816
-; Scot W. Stevenson 16. Jan 2019
+; Scot W. Stevenson 07. Feb 2019
 
         .mpu 65816
         .origin 0xE000
@@ -27,7 +27,7 @@ solo_label:
                 bra.l solo_label
                 jmp full
 
-                rep.# 20          ; Should throw warning
+                rep.# 0x20          ; Should throw warning
                 inx
 
         .save fivezeros 5
@@ -60,8 +60,9 @@ fuller:         lda.# 00  ; label with instruction and comment
         .byte 00
         .word 0000
         .long 00:0000
-        .byte 1, %00000010, 2, 'a', "aaa", .lsb [ frog 11 + ]
-        .word 1000, frog, 3000,    ; test trailing comma
+        .byte 1, %00000010, 2, 'a', "aaa", 
+        .byte .lsb [ frog 11 + ]
+        .word $1000, frog, $3000,    ; test trailing comma
         .long 0x01aaaa, 0x02bbbb, 0x03cccc, 0x04dddd, 0x05eeee, 0x06ffff
         .long $01aaaa, $02bbbb, $03cccc, $04dddd, $05eeee, $06ffff
 

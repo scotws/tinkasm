@@ -7,6 +7,8 @@
 from collections import deque
 from random import randint
 
+from common.common import convert_number
+
 # ---- DIRECTIVES ----
 
 def op_and(d):
@@ -247,12 +249,10 @@ def engine(s):
 
         if w in dir_table.keys():
             dir_table[w](stack)
+        else:
+            f_conv, n = convert_number(w)
 
-        else: 
-
-            try:
-                n = int(w)
-            except ValueError:
+            if not f_conv:
                 print(f'MATH ERROR: "{w}" is neither directive nor number')
                 ok = False
             else:
