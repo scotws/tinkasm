@@ -1,13 +1,13 @@
 # Tests for the Math Engine of Tinkasm 
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 13. Jan 2019
-# This version: 13. Jan 2019
+# This version: 07. Feb 2019
 
 # From this directory, run "python3 -m unittest"
 
 import unittest
 
-from mathengine import engine
+from rpnengine import engine
 
 class TestHelpers(unittest.TestCase):
 

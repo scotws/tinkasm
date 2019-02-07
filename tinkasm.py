@@ -26,13 +26,13 @@ intentionally written in a "primitive" style of Python.
 import argparse
 import copy
 import operator
-import re
 import string
 import sys
 import time
 import timeit
 
 from rpnmath.rpnengine import engine
+from common.common import convert_number
 
 # Check for correct version of Python
 if sys.version_info.major != 3:
@@ -129,10 +129,6 @@ CURRENT = '.*'       # Current location counter, default is ".*"
 ASSIGNMENT = '.equ'  # Assignment directive, default is ".equ"
 LOCAL_LABEL = '@'    # Marker for anonymous labels, default is "@"
 LABEL_MARKER = ':'   # Postfix that defines a word as a label if first in line
-SEPARATORS = '[.:]'  # Legal separators in number strings for regex
-HEX_PREFIX = '$'     # Prefix for hexadecimal numbers, default is "$"
-BIN_PREFIX = '%'     # Prefix for binary numbers, default is "%"
-DEC_PREFIX = '&'     # Prefix for decimal numbers, default "&" TODO
 LEFTMATH = '['       # Opening bracket for Python math terms
 RIGHTMATH = ']'      # Closing bracket for Python math terms
 INDENT = ' '*8       # Indent in whitespace for formatting
@@ -256,43 +252,6 @@ def string2bytestring(s):
     # from the listing
     return t[:-1]
 
-def convert_number(s):
-    """Convert a number string provided by the user in one of various
-    formats to an integer we can use internally. See Manual for details
-    on supported formats. Returns a tuple of a bool and an int, or a
-    bool and a string.
-    """
-
-    # Remove separator markings such as "." or ":"
-    s1 = re.sub(SEPARATORS, '', s)
-
-    # By default, all numbers are hexadecimal. See if we were given a different
-    # number such as "%01010000". Default is hex. TODO add '0x'
-    c = s1[0]
-
-    if c == DEC_PREFIX: # usually '&' TODO 
-        BASE = 10
-        s2 = s1[1:]
-    elif c == BIN_PREFIX: # usually '%'
-        BASE = 2
-        s2 = s1[1:]
-    elif c == HEX_PREFIX: # usually '$'
-        BASE = 16
-        s2 = s1[1:]
-    else:
-        BASE = 16 # Default numbers are hex, not decimal
-        s2 = s1
-
-    # If we can convert this to a number, it's a number, otherweise we claim
-    # it's a symbol. The default is to convert to a number.
-    try:
-        r = int(s2, BASE)
-        f = True
-    except ValueError:
-        r = s
-        f = False
-
-    return f, r
 
 def do_math(s):
     """Given a payload string with math term inside, replace the math term by
