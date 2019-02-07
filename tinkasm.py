@@ -1,7 +1,7 @@
 # A Tinkerer's Assembler for the 6502/65c02/65816 in Forth
 # Scot W. Stevenson <scot.stevenson@gmail.com>
 # First version: 24. Sep 2015
-# This version: 21. Jan 2019
+# This version: 07. Feb 2019
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -106,12 +106,6 @@ def verbose(s):
     if args.verbose:
         print(s)
 
-def suggestion(n, s):
-    """Print a suggestion of how the code could be better. This is to
-    be used in the analysis pass.
-    """
-    print(f'SUGGESTION: {s} in line {n}')
-
 def warning(s):
     """If program called with -w or --warnings, print a warning string.
     """
@@ -125,7 +119,7 @@ def warning(s):
 
 TITLE_STRING = \
 """A Tinkerer's Assembler for the 6502/65c02/65816
-Version BETA 16. Jan 2019
+Version BETA 07. Feb 2019
 Copyright 2015-2019 Scot W. Stevenson <scot.stevenson@gmail.com>
 This program comes with ABSOLUTELY NO WARRANTY
 """
